@@ -8,6 +8,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\DB;
 use App\Models\Data;
 
 class ProcessMecRed implements ShouldQueue
@@ -15,129 +16,138 @@ class ProcessMecRed implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public string $search;
-    
     public $time;
-
     public array $types;
-
     public string $profile;
-
     public string $interest;
-
     public ?string $meta;
 
-    /**
-     * Create a new job instance.
-     */
     public function __construct($search, $types, $profile, $interest, $time, $meta)
     {
         $this->search = $search;
-
         $this->types = $types;
-
         $this->profile = $profile;
-
         $this->interest = $interest;
-
         $this->time = $time;
-
         $this->meta = $meta;
     }
 
-    /**
-     * Execute the job.
-     */
     public function handle()
     {
-        $start_time = microtime(true); 
-
+        $start_total_time = microtime(true); 
         $offset = 0;
+        $allData = [];
 
-        $data = [];
+        $metrics = [
+            'api_time'        => 0,
+            'items_returned'  => 0,
+            'items_filtered'  => 0,
+            'timeouts_errors' => 0,
+            'breakdown'       => [
+                'meta_both' => 0, 'meta_one' => 0, 'meta' => 0,
+                'both' => 0, 'profile' => 0, 'interest' => 0,
+            ]
+        ];
 
         $model = Data::query()->where('searched_at', $this->time)->first();
 
-        while ($offset <= 120) {
-            $search = Http::withOptions(['verify' => false])->get(getMecRedURL(str_replace(" ", "+", $this->search), $offset, $this->profile, $this->meta))->json();
+        $start_api = microtime(true);
+        try {
+            $search = Http::withOptions(['verify' => false])
+                ->timeout(15)
+                ->get(getMecRedURL(str_replace(" ", "+", $this->search), $offset, $this->profile, $this->meta))
+                ->json();
+            
+            $metrics['api_time'] = microtime(true) - $start_api;
+            $metrics['items_returned'] = is_array($search) ? count($search) : 0;
+        } catch (\Exception $e) {
+            $metrics['api_time'] = microtime(true) - $start_api;
+            $metrics['timeouts_errors']++;
+            $search = [];
+        }
 
-            $offset += 30;
+        $interactivity = 'Não especificado';
+        $interactivity_level = 'Não especificado';
+        $learning_style = 'Não especificado';
+        $strategy = 'Não especificado';
 
-            if (count($search) === 0) {
-                break;
-            }
+        if ($this->meta && ($this->meta === 'ma' || $this->meta === 'mpa')) {
+            $interactivity = 'Ativo';
+            $interactivity_level = 'Alto / Muito alto';
+            $learning_style = 'Intuitivo / Ativo / Auditivo/Visual';
+            $strategy = 'Ativa / Abstrata / Visual/Verbal';
+        } elseif ($this->meta && $this->meta === 'mpe') {
+            $interactivity = 'Expositivo';
+            $interactivity_level = 'Baixo / Muito baixo';
+            $learning_style = 'Sensorial / Reflexivo / Auditivo/Visual';
+            $strategy = 'Passiva / Concreta / Visual/Verbal';
+        }
 
-            $recommended = 'both';
+        $interactivityData = [
+            'interatividade'       => $interactivity,
+            'nivel_interatividade' => $interactivity_level,
+            'estilo_aprendizagem'  => $learning_style,
+            'estrategia'           => $strategy,
+        ];
 
-            if ($this->meta) {
-                $recommended = 'meta';
-            }
-
-            $interactivity = 'Não especificado';
-            $interactivity_level = 'Não especificado';
-            $learning_style = 'Não especificado';
-            $strategy = 'Não especificado';
-
-            if ($this->meta && ($this->meta === 'ma' || $this->meta === 'mpa')) {
-                $interactivity = 'Ativo';
-                $interactivity_level = 'Alto / Muito alto';
-                $learning_style = 'Intuitivo / Ativo / Auditivo/Visual';
-                $strategy = 'Ativa / Abstrata / Visual/Verbal';
-            } elseif ($this->meta && $this->meta === 'mpe') {
-                $interactivity = 'Expositivo';
-                $interactivity_level = 'Baixo / Muito baixo';
-                $learning_style = 'Sensorial / Reflexivo / Auditivo/Visual';
-                $strategy = 'Passiva / Concreta / Visual/Verbal';
-            }
-
-            $interactivityData = [
-                'interatividade' => $interactivity,
-                'nivel_interatividade' => $interactivity_level,
-                'estilo_aprendizagem' => $learning_style,
-                'estrategia' => $strategy,
-            ];
-
+        if (is_array($search)) {
             foreach ($search as $rea) {
-                $data[] = array_merge([
-                    'title' => $rea['name'],
-                    'link' => '',
-                    'type' => '',
-                    'repositorio' => 'MECRED',
-                    'recommended' => $recommended,
-                    'titulo' => $rea['name'],
-                    'descricao' => '',
-                    'tipoConteudo' => '',
-                    'dtype' => '',
-                ], $interactivityData);
-            }
+                // MecRed devolve dados mais diretos baseados na API construída
+                $recommended = $this->meta ? 'meta_both' : 'both';
 
-            if ($model->data !== null) {
-                $decodedData = json_decode($model->data);
-                $decodedData = array_merge($decodedData, $data);
-                $model->update(['data' => json_encode($decodedData)]);
-            } else {
-                $model->update(['data' => json_encode($data)]);
+                // 📊 1. Incrementa a radiografia
+                if (isset($metrics['breakdown'][$recommended])) {
+                    $metrics['breakdown'][$recommended]++;
+                }
+
+                // 🎯 2. Avalia relevância
+                if ($this->meta) {
+                    if (in_array($recommended, ['meta_both', 'meta_one', 'meta'])) {
+                        $metrics['items_filtered']++;
+                    }
+                } else {
+                    if (in_array($recommended, ['both', 'profile', 'interest'])) {
+                        $metrics['items_filtered']++;
+                    }
+                }
+
+                $allData[] = array_merge([
+                    'title'        => $rea['name'] ?? 'Sem título',
+                    'link'         => '',
+                    'type'         => '',
+                    'repositorio'  => 'MECRED',
+                    'recommended'  => $recommended,
+                    'titulo'       => $rea['name'] ?? '',
+                    'descricao'    => '',
+                    'tipoConteudo' => '',
+                    'dtype'        => '',
+                ], $interactivityData);
             }
         }
 
-        $time = $model->time;
+        if (!empty($allData)) {
+            $existingData = $model->data ? json_decode($model->data, true) : [];
+            $model->update(['data' => json_encode(array_merge($existingData, $allData))]);
+        }
 
-        $end_time = microtime(true); 
-  
-        $execution_time = ($end_time - $start_time); 
+        $total_time = microtime(true) - $start_total_time;
+        $model->update(['finished' => true, 'time' => $model->time + $total_time]);
 
-        $model->update(['finished' => true, 'time' => $time + $execution_time]);
-    }
-
-    private function sanitizeSearch(string $search)
-    {
-        $search = mb_strtolower($search, 'UTF-8');
-        $search = preg_replace('/[áàâã]/u', 'a', $search);
-        $search = preg_replace('/[éèê]/u', 'e', $search);
-        $search = preg_replace('/[íì]/u', 'i', $search);
-        $search = preg_replace('/[óòôõ]/u', 'o', $search);
-        $search = preg_replace('/[úùû]/u', 'u', $search);
-        $search = preg_replace('/ç/u', 'c', $search);
-
-        return $search;
+        DB::table('search_metrics')->insert([
+            'searched_at'     => $this->time,
+            'repository'      => 'MecRed',
+            'profile'         => $this->profile,
+            'interest'        => $this->interest,
+            'meta'            => $this->meta,
+            'total_time'      => $total_time,
+            'api_time'        => $metrics['api_time'],
+            'api_calls'       => 1, // Considerando que faz apenas uma chamada na API aqui
+            'items_returned'  => $metrics['items_returned'],
+            'items_filtered'  => $metrics['items_filtered'],
+            'timeouts_errors' => $metrics['timeouts_errors'],
+            'breakdown'       => json_encode($metrics['breakdown']),
+            'created_at'      => now(),
+            'updated_at'      => now(),
+        ]);
     }
 }

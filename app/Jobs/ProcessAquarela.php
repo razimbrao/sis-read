@@ -8,9 +8,10 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use App\Models\Data;
-//LlaMa
-//slm - small language model
+
 class ProcessAquarela implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
@@ -20,6 +21,21 @@ class ProcessAquarela implements ShouldQueue
     public array $types;
     public string $profile;
     public ?string $meta;
+
+    private array $metrics = [
+        'api_time'        => 0,
+        'api_calls'       => 0,
+        'ollama_time'     => 0,
+        'ollama_calls'    => 0,
+        'items_returned'  => 0,
+        'items_filtered'  => 0,
+        'timeouts_errors' => 0,
+        'ollama_errors'   => 0,
+        'breakdown'       => [
+            'meta_both' => 0, 'meta_one' => 0, 'meta' => 0,
+            'both' => 0, 'profile' => 0, 'interest' => 0,
+        ]
+    ];
 
     public function __construct($search, $types, $profile, $time, $meta = null)
     {
@@ -32,190 +48,231 @@ class ProcessAquarela implements ShouldQueue
 
     public function handle()
     {   
-
-        $start_time = microtime(true); 
+        $start_total_time = microtime(true); 
         $page = 0;
-        $data = [];
+        $allData = []; 
 
         $model = Data::query()->where('searched_at', $this->time)->first();
 
-        while (true) {
-            $search = Http::withOptions(['verify' => false])
-                ->get(config('app.aquarela.api') . '?string=' . $this->search . '&page=' . $page)
-                ->json()['reas'];
+        while ($page < 3) {
+            $this->metrics['api_calls']++;
+            $start_api = microtime(true);
 
-            $page++;
-            if (count($search) === 0) {
-                break;
+            try {
+                $response = Http::withOptions(['verify' => false])
+                    ->timeout(15) 
+                    ->get(config('app.aquarela.api'), [
+                        'string' => $this->search,
+                        'page'   => $page
+                    ]);
+
+                $search = $response->json('reas', []);
+                $this->metrics['api_time'] += (microtime(true) - $start_api);
+
+                if (empty($search)) {
+                    break;
+                }
+
+                $this->metrics['items_returned'] += count($search);
+
+            } catch (\Exception $e) {
+                $this->metrics['api_time'] += (microtime(true) - $start_api);
+                $this->metrics['timeouts_errors']++;
+                break; 
             }
 
             foreach ($search as $rea) {
-                $reachedLevel = false;
+                $interactivityData = $this->definirInteratividade($rea['dtype'] ?? '');
+                
+                $nivel = $this->identificarNivelEducacional($rea);
+                $recommended = $this->definirRecomendacao($nivel, $rea);
 
-                if ($rea['dtype'] === 'T') {
-                    $interactivity = 'Ativo';
-                    $interactivity_level = 'Alto / Muito alto';
-                    $learning_style = 'Intuitivo / Ativo / Auditivo/Visual';
-                    $strategy = 'Ativa / Abstrata / Visual/Verbal';
-                } elseif ($rea['dtype'] === 'D') {
-                    $interactivity = 'Expositivo';
-                    $interactivity_level = 'Baixo / Muito baixo';
-                    $learning_style = 'Sensorial / Reflexivo / Auditivo/Visual';
-                    $strategy = 'Passiva / Concreta / Visual/Verbal';
+                // 📊 1. Incrementa a radiografia exata
+                if (isset($this->metrics['breakdown'][$recommended])) {
+                    $this->metrics['breakdown'][$recommended]++;
+                }
+
+                // 🎯 2. Define se é um "Item Filtrado/Aproveitado" baseado no contexto
+                if ($this->meta) {
+                    if (in_array($recommended, ['meta_both', 'meta_one', 'meta'])) {
+                        $this->metrics['items_filtered']++;
+                    }
                 } else {
-                    $interactivity = 'Não especificado';
-                    $interactivity_level = 'Não especificado';
-                    $learning_style = 'Não especificado';
-                    $strategy = 'Não especificado';
+                    if (in_array($recommended, ['both', 'profile', 'interest'])) {
+                        $this->metrics['items_filtered']++;
+                    }
                 }
 
-                $interactivityData = [
-                    'interatividade' => $interactivity,
-                    'nivel_interatividade' => $interactivity_level,
-                    'estilo_aprendizagem' => $learning_style,
-                    'estrategia' => $strategy,
-                ];
-
-                // Seu filtro original para níveis educacionais e recomendação
-                if (
-                    (stripos($rea['descricao'], 'criança') !== false || 
-                    stripos($rea['descricao'], 'infantil') !== false ||
-                    stripos($rea['titulo'], 'criança') !== false ||
-                    stripos($rea['titulo'], 'infantil') !== false)) {
-                        $reachedLevel = true;
-                        $recommended = $this->definirRecomendacao('educacao infantil', $rea);
-                }
-                elseif (
-                    (stripos($rea['descricao'], 'fundamental') !== false ||
-                    stripos($rea['descricao'], 'sexto ano') !== false ||
-                    stripos($rea['descricao'], '6º') !== false ||
-                    stripos($rea['descricao'], 'sétimo ano') !== false ||
-                    stripos($rea['descricao'], '7º') !== false ||
-                    stripos($rea['descricao'], 'oitavo ano') !== false ||
-                    stripos($rea['descricao'], '8º') !== false ||
-                    stripos($rea['descricao'], 'nono ano') !== false ||
-                    stripos($rea['descricao'], '9º') !== false ||
-                    str_contains($rea['descricao'], 'EF') ||
-                    stripos($rea['titulo'], 'fundamental') !== false ||
-                    str_contains($rea['titulo'], 'EF'))) {
-                        $reachedLevel = true;
-                        $recommended = $this->definirRecomendacao('ensino fundamental', $rea);
-                }
-                elseif (
-                    (stripos($rea['descricao'], 'médio') !== false ||
-                    stripos($rea['titulo'], 'médio') !== false)) {
-                        $reachedLevel = true;
-                        $recommended = $this->definirRecomendacao('ensino medio', $rea);
-                }
-                else {
-                    $recommended = $this->definirRecomendacao('ensino superior', $rea);
-                }
-
-                $data[] = array_merge([
-                    'title' => $rea['titulo'],
-                    'link'  => $rea['links'][0]['href'],
-                    'type'  => $rea['tipoConteudo'],
-                    'repositorio' => 'Aquarela',
-                    'recommended' => $recommended,
-                    'titulo' => $rea['titulo'],
-                    'descricao' => $rea['descricao'],
+                $allData[] = array_merge([
+                    'title'        => $rea['titulo'],
+                    'link'         => $rea['links'][0]['href'] ?? null,
+                    'type'         => $rea['tipoConteudo'],
+                    'repositorio'  => 'Aquarela',
+                    'recommended'  => $recommended,
+                    'titulo'       => $rea['titulo'],
+                    'descricao'    => $rea['descricao'],
                     'tipoConteudo' => $rea['tipoConteudo'],
-                    'dtype' => $rea['dtype'],
+                    'dtype'        => $rea['dtype'],
                 ], $interactivityData);
             }
 
-            if ($model->data !== null) {
-                $decodedData = json_decode($model->data);
-                $decodedData = array_merge($decodedData, $data);
-                $model->update(['data' => json_encode($decodedData)]);
-            } else {
-                $model->update(['data' => json_encode($data)]);
-            }
+            $page++;
         }
 
-        $end_time = microtime(true); 
-        $execution_time = ($end_time - $start_time); 
-        $model->update(['time' => $execution_time]);
+        if (!empty($allData)) {
+            $existingData = $model->data ? json_decode($model->data, true) : [];
+            $mergedData = array_merge($existingData, $allData);
+            $model->update(['data' => json_encode($mergedData)]);
+        }
 
-        $model->update(['finished' => true, 'time' => $execution_time]);
+        $total_time = microtime(true) - $start_total_time; 
+        $model->update(['finished' => true, 'time' => $model->time + $total_time]);
+
+        DB::table('search_metrics')->insert([
+            'searched_at'     => $this->time,
+            'repository'      => 'Aquarela',
+            'profile'         => $this->profile,
+            'interest'        => $this->search,
+            'meta'            => $this->meta,
+            'total_time'      => $total_time,
+            'api_time'        => $this->metrics['api_time'],
+            'api_calls'       => $this->metrics['api_calls'],
+            'ollama_time'     => $this->metrics['ollama_time'],
+            'ollama_calls'    => $this->metrics['ollama_calls'],
+            'items_returned'  => $this->metrics['items_returned'],
+            'items_filtered'  => $this->metrics['items_filtered'],
+            'timeouts_errors' => $this->metrics['timeouts_errors'],
+            'ollama_errors'   => $this->metrics['ollama_errors'],
+            'breakdown'       => json_encode($this->metrics['breakdown']),
+            'created_at'      => now(),
+            'updated_at'      => now(),
+        ]);
     }
 
-    private function sanitizeSearch(string $search)
+    private function definirInteratividade(string $dtype): array
     {
-        $search = mb_strtolower($search, 'UTF-8');
-        $search = preg_replace('/[áàâã]/u', 'a', $search);
-        $search = preg_replace('/[éèê]/u', 'e', $search);
-        $search = preg_replace('/[íì]/u', 'i', $search);
-        $search = preg_replace('/[óòôõ]/u', 'o', $search);
-        $search = preg_replace('/[úùû]/u', 'u', $search);
-        $search = preg_replace('/ç/u', 'c', $search);
-        return $search;
+        if ($dtype === 'T') {
+            return [
+                'interatividade'       => 'Ativo',
+                'nivel_interatividade' => 'Alto / Muito alto',
+                'estilo_aprendizagem'  => 'Intuitivo / Ativo / Auditivo/Visual',
+                'estrategia'           => 'Ativa / Abstrata / Visual/Verbal',
+            ];
+        } 
+        if ($dtype === 'D') {
+            return [
+                'interatividade'       => 'Expositivo',
+                'nivel_interatividade' => 'Baixo / Muito baixo',
+                'estilo_aprendizagem'  => 'Sensorial / Reflexivo / Auditivo/Visual',
+                'estrategia'           => 'Passiva / Concreta / Visual/Verbal',
+            ];
+        }
+        return [
+            'interatividade'       => 'Não especificado',
+            'nivel_interatividade' => 'Não especificado',
+            'estilo_aprendizagem'  => 'Não especificado',
+            'estrategia'           => 'Não especificado',
+        ];
+    }
+
+    private function identificarNivelEducacional(array $rea): string
+    {
+        $text = mb_strtolower($rea['titulo'] . ' ' . $rea['descricao'], 'UTF-8');
+        if (preg_match('/\b(criança|infantil)\b/', $text)) return 'educacao infantil';
+        if (preg_match('/\b(fundamental|sexto ano|6º|sétimo ano|7º|oitavo ano|8º|nono ano|9º|ef)\b/', $text)) return 'ensino fundamental';
+        if (preg_match('/\b(médio)\b/', $text)) return 'ensino medio';
+        return 'ensino superior';
+    }
+
+    private function sanitizeSearch(string $search): string
+    {
+        return Str::lower(Str::ascii($search));
     }
 
     private function definirRecomendacao(string $nivel, array $rea): string
     {
         $perfilSanitizado = $this->sanitizeSearch($this->profile);
         $tipoSanitizado = $this->sanitizeSearch($rea['tipoConteudo']);
-        $response = $this->classificarMetaComLLM($rea);
 
-        if ($this->meta && $this->analisarMeta($response, $this->meta)) {
-            return 'meta';
-        } elseif ($perfilSanitizado === $nivel && in_array($tipoSanitizado, $this->types)) {
-            return 'both';
-        } elseif ($perfilSanitizado === $nivel) {
-            return 'profile';
-        } else {
-            return 'interest';
-        }
+        //  CORREÇÃO CRÍTICA: Só aciona o Ollama se o cenário atual exigir Meta!
+        if ($this->meta) {
+            $metaLLM = $this->classificarMetaComLLM($rea);
+
+            if ($this->analisarMeta($metaLLM, $this->meta)) {
+                if ($perfilSanitizado === $nivel && in_array($tipoSanitizado, $this->types)) return 'meta_both';
+                elseif ($perfilSanitizado === $nivel || in_array($tipoSanitizado, $this->types)) return 'meta_one';
+                return 'meta';
+            }
+        } 
+        
+        // Cenários padrão (Sem IA envolvida)
+        if ($perfilSanitizado === $nivel && in_array($tipoSanitizado, $this->types)) return 'both';
+        if ($perfilSanitizado === $nivel) return 'profile';
+        return 'interest';
     }
 
-    private function analisarMeta(string $response, string $meta = null): bool {
-        if (!$meta) {
-            return false;
-        }
-
-        if ($meta === 'ma' && str_contains($response, 'Aprendizagem')) {
-            return true;
-        }
-
-        if ($meta === 'mpa' && str_contains($response, 'Performance') && str_contains($response, 'Aproximação')) {
-            return true;
-        }
-
-        if ($meta === 'mpe' && str_contains($response, 'Performance') && str_contains($response, 'Evitação')) {
-            return true;
-        }
-
-        return false;
+    private function analisarMeta(string $response, string $meta = null): bool 
+    {
+        if (!$meta || $response === 'Não classificado') return false;
+        $response = strtolower($response);
+        return match ($meta) {
+            'ma'  => str_contains($response, 'aprendizagem'),
+            'mpa' => str_contains($response, 'performance_aproximacao'),
+            'mpe' => str_contains($response, 'performance_evitacao'),
+            default => false,
+        };
     }
 
     private function classificarMetaComLLM(array $rea): string
     {
         $prompt = <<<PROMPT
-Classifique o seguinte recurso educacional segundo as metas:
+        Classifique o REA em APENAS uma das metas abaixo.
 
-Título: {$rea['titulo']}
-Descrição: {$rea['descricao']}
-Tipo: {$rea['tipoConteudo']}
-DType: {$rea['dtype']}
+        Título: {$rea['titulo']}
+        Descrição: {$rea['descricao']}
+        Tipo: {$rea['tipoConteudo']}
+        DType: {$rea['dtype']}
 
-Metas:
-1. Aprendizagem: foco em domínio de conteúdo, compreensão profunda, estratégias cognitivas/metacognitivas.
-2. Performance Aproximação: foco em boas notas, reconhecimento, resultado.
-3. Performance Evitação: foco em evitar erros, tarefas simples, linguagem acessível.
+        Critérios:
 
-Responda com uma única palavra: "Aprendizagem", "Performance Aproximação", "Performance Evitação". Caso seja mais de uma, especifique a que mais se aproxima.
-PROMPT;
+        - Aprendizagem: prioriza compreensão profunda, construção de conhecimento, investigação, criação de projetos, resolução de problemas, desenvolvimento de habilidades e autonomia.
+        - Performance Aproximação: prioriza demonstrar desempenho, alcançar resultados, competir, testar conhecimentos, desafios, jogos, avaliações ou obtenção de reconhecimento.
+        - Performance Evitação: prioriza reduzir dificuldades, facilitar a entrada no tema, apresentar conceitos introdutórios, básicos ou simplificados, minimizando erros e insegurança.
 
-        $response = Http::timeout(60)->post("http://127.0.0.1:11434/api/generate", [
-            'model' => 'llama3.2',
-            'prompt' => $prompt,
-            'stream' => false, // important: false to get a single JSON response
-        ]);
+        Escolha a meta predominante considerando principalmente o objetivo pedagógico do recurso, não apenas palavras isoladas do título.
 
+        Responda SOMENTE com uma das opções:
+        Aprendizagem
+        Performance Aproximação
+        Performance Evitação
+        PROMPT;
 
-        $result = $response->json();
-        
-        return trim($result['response'] ?? 'Não classificado');
+        $this->metrics['ollama_calls']++;
+        $start_ollama = microtime(true);
+
+        try {
+            $response = Http::timeout(10)
+                ->post("http://127.0.0.1:11434/api/generate", [
+                    'model'  => 'gemma3:4b',
+                    'prompt' => $prompt,
+                    'format' => 'json', 
+                    'stream' => false,
+                ]);
+
+            $this->metrics['ollama_time'] += (microtime(true) - $start_ollama);
+
+            if ($response->successful()) {
+                $result = json_decode($response->json('response'), true);
+                return $result['meta'] ?? 'Não classificado';
+            }
+
+            $this->metrics['ollama_errors']++;
+            return 'Não classificado';
+
+        } catch (\Exception $e) {
+            $this->metrics['ollama_time'] += (microtime(true) - $start_ollama);
+            $this->metrics['ollama_errors']++;
+            return 'Não classificado';
+        }
     }
 }

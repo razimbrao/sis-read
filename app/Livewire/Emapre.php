@@ -12,7 +12,7 @@ class Emapre extends Component
     {
         $rules = [];
         for ($i = 1; $i <= 28; $i++) {
-            $rules["responses.$i"] = 'required|in:1,2,3';
+            $rules["responses.$i"] = 'required|in:1,2,3,4,5';
         }
 
         $this->validate($rules);

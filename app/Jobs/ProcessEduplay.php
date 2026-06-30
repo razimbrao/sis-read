@@ -7,101 +7,137 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use App\Models\Data;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\DB;
+use App\Models\Data;
 
 class ProcessEduplay implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public string $search;
-
+    public string $search; 
+    public string $profile;
     public $time;
-
     public ?string $meta;
 
-    /**
-     * Create a new job instance.
-     */
-    public function __construct($search, $time, $meta)
+    public function __construct($search, $profile, $time, $meta)
     {
         $this->search = $search;
-
+        $this->profile = $profile;
         $this->time = $time;
-
         $this->meta = $meta;
     }
 
-    /**
-     * Execute the job.
-     */
     public function handle(): void
     {
-        $start_time = microtime(true); 
-
+        $start_total_time = microtime(true); 
         $page = 1;
+        
+        $metrics = [
+            'api_time'        => 0,
+            'api_calls'       => 0,
+            'items_returned'  => 0,
+            'items_filtered'  => 0,
+            'timeouts_errors' => 0,
+            'breakdown'       => [
+                'meta_both' => 0, 'meta_one' => 0, 'meta' => 0,
+                'both' => 0, 'profile' => 0, 'interest' => 0,
+            ]
+        ];
 
-        $data = [];
-
+        $allData = [];
         $model = Data::query()->where('searched_at', $this->time)->first();
 
         while ($page < 10) {
-            $search = Http::withOptions(['verify' => false])
-                ->get("https://eduplay.rnp.br/api/v1/search?term={$this->search}&page={$page}&quantity=10&type=0&order=0")->json();
+            $metrics['api_calls']++;
+            $start_api = microtime(true);
 
-            $page++;
+            try {
+                $response = Http::withOptions(['verify' => false])
+                    ->timeout(15)
+                    ->get("https://eduplay.rnp.br/api/v1/search?term={$this->search}&page={$page}&quantity=10&type=0&order=0");
+                
+                $search = $response->json();
+                $metrics['api_time'] += (microtime(true) - $start_api);
 
-            if (count($search) === 0) {
+                if (empty($search) || !isset($search['contents'])) {
+                    break;
+                }
+
+                $metrics['items_returned'] += count($search['contents']);
+
+            } catch (\Exception $e) {
+                $metrics['api_time'] += (microtime(true) - $start_api);
+                $metrics['timeouts_errors']++;
                 break;
             }
 
-            $interactivity = 'Ativo';
-            $interactivity_level = 'Alto / Muito alto';
-            $learning_style = 'Intuitivo / Ativo / Auditivo/Visual';
-            $strategy = 'Ativa / Abstrata / Visual/Verbal';
+            $page++;
 
             $interactivityData = [
-                'interatividade' => $interactivity,
-                'nivel_interatividade' => $interactivity_level,
-                'estilo_aprendizagem' => $learning_style,
-                'estrategia' => $strategy,
+                'interatividade'       => 'Ativo',
+                'nivel_interatividade' => 'Alto / Muito alto',
+                'estilo_aprendizagem'  => 'Intuitivo / Ativo / Auditivo/Visual',
+                'estrategia'           => 'Ativa / Abstrata / Visual/Verbal',
             ];
 
-            $recommended = 'interest';
-
-            if ($this->meta && ($this->meta === 'ma' || $this->meta === 'mpa')) {
-                $recommended = 'meta';
-            }
-
             foreach ($search['contents'] as $rea) {
-                $data[] = array_merge([
-                    'title' => $rea['name'],
-                    'link' => $rea['contentUrl'],
-                    'type' => 'Vídeo',
-                    'repositorio' => 'Eduplay',
-                    'recommended' => $recommended,
-                    'titulo' => $rea['name'],
-                    'descricao' => $rea['metatagDescription'] ?? '',
-                    'tipoConteudo' => 'Vídeo',
-                    'dtype' => 'T',
-                ], $interactivityData);
-            }
+                // Eduplay segue uma regra mais direta nas recomendações atuais do seu sistema
+                $recommended = ($this->meta === 'ma' || $this->meta === 'mpa') ? 'meta_one' : 'interest';
 
-            if ($model->data !== null) {
-                $decodedData = json_decode($model->data);
-                $decodedData = array_merge($decodedData, $data);
-                $model->update(['data' => json_encode($decodedData)]);
-            } else {
-                $model->update(['data' => json_encode($data)]);
+                // 📊 1. Incrementa a radiografia
+                if (isset($metrics['breakdown'][$recommended])) {
+                    $metrics['breakdown'][$recommended]++;
+                }
+
+                // 🎯 2. Avalia se é útil baseado na intenção do usuário
+                if ($this->meta) {
+                    if (in_array($recommended, ['meta_both', 'meta_one', 'meta'])) {
+                        $metrics['items_filtered']++;
+                    }
+                } else {
+                    if (in_array($recommended, ['both', 'profile', 'interest'])) {
+                        $metrics['items_filtered']++;
+                    }
+                }
+
+                $allData[] = array_merge([
+                    'title'        => $rea['name'],
+                    'link'         => $rea['contentUrl'],
+                    'type'         => 'Vídeo',
+                    'repositorio'  => 'Eduplay',
+                    'recommended'  => $recommended,
+                    'titulo'       => $rea['name'],
+                    'descricao'    => $rea['metatagDescription'] ?? '',
+                    'tipoConteudo' => 'Vídeo',
+                    'dtype'        => 'T',
+                ], $interactivityData);
             }
         }
 
-        $time = $model->time;
+        if (!empty($allData)) {
+            $existingData = $model->data ? json_decode($model->data, true) : [];
+            $model->update(['data' => json_encode(array_merge($existingData, $allData))]);
+        }
 
-        $end_time = microtime(true); 
-  
-        $execution_time = ($end_time - $start_time); 
+        $total_time = microtime(true) - $start_total_time;
+        $model->update(['finished' => true, 'time' => $model->time + $total_time]);
 
-        $model->update(['finished' => true, 'time' => $time + $execution_time]);
+        DB::table('search_metrics')->insert([
+            'searched_at'     => $this->time,
+            'repository'      => 'Eduplay',
+            'profile'         => $this->profile,
+            'interest'        => $this->search,
+            'meta'            => $this->meta,
+            'total_time'      => $total_time,
+            'api_time'        => $metrics['api_time'],
+            'api_calls'       => $metrics['api_calls'],
+            'items_returned'  => $metrics['items_returned'],
+            'items_filtered'  => $metrics['items_filtered'],
+            'timeouts_errors' => $metrics['timeouts_errors'],
+            'breakdown'       => json_encode($metrics['breakdown']),
+            'created_at'      => now(),
+            'updated_at'      => now(),
+        ]);
     }
 }

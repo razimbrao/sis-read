@@ -15,18 +15,26 @@
             @foreach ($items as $key => $text)
                 <div class="mb-4">
                     <p class="mb-2 font-medium">{{ $text }}</p>
-                    <div class="flex space-x-4">
+                    <div class="flex flex-col space-y-2">
                         <label>
                             <input type="radio" wire:model="responses.{{ $key }}" value="1">
-                            Discordo
+                            Discordo Completamente
                         </label>
                         <label>
                             <input type="radio" wire:model="responses.{{ $key }}" value="2">
-                            Não sei
+                            Discordo
                         </label>
                         <label>
                             <input type="radio" wire:model="responses.{{ $key }}" value="3">
+                            Não sei
+                        </label>
+                        <label>
+                            <input type="radio" wire:model="responses.{{ $key }}" value="4">
                             Concordo
+                        </label>
+                        <label>
+                            <input type="radio" wire:model="responses.{{ $key }}" value="5">
+                            Concordo Completamente
                         </label>
                     </div>
                     @error('responses.' . $key)

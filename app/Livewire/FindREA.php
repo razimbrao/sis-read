@@ -51,9 +51,13 @@ class FindREA extends Component
 
     public bool $loading = false;
 
+    public bool $feedbackSent = false;
+
     public array $sheet = [];
 
     public array $reas = [];
+
+    public Data $data;
 
     public $timestampSession;
 
@@ -71,6 +75,12 @@ class FindREA extends Component
     public $charCount = 0;
 
     public int $page = 1;
+
+    public int $rating = 0;
+
+    public $comment = '';
+
+    public $selectedReasons = [];
 
     public function updatedMessage($value)
     {
@@ -116,12 +126,21 @@ class FindREA extends Component
             return;
         }
 
+        $meta_both = [];
+        $meta_one = [];
         $meta = [];
         $both = [];
         $profile = [];
         $interest = [];
+        $sortedData = [];
 
         foreach (json_decode($data->data) as $rea) {
+            if ($rea->recommended === 'meta_both') {
+                $meta_both[] = $rea;
+            }
+            if ($rea->recommended === 'meta_one') {
+                $meta_one[] = $rea;
+            }
             if ($rea->recommended === 'meta') {
                 $meta[] = $rea;
             } elseif ($rea->recommended === 'both') {
@@ -134,7 +153,13 @@ class FindREA extends Component
             }
         }
 
-        $sortedData = array_merge($meta, $both, $profile, $interest);
+        if (auth()->user()?->questionnaire?->dominant) {
+            $sortedData = array_merge($meta_both, $meta_one, $meta);
+        }
+        else {
+            $sortedData = array_merge($both, $interest);
+        }
+
 
         $items = collect($sortedData);
         $total = $items->count();
@@ -165,6 +190,31 @@ class FindREA extends Component
         $this->reset('message');
 
         $this->showMessage = true;
+    }
+
+    public function setRating(int $rating)
+    {
+        $this->rating = $rating;
+
+        $this->data->update(['stars' => $rating]);
+    }
+
+    public function saveSearchFeedback() 
+    {
+        if (empty($this->selectedReasons) && empty($this->comment)) {
+            $this->addError('feedback_vazio', 'Por favor, selecione pelo menos um motivo ou deixe um comentário.');
+            return; 
+        }
+
+        $dadosParaSalvar = [];
+
+        foreach ($this->selectedReasons as $reason) {          
+            $dadosParaSalvar[$reason] = ['feedback' => $this->comment];
+        }
+
+        $this->data->feedbackReasons()->sync($dadosParaSalvar);
+
+        $this->feedbackSent = true;
     }
 
     public function insert()
@@ -300,13 +350,13 @@ class FindREA extends Component
 
         $types = array_merge($types, $collaboratorsTypes->all());
 
-        Data::create(['searched_at' => $this->timestampSession]);
+        $this->data = Data::create(['searched_at' => $this->timestampSession]);
 
         ProcessAquarela::dispatch($this->interestApiSearch, $types, $this->profile, $this->timestampSession, auth()->user()?->questionnaire?->dominant);
 
         ProcessMecRed::dispatch($this->interestApiSearch, $types, $this->profile, $this->interest, $this->timestampSession, auth()->user()?->questionnaire?->dominant);
 
-        ProcessEduplay::dispatch($this->interestApiSearch, $this->timestampSession, auth()->user()?->questionnaire?->dominant);
+        ProcessEduplay::dispatch($this->interestApiSearch, $this->profile, $this->timestampSession, auth()->user()?->questionnaire?->dominant);
 
         $this->loading = false;
     }
