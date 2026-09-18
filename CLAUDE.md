@@ -1,0 +1,26 @@
+# SisREAd
+
+Sistema de recomendação de Recursos Educacionais Abertos (REA). Laravel 11 + Livewire 3 + SQLite.
+Documentação completa em `docs/` (comece por `docs/README.md` e `docs/arquitetura.md`).
+
+## Comandos
+- Setup: `powershell -ExecutionPolicy Bypass -File scripts\setup.ps1`
+- Rodar: `php artisan serve` **e** `php artisan queue:work --timeout=600` (sem o worker, as buscas nunca terminam)
+- Testes: `php artisan test`
+- Formatação: `vendor/bin/pint`
+- Composer no Windows: sempre com `--ignore-platform-req=ext-pcntl --ignore-platform-req=ext-posix`
+
+## Onde está o quê
+- UI e orquestração da busca: `app/Livewire/FindREA.php` + `resources/views/livewire/find-r-e-a.blade.php`
+- Busca em repositórios externos: `app/Jobs/Process{Aquarela,MecRed,Eduplay}.php`
+- Questionário de metas (EMAPRE): `app/Livewire/Emapre.php`
+- URL do MEC RED: `app/Helpers/helpers.php`
+- Regras, ordenação e textos das explicações: `app/Recommendation/` (spec em `docs/transparencia.md`)
+
+## Convenções
+- Textos de UI, comentários e mensagens de validação em português.
+- Os jobs se ligam à busca por `Data.searched_at`; mantenha essa chave ao mexer no fluxo.
+- Rótulos de recomendação (`both`, `profile`, `interest`, `meta_*`) estão acoplados a `Ranking` e `ExplanationRenderer::FAIXAS`. Mude juntos.
+- Toda regra nova de recomendação deve gravar seu critério em `explicacao` (decisão e explicação vêm da mesma fonte).
+- `database/database.sqlite` é versionado e tem dados reais: não rode `migrate:fresh` sem pedir.
+- Bugs conhecidos estão em `docs/problemas-conhecidos.md`. Atualize esse arquivo ao corrigir algum.

@@ -10,6 +10,7 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\DB;
 use App\Models\Data;
+use App\Recommendation\RuleClassifier;
 
 class ProcessEduplay implements ShouldQueue
 {
@@ -75,6 +76,7 @@ class ProcessEduplay implements ShouldQueue
             $page++;
 
             $interactivityData = [
+                'fonte_interatividade' => 'padrao_repositorio',
                 'interatividade'       => 'Ativo',
                 'nivel_interatividade' => 'Alto / Muito alto',
                 'estilo_aprendizagem'  => 'Intuitivo / Ativo / Auditivo/Visual',
@@ -84,6 +86,11 @@ class ProcessEduplay implements ShouldQueue
             foreach ($search['contents'] as $rea) {
                 // Eduplay segue uma regra mais direta nas recomendações atuais do seu sistema
                 $recommended = ($this->meta === 'ma' || $this->meta === 'mpa') ? 'meta_one' : 'interest';
+                $explicacao = RuleClassifier::explicacao(
+                    $this->criterios(),
+                    $recommended,
+                    'O Eduplay só tem vídeos e não informa etapa; a faixa é definida por política do SisREAd a partir da sua meta.'
+                );
 
                 // 📊 1. Incrementa a radiografia
                 if (isset($metrics['breakdown'][$recommended])) {
@@ -107,6 +114,7 @@ class ProcessEduplay implements ShouldQueue
                     'type'         => 'Vídeo',
                     'repositorio'  => 'Eduplay',
                     'recommended'  => $recommended,
+                    'explicacao'   => $explicacao,
                     'titulo'       => $rea['name'],
                     'descricao'    => $rea['metatagDescription'] ?? '',
                     'tipoConteudo' => 'Vídeo',
@@ -139,5 +147,41 @@ class ProcessEduplay implements ShouldQueue
             'created_at'      => now(),
             'updated_at'      => now(),
         ]);
+    }
+
+    /**
+     * Critérios do Eduplay: nível e tipo não são verificados; a meta segue uma regra fixa do repositório.
+     */
+    private function criterios(): array
+    {
+        $criterios = [
+            'tema'  => RuleClassifier::criterioTema($this->search, 'Eduplay'),
+            'nivel' => [
+                'status'    => 'nao_avaliado',
+                'valor'     => null,
+                'esperado'  => RuleClassifier::normalizar($this->profile),
+                'fonte'     => 'padrao_repositorio',
+                'evidencia' => 'o Eduplay não informa a etapa de ensino',
+            ],
+            'tipo'  => [
+                'status'    => 'nao_avaliado',
+                'valor'     => 'video',
+                'esperado'  => [],
+                'fonte'     => 'padrao_repositorio',
+                'evidencia' => 'o Eduplay só tem vídeos e o tipo não é comparado com os preferidos',
+            ],
+        ];
+
+        if ($this->meta) {
+            $criterios['meta'] = [
+                'status'    => in_array($this->meta, ['ma', 'mpa'], true) ? 'ok' : 'falhou',
+                'valor'     => 'video',
+                'esperado'  => $this->meta,
+                'fonte'     => 'padrao_repositorio',
+                'evidencia' => 'Vídeos do Eduplay são considerados adequados às metas Aprendizagem e Performance-aproximação.',
+            ];
+        }
+
+        return $criterios;
     }
 }
