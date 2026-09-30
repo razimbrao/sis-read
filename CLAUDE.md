@@ -2,6 +2,7 @@
 
 Sistema de recomendação de Recursos Educacionais Abertos (REA). Laravel 11 + Livewire 3 + SQLite.
 Documentação completa em `docs/` (comece por `docs/README.md` e `docs/arquitetura.md`).
+Base acadêmica (monografia, avaliações e divergências com o código) em `docs/monografia.md`.
 
 ## Comandos
 - Setup: `powershell -ExecutionPolicy Bypass -File scripts\setup.ps1`
