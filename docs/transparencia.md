@@ -124,6 +124,10 @@ REAs gravados antes desta funcionalidade não têm `explicacao`. O renderer most
 | tipo | `tipoConteudo` normalizado ∈ tipos preferidos | `colaboradores` |
 | meta | Só se o usuário tem meta. O LLM (Ollama `gemma3:4b`) classifica e o resultado é comparado com a meta dominante. Se a resposta for inválida ou o serviço falhar, o critério fica `nao_avaliado` | `llm` |
 
+A confiabilidade desse critério foi medida na monografia com Llama 3.1 (acurácia de 85,48%, F1 macro de 0,85,
+erros concentrados entre Performance-Aproximação e Performance-Evitação). Ver [monografia.md](monografia.md#42-classificação-por-meta-com-llm-qs2).
+Por isso a explicação traz o aviso de estimativa automática.
+
 Rótulo (`RuleClassifier::rotular`), idêntico à regra anterior:
 
 ```
