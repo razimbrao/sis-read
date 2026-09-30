@@ -8,9 +8,11 @@ o caminho mais simples (não precisa de MySQL nem Redis).
   openssl, pdo_sqlite, sqlite3, zip, intl e sodium
 - Composer (o `composer.phar` fica na pasta do PHP, junto com um `composer.bat`)
 - Node 20+ / npm (só para `vite build`)
-- Opcional: [Ollama](https://ollama.com) com o modelo `gemma3:4b` em `127.0.0.1:11434`. Ele é usado
-  apenas para usuários que responderam ao questionário (classificação de meta no Aquarela). Sem ele,
-  as chamadas falham silenciosamente e os itens ficam "Não classificado".
+- Opcional: [Ollama](https://ollama.com) com o modelo `gemma3:4b` (`ollama pull gemma3:4b`) em
+  `127.0.0.1:11434`. Ele só é usado para usuários que responderam ao questionário (classificação de
+  meta no Aquarela). Sem ele, as chamadas falham em silêncio, a meta fica "não avaliada" e os REAs do
+  Aquarela somem da lista de quem tem meta (problema conhecido #16). A monografia usou Llama 3.1 (ver
+  [integracoes.md](integracoes.md#ollama-e-o-modelo-de-linguagem)).
 
 ## Instalação automática
 ```powershell
@@ -43,6 +45,14 @@ hashes de senha). O `scripts/setup.ps1` cria o arquivo, aplica as migrações e 
 Quem já tem o banco com os dados históricos (~50 MB, ~1000 buscas) deve guardá-lo fora do git e
 copiá-lo para `database/database.sqlite`. Para zerar, `php artisan migrate:fresh --seed` (apaga tudo).
 
-## Simulação em massa
-`php artisan simulation:run-all` enfileira 3 jobs para cada combinação perfil × interesse × meta
-(26 × 4 = 104 combinações, ou seja, 312 jobs). As métricas vão para `search_metrics`.
+## Simulação em massa (experimento de desempenho da monografia)
+`php artisan simulation:run-all` enfileira 3 jobs para cada combinação perfil × interesse × meta:
+26 pares perfil/interesse de Pensamento Computacional × 4 metas (nenhuma, `ma`, `mpa`, `mpe`) = 104
+cenários, ou seja, 312 jobs. As métricas vão para `search_metrics` ([dados.md](dados.md#métricas-search_metrics)).
+Esse é o experimento da seção 5.4 da monografia ([monografia.md](monografia.md#43-desempenho-e-escalabilidade-qs1)).
+
+- Precisa do worker rodando (`queue:work --timeout=600`) e do Ollama para os cenários com meta.
+- A simulação grava linhas em `data` e `search_metrics` do banco versionado. Faça um backup antes se
+  não quiser misturar com os dados reais.
+- A simulação usa tipos preferidos fixos (`texto`, `video`, `software`, `audio`) e perfis sem acento,
+  diferentes dos da UI (problema conhecido #17).
