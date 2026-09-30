@@ -141,6 +141,24 @@ class ExplanationRendererTest extends TestCase
         ]]));
     }
 
+    public function test_texto_da_ia_declara_modelo_e_tempo(): void
+    {
+        $c = RuleClassifier::criterioMeta('ma', 'Aprendizagem', 'gemma3:4b', 1.234);
+        $texto = ExplanationRenderer::linhas(['criterios' => ['meta' => $c]])[0]['texto'];
+
+        $this->assertStringContainsString('Modelo: gemma3:4b, em 1.23s.', $texto);
+
+        $semModelo = ExplanationRenderer::linhas(['criterios' => ['meta' => RuleClassifier::criterioMeta('ma', 'Aprendizagem')]])[0]['texto'];
+        $this->assertStringNotContainsString('Modelo:', $semModelo);
+    }
+
+    public function test_aviso_menciona_o_vies_da_ia(): void
+    {
+        $avisos = ExplanationRenderer::avisos(['criterios' => ['meta' => RuleClassifier::criterioMeta('ma', 'Aprendizagem', 'gemma3:4b', 1.0)]]);
+
+        $this->assertStringContainsString('Aprendizagem', $avisos[0]);
+    }
+
     public function test_faixa(): void
     {
         $this->assertSame('Nível', ExplanationRenderer::faixa('profile')['titulo']);

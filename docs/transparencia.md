@@ -276,6 +276,22 @@ Os testes rodam em SQLite em memória (`phpunit.xml`), sem tocar em `database/da
 
 Rodar: `php artisan test`.
 
+## 11.1 Avisos e falhas silenciosas (fase 1b)
+
+Quatro pontos em que o sistema falhava calado ou omitia o que estava fazendo:
+
+1. **Interesse não reconhecido**: `search()` resolve o termo **antes** de disparar os jobs. Sem
+   correspondência, mostra "Não sabemos buscar por X. Interesses disponíveis: …" e não cria busca
+   nenhuma. `opcoesInteresse()` junta os fixos com os dos colaboradores, sem duplicatas.
+2. **Progresso da busca**: enquanto algum repositório não respondeu, a tela mostra "Consultando
+   repositórios… N de 3 responderam", em vez de só "Carregando". Isso cobre o efeito do `finished`
+   prematuro (problema #2), em que a lista parecia pronta e continuava crescendo.
+3. **Classificação por IA**: o critério de meta guarda o modelo (`ProcessAquarela::MODELO_LLM`) e
+   quanto tempo levou, e o texto os declara ("Modelo: gemma3:4b, em 1.23s"). O aviso de estimativa
+   automática menciona que o modelo local tende a favorecer "Aprendizagem" (problema #18).
+4. **REAs excluídos**: o painel de ordenação ganhou "Ver os REAs que não aparecem", com título,
+   repositório, motivo e resumo dos critérios (até 20). A ação vira o evento `abriu_ocultos`.
+
 ## 12. Próxima fase (diferenciais)
 
 - **Contrafactual**: derivado dos critérios `falhou`. Exemplo: "se o tipo fosse vídeo, este REA
