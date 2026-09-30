@@ -2,24 +2,24 @@
 
 namespace App\Livewire;
 
+use App\Jobs\ProcessAquarela;
+use App\Jobs\ProcessEduplay;
+use App\Jobs\ProcessMecRed;
+use App\Models\Collaborator;
 use App\Models\Data;
-use Livewire\Component;
+use App\Models\ExplanationEvent;
 use App\Models\Feedback;
 use App\Models\Searches;
-use App\Jobs\ProcessMecRed;
-use App\Jobs\ProcessEduplay;
-use App\Models\Collaborator;
-use Livewire\WithPagination;
-use App\Jobs\ProcessAquarela;
-use App\Models\ExplanationEvent;
+use App\Recommendation\ExplanationRenderer;
 use App\Recommendation\Ranking;
 use App\Recommendation\RuleClassifier;
-use Livewire\Attributes\Renderless;
-use Illuminate\Support\Facades\DB;
-use Livewire\Attributes\Validate;
-use Illuminate\Support\Facades\Http;
-use Revolution\Google\Sheets\Facades\Sheets;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
+use Livewire\Attributes\Renderless;
+use Livewire\Attributes\Validate;
+use Livewire\Component;
+use Livewire\WithPagination;
+use Revolution\Google\Sheets\Facades\Sheets;
 
 class FindREA extends Component
 {
@@ -72,7 +72,7 @@ class FindREA extends Component
         'algoritmos',
         'decomposição',
         'reconhecimento de padrões',
-        'abstração'
+        'abstração',
     ];
 
     public string $interestApiSearch = '';
@@ -99,14 +99,7 @@ class FindREA extends Component
 
     public function mount()
     {
-        $collaboratorsInterests = collect(Collaborator::lazyById(100, $column = 'id'))
-            ->map(function ($collaborator) {
-                return [
-                    $collaborator->interest
-                ];
-            });
-
-        $this->interestOptions = array_merge($this->interestOptions, $collaboratorsInterests->all());
+        //
     }
 
     public function selectUserType(?string $type = null)
@@ -137,7 +130,7 @@ class FindREA extends Component
 
     public function paginate($data)
     {
-        if (!isset($data->data)) {
+        if (! isset($data->data)) {
             return;
         }
 
@@ -145,7 +138,7 @@ class FindREA extends Component
 
         $items = collect($sortedData);
         $total = $items->count();
-    
+
         return new LengthAwarePaginator(
             $items->forPage($this->page, 10),
             $total,
@@ -160,7 +153,7 @@ class FindREA extends Component
         $this->validate(
             ['message' => 'max:4096|required'],
             ['message.required' => 'O campo de mensagem é obrigatório.',
-            'message.max' => 'A mensagem não pode ter mais que 4096 caracteres.']
+                'message.max' => 'A mensagem não pode ter mais que 4096 caracteres.']
         );
 
         $this->showMessage = false;
@@ -181,16 +174,17 @@ class FindREA extends Component
         $this->data->update(['stars' => $rating]);
     }
 
-    public function saveSearchFeedback() 
+    public function saveSearchFeedback()
     {
         if (empty($this->selectedReasons) && empty($this->comment)) {
             $this->addError('feedback_vazio', 'Por favor, selecione pelo menos um motivo ou deixe um comentário.');
-            return; 
+
+            return;
         }
 
         $dadosParaSalvar = [];
 
-        foreach ($this->selectedReasons as $reason) {          
+        foreach ($this->selectedReasons as $reason) {
             $dadosParaSalvar[$reason] = ['feedback' => $this->comment];
         }
 
@@ -206,14 +200,14 @@ class FindREA extends Component
         $this->validate();
 
         Collaborator::create([
-            'name'        => $this->name,
-            'role'        => $this->role,
+            'name' => $this->name,
+            'role' => $this->role,
             'institution' => $this->institution,
-            'reference'   => $this->reference,
-            'rea_title'   => $this->reaTitle,
-            'interest'    => $this->sanitizeSearch($this->interest),
-            'profile'     => $this->sanitizeSearch($this->profile),
-            'item'        => $this->sanitizeSearch($this->item),
+            'reference' => $this->reference,
+            'rea_title' => $this->reaTitle,
+            'interest' => $this->sanitizeSearch($this->interest),
+            'profile' => $this->sanitizeSearch($this->profile),
+            'item' => $this->sanitizeSearch($this->item),
         ]);
 
         // $getrange = 'Pagina1!A:F';
@@ -265,9 +259,40 @@ class FindREA extends Component
         $comMeta = $this->temMeta();
 
         return Ranking::contar(json_decode($data->data ?? '[]') ?? [], $comMeta) + [
-            'ordem'    => Ranking::ordem($comMeta),
+            'ordem' => Ranking::ordem($comMeta),
             'com_meta' => $comMeta,
         ];
+    }
+
+    /**
+     * REAs encontrados que não são exibidos, com o motivo de cada um (limitado para não pesar a tela).
+     *
+     * @return array<int, array{titulo: string, repositorio: string, motivo: string, resumo: string}>
+     */
+    public function ocultos($data, int $limite = 20): array
+    {
+        $comMeta = $this->temMeta();
+        $exibidas = Ranking::ordem($comMeta);
+        $ocultos = [];
+
+        foreach (json_decode($data->data ?? '[]') ?? [] as $rea) {
+            if (in_array($rea->recommended ?? null, $exibidas, true)) {
+                continue;
+            }
+
+            $ocultos[] = [
+                'titulo' => $rea->title ?? $rea->titulo ?? 'Sem título',
+                'repositorio' => $rea->repositorio ?? '',
+                'motivo' => Ranking::motivo($rea, $comMeta),
+                'resumo' => ExplanationRenderer::resumo($rea->explicacao ?? null),
+            ];
+
+            if (count($ocultos) >= $limite) {
+                break;
+            }
+        }
+
+        return $ocultos;
     }
 
     /**
@@ -300,29 +325,59 @@ class FindREA extends Component
     #[Renderless]
     public function registrarExplicacao(string $acao, ?string $repositorio = null, ?string $titulo = null, ?string $faixa = null): void
     {
-        if (!in_array($acao, ExplanationEvent::ACOES, true)) {
+        if (! in_array($acao, ExplanationEvent::ACOES, true)) {
             return;
         }
 
         ExplanationEvent::create([
             'searched_at' => $this->timestampSession,
-            'user_id'     => auth()->id(),
-            'acao'        => $acao,
+            'user_id' => auth()->id(),
+            'acao' => $acao,
             'repositorio' => $repositorio ? mb_substr($repositorio, 0, 50) : null,
-            'titulo'      => $titulo ? mb_substr($titulo, 0, 255) : null,
-            'faixa'       => $faixa ? mb_substr($faixa, 0, 20) : null,
+            'titulo' => $titulo ? mb_substr($titulo, 0, 255) : null,
+            'faixa' => $faixa ? mb_substr($faixa, 0, 20) : null,
         ]);
+    }
+
+    /**
+     * Interesses que o SisREAd sabe buscar: os fixos mais os cadastrados por colaboradores.
+     * É calculado a cada requisição porque propriedades privadas não sobrevivem entre elas no Livewire.
+     */
+    public function opcoesInteresse(): array
+    {
+        $opcoes = [];
+
+        // Os fixos vêm primeiro, então a grafia com acento prevalece sobre a versão sanitizada do banco.
+        foreach (array_merge($this->interestOptions, Collaborator::query()->pluck('interest')->filter()->all()) as $opcao) {
+            $chave = RuleClassifier::normalizar($opcao);
+
+            if ($chave !== '' && ! isset($opcoes[$chave])) {
+                $opcoes[$chave] = $opcao;
+            }
+        }
+
+        return array_values($opcoes);
     }
 
     public function search()
     {
         $this->validate();
 
+        // Sem termo conhecido a busca sairia vazia e a tela não mostraria nada (problema #14).
+        $this->findAdequateTerm();
+
+        if ($this->interestApiSearch === '') {
+            $this->addError('interest', 'Não sabemos buscar por “'.$this->interest.'”. Interesses disponíveis: '
+                .implode(', ', $this->opcoesInteresse()).'.');
+
+            return;
+        }
+
         $this->timestampSession = now()->setTimezone('UTC');
-        
+
         Searches::create([
-            'interest'    => $this->sanitizeSearch($this->interest),
-            'profile'     => $this->sanitizeSearch($this->profile),
+            'interest' => $this->sanitizeSearch($this->interest),
+            'profile' => $this->sanitizeSearch($this->profile),
         ]);
 
         $getrange = 'Pagina1!A:F';
@@ -335,14 +390,14 @@ class FindREA extends Component
                     $collaborator->rea_title,
                     $collaborator->interest,
                     $collaborator->profile,
-                    $collaborator->item
+                    $collaborator->item,
                 ];
             });
 
         $values = $collaborators->all();
 
         $this->sheet = array_filter(
-            $values, 
+            $values,
             fn ($rea) => $rea[3] === $this->sanitizeSearch($this->interest) && $rea[4] === $this->sanitizeSearch($this->profile)
         );
 
@@ -368,8 +423,6 @@ class FindREA extends Component
     {
         $this->loading = true;
 
-        $this->findAdequateTerm();
-
         // Tipos de colaboradores com o mesmo tema e perfil, e tipos de todos os colaboradores.
         $tiposBusca = RuleClassifier::normalizarTipos(array_column($this->sheet, 5));
         $tiposGerais = array_values(array_diff(
@@ -381,16 +434,16 @@ class FindREA extends Component
         $questionnaire = auth()->user()?->questionnaire;
 
         $this->contexto = [
-            'perfil'       => $this->profile,
-            'interesse'    => $this->interest,
-            'termo_api'    => $this->interestApiSearch,
-            'tipos_busca'  => $tiposBusca,
+            'perfil' => $this->profile,
+            'interesse' => $this->interest,
+            'termo_api' => $this->interestApiSearch,
+            'tipos_busca' => $tiposBusca,
             'tipos_gerais' => $tiposGerais,
-            'meta'         => $questionnaire?->dominant ? [
+            'meta' => $questionnaire?->dominant ? [
                 'dominante' => $questionnaire->dominant,
-                'ma'        => round((float) $questionnaire->ma, 2),
-                'mpa'       => round((float) $questionnaire->mpa, 2),
-                'mpe'       => round((float) $questionnaire->mpe, 2),
+                'ma' => round((float) $questionnaire->ma, 2),
+                'mpa' => round((float) $questionnaire->mpa, 2),
+                'mpe' => round((float) $questionnaire->mpe, 2),
             ] : null,
         ];
 
@@ -407,7 +460,7 @@ class FindREA extends Component
 
     private function findAdequateTerm()
     {
-        foreach ($this->interestOptions as $option) {
+        foreach ($this->opcoesInteresse() as $option) {
             if ($this->sanitizeSearch($option) === $this->sanitizeSearch($this->interest)) {
                 $this->interestApiSearch = $option;
             }
