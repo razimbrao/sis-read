@@ -10,6 +10,7 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\DB;
 use App\Models\Data;
+use App\Recommendation\RuleClassifier;
 
 class ProcessMecRed implements ShouldQueue
 {
@@ -84,6 +85,7 @@ class ProcessMecRed implements ShouldQueue
         }
 
         $interactivityData = [
+            'fonte_interatividade' => $this->meta ? 'meta_usuario' : 'indisponivel',
             'interatividade'       => $interactivity,
             'nivel_interatividade' => $interactivity_level,
             'estilo_aprendizagem'  => $learning_style,
@@ -94,6 +96,11 @@ class ProcessMecRed implements ShouldQueue
             foreach ($search as $rea) {
                 // MecRed devolve dados mais diretos baseados na API construída
                 $recommended = $this->meta ? 'meta_both' : 'both';
+                $explicacao = RuleClassifier::explicacao(
+                    $this->criterios(),
+                    $recommended,
+                    'Por política do SisREAd, os itens do MEC RED ficam na faixa mais alta, mas nível, tipo e meta não puderam ser conferidos neste repositório.'
+                );
 
                 // 📊 1. Incrementa a radiografia
                 if (isset($metrics['breakdown'][$recommended])) {
@@ -117,6 +124,7 @@ class ProcessMecRed implements ShouldQueue
                     'type'         => '',
                     'repositorio'  => 'MECRED',
                     'recommended'  => $recommended,
+                    'explicacao'   => $explicacao,
                     'titulo'       => $rea['name'] ?? '',
                     'descricao'    => '',
                     'tipoConteudo' => '',
@@ -149,5 +157,52 @@ class ProcessMecRed implements ShouldQueue
             'created_at'      => now(),
             'updated_at'      => now(),
         ]);
+    }
+
+    /**
+     * Critérios do MEC RED. Os filtros de etapa e tipo são enviados na URL, mas a API não devolve a etapa
+     * nem o tipo de cada item (e, em 2026-09-18, ignorava os filtros): nada disso pode ser conferido,
+     * então os critérios ficam como não avaliados, com o pedido feito como evidência.
+     */
+    private function criterios(): array
+    {
+        $criterios = ['tema' => RuleClassifier::criterioTema($this->search, 'MEC RED')];
+
+        $etapas = mecRedEtapas($this->profile);
+        $criterios['nivel'] = $etapas
+            ? [
+                'status'    => 'nao_avaliado',
+                'valor'     => null,
+                'esperado'  => RuleClassifier::normalizar($this->profile),
+                'fonte'     => 'filtro_api',
+                'evidencia' => 'o SisREAd pediu ao MEC RED itens desta etapa (educational_stages=' . implode(',', $etapas) . '), mas o repositório não informa a etapa de cada item para conferir',
+            ]
+            : [
+                'status'    => 'nao_avaliado',
+                'valor'     => null,
+                'esperado'  => RuleClassifier::normalizar($this->profile),
+                'fonte'     => 'filtro_api',
+                'evidencia' => 'seu perfil não corresponde a uma etapa do MEC RED; nenhum filtro de nível foi aplicado',
+            ];
+
+        $criterios['tipo'] = [
+            'status'    => 'nao_avaliado',
+            'valor'     => null,
+            'esperado'  => RuleClassifier::normalizarTipos($this->types),
+            'fonte'     => 'filtro_api',
+            'evidencia' => 'o MEC RED não informa o tipo nesta busca',
+        ];
+
+        if ($this->meta) {
+            $criterios['meta'] = [
+                'status'    => 'nao_avaliado',
+                'valor'     => null,
+                'esperado'  => $this->meta,
+                'fonte'     => 'filtro_api',
+                'evidencia' => 'o SisREAd pediu ao MEC RED tipos de objeto associados à sua meta (object_type=' . implode(',', mecRedTiposObjeto($this->meta)) . '), mas o repositório não informa o tipo de cada item para conferir',
+            ];
+        }
+
+        return $criterios;
     }
 }

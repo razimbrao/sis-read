@@ -20,10 +20,12 @@ class FeedbackReasonSeeder extends Seeder
             'A abordagem dos conteúdos não são condizentes com o questionário respondido.',
             'Vieram conteúdos repetitivos.',
             'A ordem de prioridade da amostragem dos conteúdos não é coerente.',
+            'As explicações das recomendações estavam erradas ou confusas.',
+            'As explicações não ajudaram a entender a ordem dos resultados.',
         ];
 
         foreach ($frases as $frase) {
-            FeedbackReason::create([
+            FeedbackReason::firstOrCreate([
                 'phrase' => $frase,
             ]);
         }

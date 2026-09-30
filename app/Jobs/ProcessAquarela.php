@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use App\Models\Data;
+use App\Recommendation\RuleClassifier;
 
 class ProcessAquarela implements ShouldQueue
 {
@@ -84,8 +85,8 @@ class ProcessAquarela implements ShouldQueue
             foreach ($search as $rea) {
                 $interactivityData = $this->definirInteratividade($rea['dtype'] ?? '');
                 
-                $nivel = $this->identificarNivelEducacional($rea);
-                $recommended = $this->definirRecomendacao($nivel, $rea);
+                $criterios = $this->avaliarCriterios($rea);
+                $recommended = RuleClassifier::rotular($criterios, (bool) $this->meta);
 
                 // 📊 1. Incrementa a radiografia exata
                 if (isset($this->metrics['breakdown'][$recommended])) {
@@ -109,6 +110,7 @@ class ProcessAquarela implements ShouldQueue
                     'type'         => $rea['tipoConteudo'],
                     'repositorio'  => 'Aquarela',
                     'recommended'  => $recommended,
+                    'explicacao'   => RuleClassifier::explicacao($criterios, $recommended),
                     'titulo'       => $rea['titulo'],
                     'descricao'    => $rea['descricao'],
                     'tipoConteudo' => $rea['tipoConteudo'],
@@ -153,6 +155,7 @@ class ProcessAquarela implements ShouldQueue
     {
         if ($dtype === 'T') {
             return [
+                'fonte_interatividade' => 'dtype',
                 'interatividade'       => 'Ativo',
                 'nivel_interatividade' => 'Alto / Muito alto',
                 'estilo_aprendizagem'  => 'Intuitivo / Ativo / Auditivo/Visual',
@@ -161,6 +164,7 @@ class ProcessAquarela implements ShouldQueue
         } 
         if ($dtype === 'D') {
             return [
+                'fonte_interatividade' => 'dtype',
                 'interatividade'       => 'Expositivo',
                 'nivel_interatividade' => 'Baixo / Muito baixo',
                 'estilo_aprendizagem'  => 'Sensorial / Reflexivo / Auditivo/Visual',
@@ -168,6 +172,7 @@ class ProcessAquarela implements ShouldQueue
             ];
         }
         return [
+            'fonte_interatividade' => 'indisponivel',
             'interatividade'       => 'Não especificado',
             'nivel_interatividade' => 'Não especificado',
             'estilo_aprendizagem'  => 'Não especificado',
@@ -175,52 +180,29 @@ class ProcessAquarela implements ShouldQueue
         ];
     }
 
-    private function identificarNivelEducacional(array $rea): string
+    /**
+     * Avalia tema, nível, tipo e (com meta) meta; o rótulo é derivado destes critérios.
+     */
+    private function avaliarCriterios(array $rea): array
     {
-        $text = mb_strtolower($rea['titulo'] . ' ' . $rea['descricao'], 'UTF-8');
-        if (preg_match('/\b(criança|infantil)\b/', $text)) return 'educacao infantil';
-        if (preg_match('/\b(fundamental|sexto ano|6º|sétimo ano|7º|oitavo ano|8º|nono ano|9º|ef)\b/', $text)) return 'ensino fundamental';
-        if (preg_match('/\b(médio)\b/', $text)) return 'ensino medio';
-        return 'ensino superior';
-    }
+        $criterios = [
+            'tema'  => RuleClassifier::criterioTema($this->search, 'Aquarela'),
+            'nivel' => RuleClassifier::criterioNivel(
+                $this->profile,
+                RuleClassifier::inferirNivel($rea['titulo'] ?? '', $rea['descricao'] ?? '')
+            ),
+            'tipo'  => RuleClassifier::criterioTipo(
+                $rea['tipoConteudo'] ?? '',
+                RuleClassifier::normalizarTipos($this->types)
+            ),
+        ];
 
-    private function sanitizeSearch(string $search): string
-    {
-        return Str::lower(Str::ascii($search));
-    }
-
-    private function definirRecomendacao(string $nivel, array $rea): string
-    {
-        $perfilSanitizado = $this->sanitizeSearch($this->profile);
-        $tipoSanitizado = $this->sanitizeSearch($rea['tipoConteudo']);
-
-        //  CORREÇÃO CRÍTICA: Só aciona o Ollama se o cenário atual exigir Meta!
+        // Só aciona o Ollama se o cenário atual exigir meta.
         if ($this->meta) {
-            $metaLLM = $this->classificarMetaComLLM($rea);
+            $criterios['meta'] = RuleClassifier::criterioMeta($this->meta, $this->classificarMetaComLLM($rea));
+        }
 
-            if ($this->analisarMeta($metaLLM, $this->meta)) {
-                if ($perfilSanitizado === $nivel && in_array($tipoSanitizado, $this->types)) return 'meta_both';
-                elseif ($perfilSanitizado === $nivel || in_array($tipoSanitizado, $this->types)) return 'meta_one';
-                return 'meta';
-            }
-        } 
-        
-        // Cenários padrão (Sem IA envolvida)
-        if ($perfilSanitizado === $nivel && in_array($tipoSanitizado, $this->types)) return 'both';
-        if ($perfilSanitizado === $nivel) return 'profile';
-        return 'interest';
-    }
-
-    private function analisarMeta(string $response, string $meta = null): bool 
-    {
-        if (!$meta || $response === 'Não classificado') return false;
-        $response = strtolower($response);
-        return match ($meta) {
-            'ma'  => str_contains($response, 'aprendizagem'),
-            'mpa' => str_contains($response, 'performance_aproximacao'),
-            'mpe' => str_contains($response, 'performance_evitacao'),
-            default => false,
-        };
+        return $criterios;
     }
 
     private function classificarMetaComLLM(array $rea): string
@@ -241,7 +223,7 @@ class ProcessAquarela implements ShouldQueue
 
         Escolha a meta predominante considerando principalmente o objetivo pedagógico do recurso, não apenas palavras isoladas do título.
 
-        Responda SOMENTE com uma das opções:
+        Responda SOMENTE com um JSON no formato {"meta": "<opção>"}, em que <opção> é uma de:
         Aprendizagem
         Performance Aproximação
         Performance Evitação
@@ -262,8 +244,10 @@ class ProcessAquarela implements ShouldQueue
             $this->metrics['ollama_time'] += (microtime(true) - $start_ollama);
 
             if ($response->successful()) {
-                $result = json_decode($response->json('response'), true);
-                return $result['meta'] ?? 'Não classificado';
+                $result = json_decode((string) $response->json('response'), true);
+                $meta = is_array($result) ? ($result['meta'] ?? null) : null;
+
+                return is_string($meta) && $meta !== '' ? $meta : 'Não classificado';
             }
 
             $this->metrics['ollama_errors']++;
