@@ -45,6 +45,10 @@
                         @endphp
                         @if ($data)
                             <span class="font-semibold text-lg text-gray-900 text-center block mb-4">@lang('Tabela de REAs encontrados nos repositórios: ')</span>
+
+                            @if ($data->data)
+                                @include('livewire.partials.transparencia-paineis', ['resumo' => $this->resumoOrdenacao($data), 'contexto' => $this->contexto, 'repositorios' => $this->statusRepositorios($data)])
+                            @endif
                             
                             <div class="relative overflow-x-auto shadow-md sm:rounded-lg w-full">
                                 <table class="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400">
@@ -65,12 +69,21 @@
                                     @php
                                         $reaIndex = 0;
                                     @endphp
-                                    <tbody>
                                         @if ($data->data)
                                             @foreach ($this->paginate($data) as $rea)
                                                 @php
                                                     $reaIndex++;
+                                                    $explicacao = $rea->explicacao ?? null;
+                                                    $faixa = \App\Recommendation\ExplanationRenderer::faixa($rea->recommended ?? null, $explicacao);
+                                                    $fontesInteratividade = [
+                                                        'dtype' => 'Derivado do tipo de interatividade (dtype) informado pelo repositório.',
+                                                        'meta_usuario' => 'Derivado da sua meta de aprendizagem, não do recurso.',
+                                                        'padrao_repositorio' => 'Valor padrão do repositório (todos os itens são vídeos).',
+                                                        'indisponivel' => 'O repositório não informa este dado.',
+                                                    ];
+                                                    $fonteInteratividade = $fontesInteratividade[$rea->fonte_interatividade ?? ''] ?? 'Fonte não registrada (busca anterior à transparência).';
                                                 @endphp
+                                            <tbody x-data="{ aberto: false }" wire:key="rea-{{ $this->page }}-{{ $reaIndex }}">
                                                 <tr @class([
                                                     "bg-white border-b",
                                                     "bg-yellow-50" => auth()->user() ? $rea->recommended === 'meta_both' : $rea->recommended === 'both'
@@ -102,16 +115,32 @@
                                                             </button>
                                                         </div>
                                                     </td>
-                                                    <td class="px-6 py-4 min-w-[200px]">{{ $rea->title }}</td>
+                                                    <td class="px-6 py-4 min-w-[200px]">
+                                                        <span class="block">{{ $rea->title }}</span>
+                                                        <span class="inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700" title="{{ $faixa['descricao'] }}">
+                                                            {{ $faixa['titulo'] }}
+                                                        </span>
+                                                        <button
+                                                            type="button"
+                                                            class="block mt-1 text-xs text-blue-600 hover:underline focus:outline-none"
+                                                            :aria-expanded="aberto"
+                                                            @click="aberto = !aberto; if (aberto) $wire.registrarExplicacao('abriu_explicacao', @js($rea->repositorio ?? null), @js($rea->title ?? null), @js($rea->recommended ?? null))"
+                                                        >
+                                                            <span x-text="aberto ? 'Ocultar explicação' : 'Por que este REA?'">Por que este REA?</span>
+                                                        </button>
+                                                    </td>
                                                     <td class="px-6 py-4 whitespace-nowrap">{{ $rea->type }}</td>
                                                     <td class="px-6 py-4 whitespace-nowrap">{{ $rea->repositorio }}</td>
-                                                    <td class="px-6 py-4 whitespace-nowrap">{{ $rea->interatividade }}</td>
-                                                    <td class="px-6 py-4 whitespace-nowrap">{{ $rea->nivel_interatividade }}</td>
-                                                    <td class="px-6 py-4 whitespace-nowrap">{{ $rea->estilo_aprendizagem }}</td>
-                                                    <td class="px-6 py-4 whitespace-nowrap">{{ $rea->estrategia }}</td>
+                                                    <td class="px-6 py-4 whitespace-nowrap" title="{{ $fonteInteratividade }}">{{ $rea->interatividade }}</td>
+                                                    <td class="px-6 py-4 whitespace-nowrap" title="{{ $fonteInteratividade }}">{{ $rea->nivel_interatividade }}</td>
+                                                    <td class="px-6 py-4 whitespace-nowrap" title="{{ $fonteInteratividade }}">{{ $rea->estilo_aprendizagem }}</td>
+                                                    <td class="px-6 py-4 whitespace-nowrap" title="{{ $fonteInteratividade }}">{{ $rea->estrategia }}</td>
                                                     <td class="px-6 py-4 min-w-[150px]">
-                                                        @if ($rea->recommended === 'meta')
-                                                            Indicado para a sua meta de aprendizagem
+                                                        @php
+                                                            $criterioMeta = collect(\App\Recommendation\ExplanationRenderer::linhas($explicacao))->firstWhere('criterio', 'meta');
+                                                        @endphp
+                                                        @if ($criterioMeta)
+                                                            <span title="{{ $criterioMeta['texto'] }}">{{ $criterioMeta['icone'] }} {{ ['ok' => 'Compatível', 'falhou' => 'Incompatível', 'filtro_api' => 'Filtrado pelo repositório'][$criterioMeta['status']] ?? 'Não verificado' }}</span>
                                                         @endif
                                                     </td>
                                                     @if (isset($rea->link) || isset($rea->id))
@@ -131,9 +160,14 @@
                                                         </td>
                                                     @endif
                                                 </tr>
+                                                <tr x-show="aberto" class="bg-gray-50 border-b">
+                                                    <td colspan="10" class="px-6 py-4 text-gray-700">
+                                                        @include('livewire.partials.explicacao-rea', ['explicacao' => $explicacao, 'faixa' => $faixa])
+                                                    </td>
+                                                </tr>
+                                            </tbody>
                                             @endforeach
                                         @endif
-                                    </tbody>
                                 </table>
                             </div>
 
@@ -156,7 +190,7 @@
                                     </svg>
                                     <span class="mt-2">Carregando...</span>
                                 </div>
-                            @elseif (json_decode($data->data) === [])
+                            @elseif (empty(json_decode($data->data ?? "[]")))
                                 <div class="mt-6 text-center">
                                     <span class="text-gray-900">@lang('Nenhum resultado encontrado.')</span>
                                 </div>

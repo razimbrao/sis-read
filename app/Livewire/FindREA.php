@@ -11,6 +11,11 @@ use App\Jobs\ProcessEduplay;
 use App\Models\Collaborator;
 use Livewire\WithPagination;
 use App\Jobs\ProcessAquarela;
+use App\Models\ExplanationEvent;
+use App\Recommendation\Ranking;
+use App\Recommendation\RuleClassifier;
+use Livewire\Attributes\Renderless;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Validate;
 use Illuminate\Support\Facades\Http;
 use Revolution\Google\Sheets\Facades\Sheets;
@@ -82,6 +87,11 @@ class FindREA extends Component
 
     public $selectedReasons = [];
 
+    /**
+     * O que o SisREAd usou sobre o usuário na última busca (painel "O que usamos sobre você").
+     */
+    public array $contexto = [];
+
     public function updatedMessage($value)
     {
         $this->charCount = strlen($value);
@@ -120,46 +130,18 @@ class FindREA extends Component
         $this->page++;
     }
 
+    private function temMeta(): bool
+    {
+        return (bool) auth()->user()?->questionnaire?->dominant;
+    }
+
     public function paginate($data)
     {
         if (!isset($data->data)) {
             return;
         }
 
-        $meta_both = [];
-        $meta_one = [];
-        $meta = [];
-        $both = [];
-        $profile = [];
-        $interest = [];
-        $sortedData = [];
-
-        foreach (json_decode($data->data) as $rea) {
-            if ($rea->recommended === 'meta_both') {
-                $meta_both[] = $rea;
-            }
-            if ($rea->recommended === 'meta_one') {
-                $meta_one[] = $rea;
-            }
-            if ($rea->recommended === 'meta') {
-                $meta[] = $rea;
-            } elseif ($rea->recommended === 'both') {
-                $both[] = $rea;
-            } else if ($rea->recommended === 'profile') {
-                $profile[] = $rea;
-            } 
-            else {
-                $interest[] = $rea;
-            }
-        }
-
-        if (auth()->user()?->questionnaire?->dominant) {
-            $sortedData = array_merge($meta_both, $meta_one, $meta);
-        }
-        else {
-            $sortedData = array_merge($both, $interest);
-        }
-
+        $sortedData = Ranking::ordenar(json_decode($data->data) ?? [], $this->temMeta());
 
         $items = collect($sortedData);
         $total = $items->count();
@@ -275,6 +257,63 @@ class FindREA extends Component
         $this->showMessage = true;
     }
 
+    /**
+     * Contagem por faixa e ocultos para o painel "Como ordenamos".
+     */
+    public function resumoOrdenacao($data): array
+    {
+        $comMeta = $this->temMeta();
+
+        return Ranking::contar(json_decode($data->data ?? '[]') ?? [], $comMeta) + [
+            'ordem'    => Ranking::ordem($comMeta),
+            'com_meta' => $comMeta,
+        ];
+    }
+
+    /**
+     * Situação de cada repositório na busca (search_metrics): quantos itens vieram e se houve falha.
+     */
+    public function statusRepositorios($data): array
+    {
+        $metricas = DB::table('search_metrics')
+            ->where('searched_at', $data->getRawOriginal('searched_at'))
+            ->get()
+            ->keyBy('repository');
+
+        $status = [];
+
+        foreach (['Aquarela', 'MecRed' => 'MEC RED', 'Eduplay'] as $chave => $nome) {
+            $chave = is_int($chave) ? $nome : $chave;
+            $m = $metricas->get($chave);
+
+            $status[$nome] = match (true) {
+                $m === null => ['situacao' => 'aguardando', 'itens' => 0],
+                $m->timeouts_errors > 0 && $m->items_returned == 0 => ['situacao' => 'falhou', 'itens' => 0],
+                $m->timeouts_errors > 0 => ['situacao' => 'parcial', 'itens' => (int) $m->items_returned],
+                default => ['situacao' => 'ok', 'itens' => (int) $m->items_returned],
+            };
+        }
+
+        return $status;
+    }
+
+    #[Renderless]
+    public function registrarExplicacao(string $acao, ?string $repositorio = null, ?string $titulo = null, ?string $faixa = null): void
+    {
+        if (!in_array($acao, ExplanationEvent::ACOES, true)) {
+            return;
+        }
+
+        ExplanationEvent::create([
+            'searched_at' => $this->timestampSession,
+            'user_id'     => auth()->id(),
+            'acao'        => $acao,
+            'repositorio' => $repositorio ? mb_substr($repositorio, 0, 50) : null,
+            'titulo'      => $titulo ? mb_substr($titulo, 0, 255) : null,
+            'faixa'       => $faixa ? mb_substr($faixa, 0, 20) : null,
+        ]);
+    }
+
     public function search()
     {
         $this->validate();
@@ -331,24 +370,29 @@ class FindREA extends Component
 
         $this->findAdequateTerm();
 
-        $types = [];
+        // Tipos de colaboradores com o mesmo tema e perfil, e tipos de todos os colaboradores.
+        $tiposBusca = RuleClassifier::normalizarTipos(array_column($this->sheet, 5));
+        $tiposGerais = array_values(array_diff(
+            RuleClassifier::normalizarTipos(Collaborator::query()->pluck('item')->all()),
+            $tiposBusca
+        ));
+        $types = array_merge($tiposBusca, $tiposGerais);
 
-        foreach ($this->sheet as $line) {
-            $types[] = $line[5];
+        $questionnaire = auth()->user()?->questionnaire;
 
-            if ($line[5] === 'e-book') {
-                $types[] = 'livro digital';
-            }
-        }
-
-        $collaboratorsTypes = collect(Collaborator::lazyById(100, $column = 'id'))
-            ->map(function ($collaborator) {
-                return [
-                    $collaborator->item
-                ];
-            });
-
-        $types = array_merge($types, $collaboratorsTypes->all());
+        $this->contexto = [
+            'perfil'       => $this->profile,
+            'interesse'    => $this->interest,
+            'termo_api'    => $this->interestApiSearch,
+            'tipos_busca'  => $tiposBusca,
+            'tipos_gerais' => $tiposGerais,
+            'meta'         => $questionnaire?->dominant ? [
+                'dominante' => $questionnaire->dominant,
+                'ma'        => round((float) $questionnaire->ma, 2),
+                'mpa'       => round((float) $questionnaire->mpa, 2),
+                'mpe'       => round((float) $questionnaire->mpe, 2),
+            ] : null,
+        ];
 
         $this->data = Data::create(['searched_at' => $this->timestampSession]);
 
