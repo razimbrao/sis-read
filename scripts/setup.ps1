@@ -35,7 +35,11 @@ if (-not (Test-Path .env)) {
     (Get-Content .env) -replace '^APP_NAME=.*','APP_NAME=SisREAd' -replace '^APP_URL=.*','APP_URL=http://127.0.0.1:8000' | Set-Content .env
     php artisan key:generate
 }
+if (-not (Test-Path database\database.sqlite)) {
+    New-Item -ItemType File -Path database\database.sqlite | Out-Null
+}
 php artisan migrate --force
+php artisan db:seed --force
 npm install
 npm run build
 Write-Host "Setup concluído. Rode scripts\start.ps1"

@@ -22,5 +22,5 @@ Documentação completa em `docs/` (comece por `docs/README.md` e `docs/arquitet
 - Os jobs se ligam à busca por `Data.searched_at`; mantenha essa chave ao mexer no fluxo.
 - Rótulos de recomendação (`both`, `profile`, `interest`, `meta_*`) estão acoplados a `Ranking` e `ExplanationRenderer::FAIXAS`. Mude juntos.
 - Toda regra nova de recomendação deve gravar seu critério em `explicacao` (decisão e explicação vêm da mesma fonte).
-- `database/database.sqlite` é versionado e tem dados reais: não rode `migrate:fresh` sem pedir.
+- `database/database.sqlite` **não** é versionado (tem dados reais). É criado por `scripts/setup.ps1`; não rode `migrate:fresh` num banco com dados sem pedir.
 - Bugs conhecidos estão em `docs/problemas-conhecidos.md`. Atualize esse arquivo ao corrigir algum.

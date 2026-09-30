@@ -36,9 +36,12 @@ Acesse http://127.0.0.1:8000. **O worker de fila é obrigatório.** Sem ele as b
 para sempre, porque os resultados são produzidos por jobs.
 
 ## Banco
-O `database/database.sqlite` está versionado (~50 MB). Ele já tem as migrações aplicadas, os 6 motivos
-de feedback, ~1000 buscas e usuários de teste. Para começar do zero, rode
-`php artisan migrate:fresh --seed` (apaga tudo).
+O `database/database.sqlite` **não** é versionado: ele contém dados reais de usuários (e-mails e
+hashes de senha). O `scripts/setup.ps1` cria o arquivo, aplica as migrações e roda os seeders
+(motivos de feedback), deixando um banco vazio e utilizável.
+
+Quem já tem o banco com os dados históricos (~50 MB, ~1000 buscas) deve guardá-lo fora do git e
+copiá-lo para `database/database.sqlite`. Para zerar, `php artisan migrate:fresh --seed` (apaga tudo).
 
 ## Simulação em massa
 `php artisan simulation:run-all` enfileira 3 jobs para cada combinação perfil × interesse × meta

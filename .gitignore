@@ -17,5 +17,12 @@ yarn-error.log
 /.fleet
 /.idea
 /.vscode
-/storage/credentials.json/.claude/settings.local.json
+/storage/credentials.json
+/.claude/settings.local.json
 CLAUDE.local.md
+
+# Banco local: contém dados reais de usuários; use scripts/setup.ps1 para criar o seu
+/database/database.sqlite
+/database/*.sqlite-journal
+/database/*.sqlite-shm
+/database/*.sqlite-wal
