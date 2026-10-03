@@ -62,6 +62,14 @@ class Ranking
         return ['faixas' => $faixas, 'ocultos' => $ocultos, 'motivos_ocultos' => $motivos];
     }
 
+    /**
+     * Motivo de um REA não ser exibido (ver contar()).
+     */
+    public static function motivo($rea, bool $comMeta): string
+    {
+        return self::motivoOculto($rea, self::rotulo($rea), $comMeta);
+    }
+
     private static function motivoOculto($rea, ?string $rotulo, bool $comMeta): string
     {
         if (! $comMeta) {

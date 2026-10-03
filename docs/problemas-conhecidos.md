@@ -29,8 +29,9 @@
     "tipos preferidos". Vale revisar a tabela `collaborators`.
 13. A linha "Eficiência" da tela de resultados divide por `Data.time`. Se `time` for `null` (nenhum job
     terminou), a view lança divisão por zero.
-14. Se o interesse digitado não bate com nenhuma opção conhecida, `findAdequateTerm` não define
-    `interestApiSearch`: os jobs buscam termo vazio e a tabela não aparece.
+14. ~~Se o interesse digitado não bate com nenhuma opção conhecida, `findAdequateTerm` não define
+    `interestApiSearch`: os jobs buscam termo vazio e a tabela não aparece.~~ **Corrigido** (2026-09-30):
+    `search()` valida o termo antes de disparar os jobs e mostra a mensagem com os interesses disponíveis.
 15. **O MEC RED ignora os filtros enviados**: em 2026-09-18, `educational_stages` e `object_type` na URL
     devolveram os mesmos 10 itens de uma busca sem filtros (ex.: "Anos Iniciais do Ensino Fundamental" para
     perfil *Ensino médio*). Mesmo assim, a política coloca todo item do MEC RED na faixa mais alta
@@ -39,3 +40,16 @@
     `nivel`), buscar a etapa de cada item em `/public/resource/{id}`, ou tirar o MEC RED da faixa mais alta.
 16. Busca com meta e Ollama fora do ar: todos os REAs do Aquarela ficam ocultos (meta não avaliada). O painel
     "Como ordenamos" mostra esse motivo separadamente.
+17. ~~**Interesses cadastrados por colaboradores nunca funcionavam na busca**: `interestOptions` é uma
+    propriedade privada, que o Livewire não persiste entre requisições. O `mount()` carregava a lista, mas
+    no request do `search()` ela já tinha voltado só aos 4 termos fixos.~~ **Corrigido** (2026-09-30):
+    `opcoesInteresse()` consulta os colaboradores a cada requisição e remove duplicatas por forma normalizada.
+18. A classificação de meta por IA (`gemma3:4b`) tem viés: em teste manual, reconheceu
+    "Performance Aproximação" mas classificou como "Aprendizagem" um recurso claramente de
+    "Performance Evitação". Numa busca real com meta `ma`, **nenhum** dos 157 REAs foi excluído, ou seja, o
+    critério quase não filtra. A explicação declara o modelo usado, mas vale testar prompt ou modelo maior.
+19. Empate no EMAPRE é resolvido em silêncio: `array_keys($resultados, max(...))[0]` pega o primeiro fator.
+    Existe ao menos um caso real no banco (usuário 3, ma=2 e mpa=2).
+20. Os 24 `collaborators` vieram de uma planilha de artigos (o "nome" é uma referência bibliográfica), e a
+    primeira linha é o **cabeçalho da planilha**, o que criou o interesse "Interesse" e o tipo "Item".
+21. 61 `failed_jobs` acumulados, nunca revisados.

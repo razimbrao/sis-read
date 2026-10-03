@@ -112,22 +112,22 @@ class RuleClassifier
     /**
      * Critério de meta a partir da classificação do LLM ("Não classificado" = não avaliado).
      */
-    public static function criterioMeta(string $metaUsuario, ?string $classificacao): array
+    public static function criterioMeta(string $metaUsuario, ?string $classificacao, ?string $modelo = null, ?float $segundos = null): array
     {
-        if ($classificacao === null || $classificacao === '' || $classificacao === 'Não classificado') {
-            return [
-                'status' => 'nao_avaliado',
-                'valor' => null,
-                'esperado' => $metaUsuario,
-                'fonte' => 'llm',
-            ];
-        }
-
-        return [
-            'status' => self::casaMeta($classificacao, $metaUsuario) ? 'ok' : 'falhou',
-            'valor' => $classificacao,
+        $base = [
             'esperado' => $metaUsuario,
             'fonte' => 'llm',
+            'modelo' => $modelo,
+            'duracao' => $segundos === null ? null : round($segundos, 2),
+        ];
+
+        if ($classificacao === null || $classificacao === '' || $classificacao === 'Não classificado') {
+            return $base + ['status' => 'nao_avaliado', 'valor' => null];
+        }
+
+        return $base + [
+            'status' => self::casaMeta($classificacao, $metaUsuario) ? 'ok' : 'falhou',
+            'valor' => $classificacao,
         ];
     }
 

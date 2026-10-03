@@ -110,6 +110,64 @@ class FindREATransparenciaTest extends TestCase
         $this->assertSame('aguardando', $status['Eduplay']['situacao']);
     }
 
+    public function test_interesse_desconhecido_avisa_em_vez_de_buscar(): void
+    {
+        Queue::fake();
+
+        $componente = Livewire::test(FindREA::class)
+            ->set('userType', 'usuario')
+            ->set('profile', 'Ensino médio')
+            ->set('interest', 'pensamento computacional')
+            ->call('search');
+
+        $componente->assertHasErrors('interest');
+        $this->assertStringContainsString('algoritmos', $componente->errors()->first('interest'));
+        Queue::assertNothingPushed();
+        $this->assertSame(0, Data::count());
+    }
+
+    public function test_interesse_de_colaborador_e_aceito(): void
+    {
+        Queue::fake();
+        $this->colaborador('seguranca da informacao', 'ensino medio', 'Vídeo');
+
+        Livewire::test(FindREA::class)
+            ->set('userType', 'usuario')
+            ->set('profile', 'Ensino médio')
+            ->set('interest', 'Segurança da informação')
+            ->call('search')
+            ->assertHasNoErrors();
+
+        Queue::assertPushed(ProcessAquarela::class);
+    }
+
+    public function test_ocultos_listam_titulo_e_motivo(): void
+    {
+        $data = Data::create([
+            'searched_at' => '2026-09-30 12:00:00',
+            'data' => json_encode([
+                ['title' => 'Visível', 'recommended' => 'both', 'repositorio' => 'Aquarela'],
+                ['title' => 'Escondido', 'recommended' => 'meta_both', 'repositorio' => 'MECRED'],
+            ]),
+        ]);
+
+        $ocultos = Livewire::test(FindREA::class)->instance()->ocultos($data);
+
+        $this->assertCount(1, $ocultos);
+        $this->assertSame('Escondido', $ocultos[0]['titulo']);
+        $this->assertSame('sem_meta_usuario', $ocultos[0]['motivo']);
+    }
+
+    public function test_ocultos_respeitam_o_limite(): void
+    {
+        $data = Data::create([
+            'searched_at' => '2026-09-30 12:00:00',
+            'data' => json_encode(array_fill(0, 30, ['title' => 'X', 'recommended' => 'meta_both'])),
+        ]);
+
+        $this->assertCount(3, Livewire::test(FindREA::class)->instance()->ocultos($data, 3));
+    }
+
     public function test_registrar_explicacao_grava_evento(): void
     {
         Livewire::test(FindREA::class)

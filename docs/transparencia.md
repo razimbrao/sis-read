@@ -3,6 +3,7 @@
 > Especificação técnica da implementação da transparência no SisREAd. O plano e a justificativa
 > baseada no mapeamento sistemático (MSL) estão em [plano-transparencia.md](plano-transparencia.md).
 > Escrutabilidade e explicações contrafactuais ficam para a próxima fase e usam as mesmas estruturas.
+> O caminho dos dados, com diagramas, está em [fluxos-transparencia.md](fluxos-transparencia.md).
 
 ## 1. Objetivo e princípios
 
@@ -239,10 +240,10 @@ em que os itens de todos os colaboradores entravam como arrays e nunca casavam.
 |---|---|
 | `searched_at` | chave da busca (`Data.searched_at`) |
 | `user_id` | usuário logado ou `null` |
-| `acao` | `abriu_explicacao`, `abriu_ordenacao`, `abriu_contexto` |
+| `acao` | `abriu_explicacao`, `abriu_ordenacao`, `abriu_contexto`, `abriu_ocultos` |
 | `repositorio`, `titulo`, `faixa` | preenchidos em `abriu_explicacao` |
 
-`FindREA::registrarExplicacao()` é `#[Renderless]` (não re-renderiza) e só aceita as três ações.
+`FindREA::registrarExplicacao()` é `#[Renderless]` (não re-renderiza) e só aceita as ações de `ExplanationEvent::ACOES`.
 Uma migration acrescenta dois motivos de feedback ligados à explicação, e o
 `FeedbackReasonSeeder` também:
 
@@ -275,6 +276,22 @@ Os testes rodam em SQLite em memória (`phpunit.xml`), sem tocar em `database/da
 | `tests/Feature/FindREATransparenciaTest.php` | `search()` monta `$contexto` e tipos normalizados, `paginate` e `resumoOrdenacao`, `registrarExplicacao` grava e rejeita ação inválida |
 
 Rodar: `php artisan test`.
+
+## 11.1 Avisos e falhas silenciosas (fase 1b)
+
+Quatro pontos em que o sistema falhava calado ou omitia o que estava fazendo:
+
+1. **Interesse não reconhecido**: `search()` resolve o termo **antes** de disparar os jobs. Sem
+   correspondência, mostra "Não sabemos buscar por X. Interesses disponíveis: …" e não cria busca
+   nenhuma. `opcoesInteresse()` junta os fixos com os dos colaboradores, sem duplicatas.
+2. **Progresso da busca**: enquanto algum repositório não respondeu, a tela mostra "Consultando
+   repositórios… N de 3 responderam", em vez de só "Carregando". Isso cobre o efeito do `finished`
+   prematuro (problema #2), em que a lista parecia pronta e continuava crescendo.
+3. **Classificação por IA**: o critério de meta guarda o modelo (`ProcessAquarela::MODELO_LLM`) e
+   quanto tempo levou, e o texto os declara ("Modelo: gemma3:4b, em 1.23s"). O aviso de estimativa
+   automática menciona que o modelo local tende a favorecer "Aprendizagem" (problema #18).
+4. **REAs excluídos**: o painel de ordenação ganhou "Ver os REAs que não aparecem", com título,
+   repositório, motivo e resumo dos critérios (até 20). A ação vira o evento `abriu_ocultos`.
 
 ## 12. Próxima fase (diferenciais)
 

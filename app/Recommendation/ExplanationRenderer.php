@@ -127,7 +127,7 @@ class ExplanationRenderer
         foreach ($explicacao['criterios'] ?? [] as $c) {
             if (in_array($c['fonte'] ?? null, ['regex', 'llm'], true)
                 && in_array($c['status'] ?? null, ['ok', 'falhou'], true)) {
-                return ['Estimativa automática (regex/IA): pode conter erros.'];
+                return ['Estimativa automática (regex/IA): pode conter erros. A classificação por IA roda num modelo local e tende a favorecer “Aprendizagem”.'];
             }
         }
 
@@ -198,10 +198,12 @@ class ExplanationRenderer
             return ($c['evidencia'] ?? '').($status === 'ok' ? " Compatível com a sua meta ({$esperado})." : " Sua meta é {$esperado}.");
         }
 
+        $modelo = empty($c['modelo']) ? '' : " Modelo: {$c['modelo']}".(isset($c['duracao']) ? ", em {$c['duracao']}s." : '.');
+
         return match ($status) {
-            'ok' => "Classificado por IA como {$c['valor']}, compatível com a sua meta ({$esperado}).",
-            'falhou' => "Classificado por IA como {$c['valor']}; sua meta é {$esperado}.",
-            default => 'Não foi possível classificar a meta deste recurso (IA indisponível ou resposta inválida).',
+            'ok' => "Classificado por IA como {$c['valor']}, compatível com a sua meta ({$esperado}).".$modelo,
+            'falhou' => "Classificado por IA como {$c['valor']}; sua meta é {$esperado}.".$modelo,
+            default => 'Não foi possível classificar a meta deste recurso (IA indisponível ou resposta inválida).'.$modelo,
         };
     }
 
