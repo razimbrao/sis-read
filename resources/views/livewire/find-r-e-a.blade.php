@@ -59,6 +59,7 @@
                                     'repositorios' => $this->statusRepositorios($data),
                                     'ocultos' => $this->ocultos($data),
                                     'podeCorrigir' => $podeCorrigir,
+                                    'tipos' => $this->tiposPreferidos($data),
                                 ])
                             @endif
                             

@@ -220,6 +220,7 @@ class EscrutabilidadeTest extends TestCase
         $this->assertSame(['video'], $tipos['atuais']);
         $this->assertSame(['video'], $tipos['originais']);
         $this->assertFalse($tipos['editados']);
+        $this->assertSame(['jogo' => 1, 'video' => 1], $tipos['contagem']);
     }
 
     public function test_redefinir_tipos_recalcula_a_busca_toda(): void
@@ -321,7 +322,7 @@ class EscrutabilidadeTest extends TestCase
             ->call('corrigirNivel', $grafos['chave'], 'ensino fundamental')
             ->assertSee('informado por você (o sistema tinha assumido ensino superior)')
             ->assertSee('Faixa alterada pela sua correção: antes Só tema, agora Nível.')
-            ->assertSee('Você corrigiu 1 REA;')
+            ->assertSee('1 REA mudou de faixa por correções suas.')
             ->assertSee('desfazerCorrecao', false)
             ->assertSee('Corrigir de novo');
     }
@@ -345,5 +346,52 @@ class EscrutabilidadeTest extends TestCase
         $this->componente()->set('userType', 'usuario')->set('interestApiSearch', 'algoritmos')
             ->call('corrigirNivel', $grafos['chave'], 'mestrado')
             ->assertSee('Esta correção não é válida para este REA.');
+    }
+
+    public function test_painel_oferece_editar_tipos_com_origem_e_contagem(): void
+    {
+        $this->busca([$this->aquarela('Grafos', 'Jogo'), $this->aquarela('Árvores', 'Jogo'), $this->aquarela('Filas', 'Vídeo')]);
+
+        $this->componente()->set('userType', 'usuario')->set('interestApiSearch', 'algoritmos')
+            ->set('contexto', $this->contexto())
+            ->assertSee('Editar tipos preferidos')
+            ->assertSee('jogo')
+            ->assertSee('(aparece nos REAs desta busca; 2 REAs desta busca)', false)
+            ->assertSee('(colaboradores, mesmo interesse e perfil; 1 REA desta busca)', false)
+            ->assertSee('redefinirTipos', false)
+            ->assertDontSee('Voltar aos tipos do sistema');
+    }
+
+    public function test_painel_mostra_tipos_definidos_pelo_usuario(): void
+    {
+        $this->busca([$this->aquarela('Grafos', 'Jogo'), $this->aquarela('Filas', 'Vídeo')]);
+
+        $this->componente()->set('userType', 'usuario')->set('interestApiSearch', 'algoritmos')
+            ->set('contexto', $this->contexto())
+            ->call('redefinirTipos', ['jogo'])
+            ->assertSee('Definidos por você nesta busca:')
+            ->assertSee('O sistema tinha usado: video.')
+            // Nenhum dos dois REAs bate o nível do perfil, então trocar os tipos não muda faixa.
+            ->assertSee('Suas correções não mudaram a faixa de nenhum REA.')
+            ->assertSee('Voltar aos tipos do sistema')
+            ->assertSee('Tipo jogo, entre os tipos preferidos que você definiu (jogo).', false);
+    }
+
+    public function test_painel_so_libera_editar_tipos_quando_a_busca_termina(): void
+    {
+        $this->busca([$this->aquarela('Grafos', 'Jogo')], ['Aquarela']);
+
+        $this->componente()->set('userType', 'usuario')->set('interestApiSearch', 'algoritmos')
+            ->set('contexto', $this->contexto())
+            ->assertSee('Você poderá editar os tipos preferidos quando todos os repositórios responderem.')
+            ->assertDontSee('Editar tipos preferidos');
+    }
+
+    private function contexto(): array
+    {
+        return [
+            'perfil' => 'Ensino fundamental', 'interesse' => 'algoritmos', 'termo_api' => 'algoritmos',
+            'tipos_busca' => ['video'], 'tipos_gerais' => [], 'meta' => null,
+        ];
     }
 }

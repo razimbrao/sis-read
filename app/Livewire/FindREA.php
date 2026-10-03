@@ -389,11 +389,14 @@ class FindREA extends Component
      * Tipos que o usuário pode marcar como preferidos: os preferidos do sistema, os já escolhidos e os
      * tipos que aparecem nos REAs desta busca (só onde o tipo é comparado com os preferidos).
      *
-     * @return array{opcoes: array<int, string>, atuais: array<int, string>, originais: array<int, string>, editados: bool}
+     * `contagem`: quantos REAs comparáveis da busca têm cada tipo (o efeito de marcar aquele tipo).
+     *
+     * @return array{opcoes: array<int, string>, atuais: array<int, string>, originais: array<int, string>, editados: bool, contagem: array<string, int>}
      */
     public function tiposPreferidos($data): array
     {
         $opcoes = [];
+        $contagem = [];
         $atuais = null;
         $originais = null;
         $editados = false;
@@ -411,12 +414,22 @@ class FindREA extends Component
             $editados = $editados || isset($tipo['esperado_original']);
 
             $opcoes[] = $tipo['valor'] ?? '';
+
+            if (($tipo['valor'] ?? '') !== '') {
+                $contagem[$tipo['valor']] = ($contagem[$tipo['valor']] ?? 0) + 1;
+            }
         }
 
         $opcoes = array_values(array_unique(array_filter(array_merge($originais ?? [], $atuais ?? [], $opcoes))));
         sort($opcoes);
 
-        return ['opcoes' => $opcoes, 'atuais' => $atuais ?? [], 'originais' => $originais ?? [], 'editados' => $editados];
+        return [
+            'opcoes' => $opcoes,
+            'atuais' => $atuais ?? [],
+            'originais' => $originais ?? [],
+            'editados' => $editados,
+            'contagem' => $contagem,
+        ];
     }
 
     public function redefinirTipos(array $tipos): void
