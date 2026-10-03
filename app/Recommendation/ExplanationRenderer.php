@@ -26,7 +26,7 @@ class ExplanationRenderer
         'meta' => 'meta',
     ];
 
-    private const NIVEIS_LEGIVEIS = [
+    public const NIVEIS_LEGIVEIS = [
         'educacao infantil' => 'educação infantil',
         'ensino fundamental' => 'ensino fundamental',
         'ensino medio' => 'ensino médio',

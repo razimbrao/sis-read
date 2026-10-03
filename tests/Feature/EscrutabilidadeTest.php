@@ -21,6 +21,12 @@ class EscrutabilidadeTest extends TestCase
 
     private string $searchedAt = '2026-10-03 12:00:00';
 
+    // Colunas da tabela de resultados que os jobs sempre gravam.
+    private const COLUNAS = [
+        'fonte_interatividade' => 'indisponivel', 'interatividade' => '', 'nivel_interatividade' => '',
+        'estilo_aprendizagem' => '', 'estrategia' => '',
+    ];
+
     /**
      * REA do Aquarela como o job grava (perfil Ensino fundamental, tipos preferidos: video).
      */
@@ -41,10 +47,12 @@ class EscrutabilidadeTest extends TestCase
         return [
             'chave' => RuleClassifier::chave('Aquarela', null, $titulo),
             'title' => $titulo,
+            'type' => $tipo,
+            'link' => 'http://aquarela/'.$titulo,
             'repositorio' => 'Aquarela',
             'recommended' => $rotulo,
             'explicacao' => RuleClassifier::explicacao($criterios, $rotulo),
-        ];
+        ] + self::COLUNAS;
     }
 
     private function mecRed(string $titulo): array
@@ -58,15 +66,17 @@ class EscrutabilidadeTest extends TestCase
         return [
             'chave' => RuleClassifier::chave('MECRED', '1', $titulo),
             'title' => $titulo,
+            'type' => '',
+            'link' => '',
             'repositorio' => 'MECRED',
             'recommended' => 'both',
             'explicacao' => RuleClassifier::explicacao($criterios, 'both', 'Política.'),
-        ];
+        ] + self::COLUNAS;
     }
 
     private function busca(array $reas, array $repositorios = ['Aquarela', 'MecRed', 'Eduplay']): void
     {
-        Data::create(['searched_at' => $this->searchedAt, 'data' => json_encode($reas), 'finished' => true]);
+        Data::create(['searched_at' => $this->searchedAt, 'data' => json_encode($reas), 'finished' => true, 'time' => 2]);
 
         foreach ($repositorios as $repositorio) {
             DB::table('search_metrics')->insert([
@@ -276,5 +286,64 @@ class EscrutabilidadeTest extends TestCase
         $this->componente()->call('registrarExplicacao', 'abriu_correcao', 'Aquarela', 'Grafos', 'interest');
 
         $this->assertSame('abriu_correcao', ExplanationEvent::sole()->acao);
+    }
+
+    public function test_tela_oferece_correcao_so_quando_pode(): void
+    {
+        $grafos = $this->aquarela('Grafos', 'Jogo');
+        $this->busca([$grafos, $this->mecRed('Recurso do MEC')], ['Aquarela', 'MecRed']);
+        $componente = $this->componente()->set('userType', 'usuario')->set('interestApiSearch', 'algoritmos');
+
+        $componente->assertSee('Você poderá corrigir quando todos os repositórios responderem.')
+            ->assertDontSee('corrigirNivel', false)
+            ->assertSee('não podem ser corrigidos: a posição dele é definida por política do repositório.');
+
+        DB::table('search_metrics')->insert([
+            'searched_at' => $this->searchedAt, 'repository' => 'Eduplay', 'profile' => 'p', 'interest' => 'i',
+            'total_time' => 1, 'api_time' => 1, 'api_calls' => 1, 'items_returned' => 0, 'items_filtered' => 0,
+            'timeouts_errors' => 0, 'breakdown' => '{}', 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $componente->call('$refresh')
+            ->assertSee('Se estiver errado, corrija')
+            ->assertSee('corrigirNivel', false)
+            ->assertSee('Qual é a etapa deste REA?')
+            ->assertSee('wire:key="rea-'.$grafos['chave'].'-1"', false)
+            ->assertSee('✎ corrigido por você');
+    }
+
+    public function test_tela_mostra_a_correcao_feita(): void
+    {
+        $grafos = $this->aquarela('Grafos', 'Jogo');
+        $this->busca([$grafos]);
+
+        $this->componente()->set('userType', 'usuario')->set('interestApiSearch', 'algoritmos')
+            ->call('corrigirNivel', $grafos['chave'], 'ensino fundamental')
+            ->assertSee('informado por você (o sistema tinha assumido ensino superior)')
+            ->assertSee('Faixa alterada pela sua correção: antes Só tema, agora Nível.')
+            ->assertSee('Você corrigiu 1 REA;')
+            ->assertSee('desfazerCorrecao', false)
+            ->assertSee('Corrigir de novo');
+    }
+
+    public function test_tela_oferece_corrigir_a_meta_dos_ocultos(): void
+    {
+        $oculto = $this->aquarela('Grafos', 'Vídeo', 'ma', null);
+        $this->busca([$oculto]);
+
+        $this->componente($this->usuarioComMeta('ma'))->set('userType', 'usuario')->set('interestApiSearch', 'algoritmos')
+            ->assertSee('A meta deste REA está errada?')
+            ->assertSee('Qual é a meta deste REA?')
+            ->assertSee('wire:key="oculto-'.$oculto['chave'].'-1-meta-estimado"', false);
+    }
+
+    public function test_erro_de_correcao_aparece_na_tela(): void
+    {
+        $grafos = $this->aquarela('Grafos', 'Jogo');
+        $this->busca([$grafos]);
+
+        $this->componente()->set('userType', 'usuario')->set('interestApiSearch', 'algoritmos')
+            ->call('corrigirNivel', $grafos['chave'], 'mestrado')
+            ->assertSee('Esta correção não é válida para este REA.');
     }
 }

@@ -46,12 +46,19 @@
                         @if ($data)
                             <span class="font-semibold text-lg text-gray-900 text-center block mb-4">@lang('Tabela de REAs encontrados nos repositórios: ')</span>
 
+                            @php
+                                $podeCorrigir = $this->podeCorrigir($data);
+                            @endphp
+                            @error('correcao')
+                                <div class="text-red-600 text-sm text-center mb-4" role="alert">{{ $message }}</div>
+                            @enderror
                             @if ($data->data)
                                 @include('livewire.partials.transparencia-paineis', [
                                     'resumo' => $this->resumoOrdenacao($data),
                                     'contexto' => $this->contexto,
                                     'repositorios' => $this->statusRepositorios($data),
                                     'ocultos' => $this->ocultos($data),
+                                    'podeCorrigir' => $podeCorrigir,
                                 ])
                             @endif
                             
@@ -73,11 +80,16 @@
                                     </thead>
                                     @php
                                         $reaIndex = 0;
+                                        $ocorrencias = [];
                                     @endphp
                                         @if ($data->data)
                                             @foreach ($this->paginate($data) as $rea)
                                                 @php
                                                     $reaIndex++;
+                                                    // A chave mantém a explicação aberta no REA certo quando uma correção reordena a lista.
+                                                    $chaveLinha = isset($rea->chave)
+                                                        ? 'rea-'.$rea->chave.'-'.($ocorrencias[$rea->chave] = ($ocorrencias[$rea->chave] ?? 0) + 1)
+                                                        : 'rea-'.$this->page.'-'.$reaIndex;
                                                     $explicacao = $rea->explicacao ?? null;
                                                     $faixa = \App\Recommendation\ExplanationRenderer::faixa($rea->recommended ?? null, $explicacao);
                                                     $fontesInteratividade = [
@@ -88,7 +100,7 @@
                                                     ];
                                                     $fonteInteratividade = $fontesInteratividade[$rea->fonte_interatividade ?? ''] ?? 'Fonte não registrada (busca anterior à transparência).';
                                                 @endphp
-                                            <tbody x-data="{ aberto: false }" wire:key="rea-{{ $this->page }}-{{ $reaIndex }}">
+                                            <tbody x-data="{ aberto: false }" wire:key="{{ $chaveLinha }}">
                                                 <tr @class([
                                                     "bg-white border-b",
                                                     "bg-yellow-50" => auth()->user() ? $rea->recommended === 'meta_both' : $rea->recommended === 'both'
@@ -167,7 +179,7 @@
                                                 </tr>
                                                 <tr x-show="aberto" class="bg-gray-50 border-b">
                                                     <td colspan="10" class="px-6 py-4 text-gray-700">
-                                                        @include('livewire.partials.explicacao-rea', ['explicacao' => $explicacao, 'faixa' => $faixa])
+                                                        @include('livewire.partials.explicacao-rea', ['explicacao' => $explicacao, 'faixa' => $faixa, 'rea' => $rea, 'podeCorrigir' => $podeCorrigir, 'prefixo' => $chaveLinha])
                                                     </td>
                                                 </tr>
                                             </tbody>

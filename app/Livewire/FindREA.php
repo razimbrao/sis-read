@@ -270,7 +270,7 @@ class FindREA extends Component
     /**
      * REAs encontrados que não são exibidos, com o motivo de cada um (limitado para não pesar a tela).
      *
-     * @return array<int, array{titulo: string, repositorio: string, motivo: string, resumo: string}>
+     * @return array<int, array{chave: ?string, titulo: string, repositorio: string, motivo: string, resumo: string, corrigiveis: array, corrigidos: array}>
      */
     public function ocultos($data, int $limite = 20): array
     {
@@ -283,12 +283,16 @@ class FindREA extends Component
                 continue;
             }
 
+            $linhas = ExplanationRenderer::linhas($rea->explicacao ?? null);
+
             $ocultos[] = [
                 'chave' => $rea->chave ?? null,
                 'titulo' => $rea->title ?? $rea->titulo ?? 'Sem título',
                 'repositorio' => $rea->repositorio ?? '',
                 'motivo' => Ranking::motivo($rea, $comMeta),
                 'resumo' => ExplanationRenderer::resumo($rea->explicacao ?? null),
+                'corrigiveis' => array_column(array_filter($linhas, fn ($l) => $l['corrigivel']), 'criterio'),
+                'corrigidos' => array_column(array_filter($linhas, fn ($l) => $l['corrigido']), 'criterio'),
             ];
 
             if (count($ocultos) >= $limite) {
