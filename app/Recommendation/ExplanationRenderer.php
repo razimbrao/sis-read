@@ -14,6 +14,11 @@ class ExplanationRenderer
         'filtro_api' => '▽',
     ];
 
+    /**
+     * Marca de critério corrigido pelo usuário, exibida ao lado do ícone do status recalculado.
+     */
+    public const MARCA_CORRECAO = '✎';
+
     public const NOMES = [
         'tema' => 'tema',
         'nivel' => 'nível',
@@ -56,7 +61,10 @@ class ExplanationRenderer
     }
 
     /**
-     * @return array<int, array{criterio: string, status: string, icone: string, texto: string}>
+     * `corrigido`: o usuário informou o valor (ou a lista de tipos). `corrigivel`: o critério foi estimado
+     * pelo sistema e pode receber uma correção.
+     *
+     * @return array<int, array{criterio: string, status: string, icone: string, texto: string, corrigido: bool, corrigivel: bool}>
      */
     public static function linhas($explicacao): array
     {
@@ -68,9 +76,12 @@ class ExplanationRenderer
                 'status' => 'nao_avaliado',
                 'icone' => self::ICONES['nao_avaliado'],
                 'texto' => 'Explicação indisponível para esta busca.',
+                'corrigido' => false,
+                'corrigivel' => false,
             ]];
         }
 
+        $politica = ! empty($explicacao['observacao']);
         $linhas = [];
 
         foreach ($explicacao['criterios'] as $nome => $c) {
@@ -81,6 +92,8 @@ class ExplanationRenderer
                 'status' => $status,
                 'icone' => self::ICONES[$status] ?? '?',
                 'texto' => self::texto($nome, $c),
+                'corrigido' => self::corrigido($c),
+                'corrigivel' => ! $politica && in_array($nome, ['nivel', 'meta'], true) && RuleClassifier::corrigivel($c),
             ];
         }
 
@@ -103,7 +116,7 @@ class ExplanationRenderer
                 'falhou' => 'Não atende',
                 default => 'Não verificado',
             };
-            $grupos[$grupo][] = self::NOMES[$nome] ?? $nome;
+            $grupos[$grupo][] = (self::NOMES[$nome] ?? $nome).(self::corrigido($c) ? ' (corrigido por você)' : '');
         }
 
         $partes = [];
@@ -120,6 +133,29 @@ class ExplanationRenderer
         return implode(' ', $partes);
     }
 
+    /**
+     * Efeito das correções do usuário sobre a faixa do REA; null quando não há correção.
+     */
+    public static function mudancaFaixa($explicacao): ?string
+    {
+        $explicacao = self::paraArray($explicacao);
+        $original = $explicacao['faixa_original'] ?? null;
+
+        if ($original === null) {
+            return null;
+        }
+
+        if ($original === ($explicacao['faixa'] ?? null)) {
+            return 'Sua correção não mudou a faixa deste REA.';
+        }
+
+        return 'Faixa alterada pela sua correção: antes '.self::faixa($original)['titulo']
+            .', agora '.self::faixa($explicacao['faixa'] ?? null)['titulo'].'.';
+    }
+
+    /**
+     * Só critérios ainda estimados (regex/IA) geram aviso; um critério corrigido tem fonte `usuario`.
+     */
     public static function avisos($explicacao): array
     {
         $explicacao = self::paraArray($explicacao);
@@ -158,6 +194,14 @@ class ExplanationRenderer
         $esperado = self::nivel($c['esperado'] ?? null);
         $assumido = $c['assumido'] ?? false;
 
+        if (($c['fonte'] ?? null) === 'usuario') {
+            $original = $c['original'] ?? [];
+            $antes = ($original['assumido'] ?? false) ? 'assumido' : 'estimado';
+
+            return "Nível {$valor}, informado por você (o sistema tinha {$antes} ".self::nivel($original['valor'] ?? null).'). '
+                .($status === 'ok' ? 'Igual ao seu perfil.' : "Diferente do seu perfil ({$esperado}).");
+        }
+
         return match (true) {
             $status === 'filtro_api' => "O MEC RED filtrou a busca pela etapa do seu perfil ({$esperado}).",
             $status === 'nao_avaliado' => 'Nível não verificado: '.($c['evidencia'] ?? 'informação indisponível').'.',
@@ -173,6 +217,14 @@ class ExplanationRenderer
         $valor = ($c['valor'] ?? '') !== '' ? $c['valor'] : 'não informado';
         $lista = implode(', ', $c['esperado'] ?? []);
 
+        if (($c['origem_esperado'] ?? null) === 'usuario') {
+            return match (true) {
+                $lista === '' => "Tipo {$valor}: você não definiu nenhum tipo preferido.",
+                $status === 'ok' => "Tipo {$valor}, entre os tipos preferidos que você definiu ({$lista}).",
+                default => "Tipo {$valor} não está entre os tipos preferidos que você definiu ({$lista}).",
+            };
+        }
+
         return match (true) {
             $status === 'nao_avaliado' => 'Tipo não comparado com os preferidos: '.($c['evidencia'] ?? 'informação indisponível').'.',
             $status === 'ok' => "Tipo {$valor}, entre os tipos preferidos ({$lista}).",
@@ -185,6 +237,16 @@ class ExplanationRenderer
     {
         $esperado = RuleClassifier::METAS[$c['esperado'] ?? ''] ?? ($c['esperado'] ?? '');
         $fonte = $c['fonte'] ?? null;
+
+        if ($fonte === 'usuario') {
+            $original = $c['original'] ?? [];
+            $antes = ($original['status'] ?? null) === 'nao_avaliado' || empty($original['valor'])
+                ? 'a IA não tinha conseguido classificar'
+                : "a IA tinha classificado como {$original['valor']}";
+
+            return "Meta {$c['valor']}, informada por você ({$antes}). "
+                .($status === 'ok' ? "Compatível com a sua meta ({$esperado})." : "Sua meta é {$esperado}.");
+        }
 
         if ($status === 'nao_avaliado' && ! empty($c['evidencia'])) {
             return "Meta não verificada: {$c['evidencia']}.";
@@ -205,6 +267,11 @@ class ExplanationRenderer
             'falhou' => "Classificado por IA como {$c['valor']}; sua meta é {$esperado}.".$modelo,
             default => 'Não foi possível classificar a meta deste recurso (IA indisponível ou resposta inválida).'.$modelo,
         };
+    }
+
+    private static function corrigido(array $c): bool
+    {
+        return isset($c['original']) || isset($c['esperado_original']);
     }
 
     private static function nivel(?string $nivel): string
