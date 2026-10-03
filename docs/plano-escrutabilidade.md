@@ -2,7 +2,10 @@
 
 > Etapa 2 do TCC, parte 2. Continua a transparência ([transparencia.md](transparencia.md),
 > [fluxos-transparencia.md](fluxos-transparencia.md)) e reaproveita as mesmas estruturas.
-> Estado: **planejamento**, nada implementado. Branch `feat/escrutabilidade`.
+> Estado: **implementado** (passos 1 a 6), branch `feat/escrutabilidade`, PR #4. A especificação
+> do que ficou no código está em [transparencia.md §13](transparencia.md#13-escrutabilidade) e o
+> fluxo em [fluxos-transparencia.md §10](fluxos-transparencia.md#10-fluxo-9-escrutabilidade).
+> Diferenças em relação a este plano estão na §14.
 
 ## 1. O que é escrutabilidade aqui
 
@@ -370,3 +373,18 @@ existe.
   escrutabilidade, porque o contrafactual mostra o que mudaria e a correção permite mudar. Mas é
   independente.
 - **Itens de política corrigíveis**: só faz sentido depois de decidir o problema #15 (MEC RED).
+
+## 14. O que mudou na implementação
+
+- **Resumo das correções** conta faixas, não itens: "N REAs mudaram de faixa por correções suas".
+  Editar os tipos preferidos altera o critério de tipo de todos os REAs comparáveis (57 numa busca
+  real), e "Você corrigiu 57 REAs" exagerava o efeito quando só 11 mudaram de faixa.
+- **Ocultos** oferecem só a correção de meta. Com meta, é a meta que tira o REA da lista; corrigir o
+  nível de um oculto não o traria de volta.
+- **Checklist de tipos** mostra, para cada opção, a origem (colaboradores da mesma busca, outros
+  colaboradores, usado pelo sistema, aparece nos REAs da busca) e quantos REAs da busca têm aquele
+  tipo. `FindREA::tiposPreferidos` deriva tudo de `data.data`, sem depender de `$contexto`.
+- **`abriu_correcao` no painel de tipos** é gravado sem repositório, título e faixa. É assim que
+  ele se distingue da abertura de uma correção de item.
+- `wire:ignore` nos formulários de correção, com `wire:key` que inclui o estado (estimado ou
+  corrigido): sem isso o poll de 2,5 s fechava o formulário ou deixava rótulos desatualizados.

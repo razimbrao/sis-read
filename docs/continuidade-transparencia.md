@@ -87,10 +87,10 @@ os REAs do Aquarela são ocultados — o painel explica o motivo.
 4. **Fase 2 — contrafactual.** Os critérios que falharam já estão salvos, então é derivação direta:
    "se o tipo fosse vídeo, este REA subiria para a faixa Nível e tipo". Mexe em
    `ExplanationRenderer` e na partial `explicacao-rea.blade.php`.
-5. **Fase 2 — escrutabilidade.** O diferencial do TCC (só 13% dos artigos do MSL têm). O usuário
-   corrige o que o sistema supôs: o nível deduzido por regex, a meta atribuída pela IA, os tipos
-   preferidos. As correções voltam para o `RuleClassifier` como sobrescritas e ficam registradas,
-   o que também vira dado para a Etapa 3.
+5. ~~**Fase 2 — escrutabilidade.**~~ **Feita** (2026-10-03, PR #4): o usuário corrige o nível e a
+   meta estimados e os tipos preferidos. Ver [plano-escrutabilidade.md](plano-escrutabilidade.md)
+   e [transparencia.md §13](transparencia.md#13-escrutabilidade). Os registros de `corrections`
+   também viram dado para a Etapa 3.
 6. **Etapa 3 — avaliação com usuários.** Questionário de clareza percebida da explicação, nos
    moldes do artigo *Personalized AI based Learning Path Generator* (o único do corpus que mede a
    percepção da explicação em si). Os dados de `explanation_events` já começam a ser coletados.
