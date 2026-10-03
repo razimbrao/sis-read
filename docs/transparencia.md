@@ -2,7 +2,8 @@
 
 > Especificação técnica da implementação da transparência no SisREAd. O plano e a justificativa
 > baseada no mapeamento sistemático (MSL) estão em [plano-transparencia.md](plano-transparencia.md).
-> Escrutabilidade e explicações contrafactuais ficam para a próxima fase e usam as mesmas estruturas.
+> A escrutabilidade (o usuário corrige o que o sistema estimou) está em §13 e no
+> [plano-escrutabilidade.md](plano-escrutabilidade.md). Explicações contrafactuais ficam para a próxima fase.
 > O caminho dos dados, com diagramas, está em [fluxos-transparencia.md](fluxos-transparencia.md).
 
 ## 1. Objetivo e princípios
@@ -104,9 +105,14 @@ Não é preciso migration: fica dentro do JSON que já existe.
 | `status` | `ok` (atende), `falhou` (não atende), `nao_avaliado` (não foi possível ou não se aplica verificar), `filtro_api` (o repositório já filtrou por isso) |
 | `valor` | O que foi observado no REA |
 | `esperado` | O que o usuário pediu: perfil normalizado, lista de tipos ou código da meta |
-| `fonte` | `busca`, `regex`, `colaboradores`, `llm`, `filtro_api`, `padrao_repositorio` |
+| `fonte` | `busca`, `regex`, `colaboradores`, `llm`, `filtro_api`, `padrao_repositorio`, `usuario` (corrigido pelo usuário, §13) |
 | `evidencia` | Prova concreta: trecho casado pelo regex, etapas e tipos do filtro, justificativa da regra fixa |
 | `assumido` | (nível) `true` quando o regex não achou nada e o sistema assumiu *ensino superior* |
+| `original` | (nível, meta corrigidos) o critério como o job gravou |
+| `esperado_original`, `origem_esperado` | (tipo) lista de tipos do sistema e `usuario` quando o usuário redefiniu os tipos preferidos |
+
+Cada REA também tem `chave` (hash de repositório, link e título), usada para apontar correções, e a
+`explicacao` ganha `faixa_original` (faixa do job) enquanto houver correção.
 
 `versao_regras` (constante `RuleClassifier::VERSAO_REGRAS`) permite separar, na avaliação,
 explicações geradas por versões diferentes das regras.
@@ -274,6 +280,8 @@ Os testes rodam em SQLite em memória (`phpunit.xml`), sem tocar em `database/da
 | `tests/Unit/ExplanationRendererTest.php` | texto por status, nunca ✓ para não avaliado, resumo, avisos, faixa, item legado sem explicação |
 | `tests/Feature/JobsExplicacaoTest.php` | os três jobs com `Http::fake`: todo item tem `explicacao` coerente com `recommended`, Ollama fora do ar → `nao_avaliado` |
 | `tests/Feature/FindREATransparenciaTest.php` | `search()` monta `$contexto` e tipos normalizados, `paginate` e `resumoOrdenacao`, `registrarExplicacao` grava e rejeita ação inválida |
+| `tests/Unit/UserCorrectionsTest.php` | correção de nível, meta e tipos: critério, `original`, rótulo, desfazer, item de política, entradas inválidas |
+| `tests/Feature/EscrutabilidadeTest.php` | ações de correção do `FindREA`: gravam `data.data` e `corrections`, reordenam, bloqueiam durante a busca; tela de correção e painel de tipos |
 
 Rodar: `php artisan test`.
 
@@ -297,6 +305,49 @@ Quatro pontos em que o sistema falhava calado ou omitia o que estava fazendo:
 
 - **Contrafactual**: derivado dos critérios `falhou`. Exemplo: "se o tipo fosse vídeo, este REA
   subiria para a faixa Nível e tipo".
-- **Escrutabilidade**: cada critério de fonte `regex` ou `llm` ganha "corrigir". O painel do usuário
-  permite editar os tipos preferidos e a meta. As correções entram no `RuleClassifier` como
-  sobrescritas e ficam registradas.
+- **Escrutabilidade**: implementada, ver §13. Ficou de fora a edição da meta EMAPRE do usuário.
+
+## 13. Escrutabilidade
+
+O usuário corrige o que o sistema estimou, e a lista se reordena na hora. Plano, decisões e
+diagramas: [plano-escrutabilidade.md](plano-escrutabilidade.md). Fluxo:
+[fluxos-transparencia.md §10](fluxos-transparencia.md#10-fluxo-9-escrutabilidade).
+
+| O que se corrige | Onde | Efeito |
+|---|---|---|
+| Nível do REA (fonte `regex`) | **Por que este REA?** → Corrigir | status recalculado contra o perfil |
+| Meta do REA (fonte `llm`) | **Por que este REA?** e **Ver os REAs que não aparecem** | status recalculado contra a meta do usuário; um oculto pode voltar |
+| Tipos preferidos | **O que usamos sobre você** → Editar tipos preferidos | critério de tipo recalculado em todos os REAs comparáveis |
+
+Regras:
+
+1. O usuário informa **o que o REA é**, e não se ele atende. O status vem da mesma comparação do
+   job, e o rótulo de `RuleClassifier::rotular`. Decisão e explicação continuam com a mesma fonte.
+2. Só é corrigível critério com fonte `regex` ou `llm` (`RuleClassifier::corrigivel`). Itens de
+   política (MEC RED, Eduplay) e o tema não são, e a tela diz por quê.
+3. O critério do job fica em `original`, e a faixa do job em `faixa_original`. Toda correção pode
+   ser desfeita, uma a uma ou todas. Corrigir para o valor estimado equivale a desfazer.
+4. A correção vale só para a busca atual (fica em `data.data`).
+5. Correções só ficam disponíveis depois que os três repositórios responderam
+   (`FindREA::podeCorrigir`), porque os jobs regravam `data.data` sem lock (problema #3).
+
+Código: `App\Recommendation\UserCorrections` (funções puras sobre o item) e as ações
+`corrigirNivel`, `corrigirMeta`, `desfazerCorrecao`, `redefinirTipos` e `desfazerTodas` do `FindREA`.
+
+Textos novos (`ExplanationRenderer`):
+
+| Situação | Texto |
+|---|---|
+| nível corrigido | Nível ensino fundamental, informado por você (o sistema tinha estimado ensino médio). Igual ao seu perfil. |
+| meta corrigida | Meta Aprendizagem, informada por você (a IA não tinha conseguido classificar). Compatível com a sua meta (Aprendizagem). |
+| tipos editados | Tipo jogo, entre os tipos preferidos que você definiu (jogo, video). |
+| faixa mudou | ✎ Faixa alterada pela sua correção: antes Só tema, agora Nível. |
+| resumo | Atende: tema, nível (corrigido por você). Não atende: tipo. |
+
+O aviso de estimativa automática some para o critério corrigido. O painel **Como ordenamos** mostra
+"N REAs mudaram de faixa por correções suas" e **Desfazer todas**. Um oculto cuja meta o usuário
+marcou como diferente da dele aparece com o motivo `meta_corrigida_incompativel`.
+
+Registro: cada correção e cada desfazer viram uma linha em `corrections` (ver [dados.md](dados.md)),
+e abrir um formulário de correção grava o evento `abriu_correcao` em `explanation_events`. No painel
+de tipos o evento vai sem repositório e título.

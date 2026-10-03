@@ -3,6 +3,8 @@
 namespace Tests\Unit;
 
 use App\Recommendation\Ranking;
+use App\Recommendation\RuleClassifier;
+use App\Recommendation\UserCorrections;
 use PHPUnit\Framework\TestCase;
 
 class RankingTest extends TestCase
@@ -73,5 +75,48 @@ class RankingTest extends TestCase
     public function test_lista_vazia(): void
     {
         $this->assertSame([], Ranking::ordenar([], false));
+    }
+
+    private function reaComMeta(?string $classificacao): array
+    {
+        $criterios = [
+            'nivel' => RuleClassifier::criterioNivel('Ensino fundamental', RuleClassifier::inferirNivel('Grafos', '')),
+            'tipo' => RuleClassifier::criterioTipo('Jogo', ['video']),
+            'meta' => RuleClassifier::criterioMeta('ma', $classificacao),
+        ];
+        $rotulo = RuleClassifier::rotular($criterios, true);
+
+        return ['recommended' => $rotulo, 'explicacao' => RuleClassifier::explicacao($criterios, $rotulo)];
+    }
+
+    public function test_oculto_com_meta_corrigida_passa_a_aparecer(): void
+    {
+        $oculto = $this->reaComMeta(null);
+        $this->assertSame([], Ranking::ordenar([$oculto], true));
+
+        $corrigido = UserCorrections::corrigirMeta($oculto, 'ma');
+
+        $this->assertSame([$corrigido], Ranking::ordenar([$corrigido], true));
+    }
+
+    public function test_meta_marcada_como_incompativel_pelo_usuario_tem_motivo_proprio(): void
+    {
+        $corrigido = UserCorrections::corrigirMeta($this->reaComMeta('Aprendizagem'), 'mpe');
+
+        $this->assertSame('meta_corrigida_incompativel', Ranking::motivo($corrigido, true));
+        $this->assertSame('meta_corrigida_incompativel', Ranking::motivo(json_decode(json_encode($corrigido)), true));
+        $this->assertSame(1, Ranking::contar([$corrigido], true)['motivos_ocultos']['meta_corrigida_incompativel']);
+    }
+
+    public function test_contar_correcoes_e_mudancas_de_faixa(): void
+    {
+        $semCorrecao = $this->reaComMeta('Aprendizagem');
+        $subiu = UserCorrections::corrigirMeta($this->reaComMeta(null), 'ma');
+        $mesmaFaixa = UserCorrections::corrigirNivel($this->reaComMeta('Aprendizagem'), 'ensino medio');
+
+        $contagem = Ranking::contar(json_decode(json_encode([$semCorrecao, $subiu, $mesmaFaixa])), true);
+
+        $this->assertSame(2, $contagem['corrigidos']);
+        $this->assertSame(1, $contagem['mudaram_faixa']);
     }
 }

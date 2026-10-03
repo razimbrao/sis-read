@@ -4,6 +4,7 @@ namespace Tests\Unit;
 
 use App\Recommendation\ExplanationRenderer;
 use App\Recommendation\RuleClassifier;
+use App\Recommendation\UserCorrections;
 use PHPUnit\Framework\TestCase;
 
 class ExplanationRendererTest extends TestCase
@@ -167,5 +168,121 @@ class ExplanationRendererTest extends TestCase
         $politica = ExplanationRenderer::faixa('both', ['observacao' => 'Política do MEC RED.', 'criterios' => []]);
         $this->assertSame('Nível e tipo (política)', $politica['titulo']);
         $this->assertStringNotContainsString('tipo entre os preferidos', $politica['descricao']);
+    }
+
+    /**
+     * REA do Aquarela com nível assumido (superior), tipo jogo e meta não classificada pela IA.
+     */
+    private function reaAquarela(): array
+    {
+        $criterios = [
+            'tema' => RuleClassifier::criterioTema('algoritmos', 'Aquarela'),
+            'nivel' => RuleClassifier::criterioNivel('Ensino fundamental', RuleClassifier::inferirNivel('Grafos', '')),
+            'tipo' => RuleClassifier::criterioTipo('Jogo', ['video']),
+            'meta' => RuleClassifier::criterioMeta('ma', 'Não classificado', 'gemma3:4b', 1.0),
+        ];
+        $rotulo = RuleClassifier::rotular($criterios, true);
+
+        return ['recommended' => $rotulo, 'explicacao' => RuleClassifier::explicacao($criterios, $rotulo)];
+    }
+
+    public function test_nivel_corrigido_declara_o_usuario_e_a_estimativa_anterior(): void
+    {
+        $rea = UserCorrections::corrigirNivel($this->reaAquarela(), 'ensino fundamental');
+        $nivel = $this->linha(ExplanationRenderer::linhas($rea['explicacao']), 'nivel');
+
+        $this->assertSame('✓', $nivel['icone']);
+        $this->assertTrue($nivel['corrigido']);
+        $this->assertTrue($nivel['corrigivel']);
+        $this->assertSame('Nível ensino fundamental, informado por você (o sistema tinha assumido ensino superior). Igual ao seu perfil.', $nivel['texto']);
+
+        $rea = UserCorrections::corrigirNivel($this->reaAquarela(), 'ensino medio');
+        $this->assertSame(
+            'Nível ensino médio, informado por você (o sistema tinha assumido ensino superior). Diferente do seu perfil (ensino fundamental).',
+            $this->linha(ExplanationRenderer::linhas($rea['explicacao']), 'nivel')['texto']
+        );
+    }
+
+    public function test_meta_corrigida_declara_o_que_a_ia_tinha_dito(): void
+    {
+        $rea = UserCorrections::corrigirMeta($this->reaAquarela(), 'ma');
+        $meta = $this->linha(ExplanationRenderer::linhas($rea['explicacao']), 'meta');
+
+        $this->assertSame('✓', $meta['icone']);
+        $this->assertSame('Meta Aprendizagem, informada por você (a IA não tinha conseguido classificar). Compatível com a sua meta (Aprendizagem).', $meta['texto']);
+
+        $classificado = $this->reaAquarela();
+        $classificado['explicacao']['criterios']['meta'] = RuleClassifier::criterioMeta('ma', 'Aprendizagem');
+        $rea = UserCorrections::corrigirMeta($classificado, 'mpe');
+
+        $this->assertSame(
+            'Meta Performance-evitação, informada por você (a IA tinha classificado como Aprendizagem). Sua meta é Aprendizagem.',
+            $this->linha(ExplanationRenderer::linhas($rea['explicacao']), 'meta')['texto']
+        );
+    }
+
+    public function test_tipos_definidos_pelo_usuario(): void
+    {
+        $linha = fn (array $tipos) => $this->linha(
+            ExplanationRenderer::linhas(UserCorrections::redefinirTipos($this->reaAquarela(), $tipos)['explicacao']),
+            'tipo'
+        );
+
+        $this->assertSame('Tipo jogo, entre os tipos preferidos que você definiu (jogo, video).', $linha(['jogo', 'video'])['texto']);
+        $this->assertTrue($linha(['jogo'])['corrigido']);
+        $this->assertFalse($linha(['jogo'])['corrigivel']);
+        $this->assertSame('Tipo jogo não está entre os tipos preferidos que você definiu (livro).', $linha(['livro'])['texto']);
+        $this->assertSame('Tipo jogo: você não definiu nenhum tipo preferido.', $linha([])['texto']);
+    }
+
+    public function test_corrigivel_so_para_nivel_e_meta_estimados(): void
+    {
+        $linhas = ExplanationRenderer::linhas($this->reaAquarela()['explicacao']);
+
+        $this->assertSame(
+            ['tema' => false, 'nivel' => true, 'tipo' => false, 'meta' => true],
+            array_column($linhas, 'corrigivel', 'criterio')
+        );
+        $this->assertSame([false, false, false, false], array_column($linhas, 'corrigido'));
+
+        $politica = ['observacao' => 'Política.', 'criterios' => [
+            'nivel' => ['status' => 'nao_avaliado', 'fonte' => 'regex'],
+            'meta' => ['status' => 'ok', 'fonte' => 'padrao_repositorio'],
+        ]];
+        $this->assertSame([false, false], array_column(ExplanationRenderer::linhas($politica), 'corrigivel'));
+    }
+
+    public function test_resumo_marca_criterio_corrigido(): void
+    {
+        $rea = UserCorrections::corrigirNivel($this->reaAquarela(), 'ensino fundamental');
+
+        $this->assertSame(
+            'Atende: tema, nível (corrigido por você). Não atende: tipo. Não verificado: meta.',
+            ExplanationRenderer::resumo($rea['explicacao'])
+        );
+    }
+
+    public function test_aviso_de_estimativa_some_quando_tudo_foi_corrigido(): void
+    {
+        $rea = $this->reaAquarela();
+        $this->assertNotEmpty(ExplanationRenderer::avisos($rea['explicacao']));
+
+        // A meta não avaliada não gera aviso; o nível estimado gera, até ser corrigido.
+        $rea = UserCorrections::corrigirNivel($rea, 'ensino medio');
+        $this->assertSame([], ExplanationRenderer::avisos($rea['explicacao']));
+    }
+
+    public function test_mudanca_de_faixa(): void
+    {
+        $rea = $this->reaAquarela();
+        $this->assertNull(ExplanationRenderer::mudancaFaixa($rea['explicacao']));
+
+        $subiu = UserCorrections::corrigirMeta($rea, 'ma');
+        $this->assertSame('Faixa alterada pela sua correção: antes Só tema, agora Meta.', ExplanationRenderer::mudancaFaixa($subiu['explicacao']));
+
+        $igual = UserCorrections::corrigirNivel($rea, 'ensino medio');
+        $this->assertSame('Sua correção não mudou a faixa deste REA.', ExplanationRenderer::mudancaFaixa($igual['explicacao']));
+
+        $this->assertNull(ExplanationRenderer::mudancaFaixa(json_decode(json_encode(UserCorrections::desfazer($subiu, 'meta')['explicacao']))));
     }
 }

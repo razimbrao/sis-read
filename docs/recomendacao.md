@@ -26,6 +26,10 @@ Cada REA retornado recebe um rótulo `recommended`:
 A regra está em `App\Recommendation\RuleClassifier` e a ordem em `App\Recommendation\Ranking`.
 Cada REA também grava a `explicacao` da decisão; veja [transparencia.md](transparencia.md).
 
+O usuário pode corrigir o nível e a meta estimados de um REA e os tipos preferidos da busca. O
+rótulo é recalculado pela mesma regra (`RuleClassifier::rotular`), só para a busca atual; veja
+[transparencia.md §13](transparencia.md#13-escrutabilidade).
+
 ## EMAPRE (Escala de Metas de Realização)
 São 28 afirmações em escala Likert de 1 a 5. O sistema calcula a média de cada fator: **ma** (meta
 aprender, itens 1–12), **mpa** (performance-aproximação, itens 13–21) e **mpe**
