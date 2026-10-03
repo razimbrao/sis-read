@@ -6,6 +6,7 @@ use App\Jobs\ProcessAquarela;
 use App\Jobs\ProcessEduplay;
 use App\Jobs\ProcessMecRed;
 use App\Models\Collaborator;
+use App\Models\Correction;
 use App\Models\Data;
 use App\Models\ExplanationEvent;
 use App\Models\Feedback;
@@ -13,8 +14,10 @@ use App\Models\Searches;
 use App\Recommendation\ExplanationRenderer;
 use App\Recommendation\Ranking;
 use App\Recommendation\RuleClassifier;
+use App\Recommendation\UserCorrections;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
 use Livewire\Attributes\Renderless;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
@@ -281,6 +284,7 @@ class FindREA extends Component
             }
 
             $ocultos[] = [
+                'chave' => $rea->chave ?? null,
                 'titulo' => $rea->title ?? $rea->titulo ?? 'Sem título',
                 'repositorio' => $rea->repositorio ?? '',
                 'motivo' => Ranking::motivo($rea, $comMeta),
@@ -336,6 +340,237 @@ class FindREA extends Component
             'repositorio' => $repositorio ? mb_substr($repositorio, 0, 50) : null,
             'titulo' => $titulo ? mb_substr($titulo, 0, 255) : null,
             'faixa' => $faixa ? mb_substr($faixa, 0, 20) : null,
+        ]);
+    }
+
+    /**
+     * Correções só depois que todos os repositórios responderam: os jobs regravam `data.data` inteiro
+     * sem lock (problema #3), e uma correção feita no meio se perderia.
+     */
+    public function podeCorrigir($data): bool
+    {
+        if (! $data || empty($data->data)) {
+            return false;
+        }
+
+        foreach ($this->statusRepositorios($data) as $status) {
+            if ($status['situacao'] === 'aguardando') {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    public function corrigirNivel(string $chave, string $nivel): void
+    {
+        $this->corrigirItem('nivel', $chave, fn (array $rea) => UserCorrections::corrigirNivel($rea, $nivel));
+    }
+
+    public function corrigirMeta(string $chave, string $meta): void
+    {
+        $this->corrigirItem('meta', $chave, fn (array $rea) => UserCorrections::corrigirMeta($rea, $meta));
+    }
+
+    public function desfazerCorrecao(string $chave, string $criterio): void
+    {
+        if (! in_array($criterio, ['nivel', 'meta'], true)) {
+            return;
+        }
+
+        $this->corrigirItem($criterio, $chave, fn (array $rea) => UserCorrections::desfazer($rea, $criterio), 'desfazer');
+    }
+
+    /**
+     * Tipos que o usuário pode marcar como preferidos: os preferidos do sistema, os já escolhidos e os
+     * tipos que aparecem nos REAs desta busca (só onde o tipo é comparado com os preferidos).
+     *
+     * @return array{opcoes: array<int, string>, atuais: array<int, string>, originais: array<int, string>, editados: bool}
+     */
+    public function tiposPreferidos($data): array
+    {
+        $opcoes = [];
+        $atuais = null;
+        $originais = null;
+        $editados = false;
+
+        foreach (json_decode($data->data ?? '[]', true) ?? [] as $rea) {
+            $tipo = $rea['explicacao']['criterios']['tipo'] ?? null;
+
+            if (($tipo['fonte'] ?? null) !== 'colaboradores') {
+                continue;
+            }
+
+            // Todos os REAs da busca compartilham a mesma lista de tipos preferidos.
+            $atuais ??= $tipo['esperado'] ?? [];
+            $originais ??= $tipo['esperado_original'] ?? $tipo['esperado'] ?? [];
+            $editados = $editados || isset($tipo['esperado_original']);
+
+            $opcoes[] = $tipo['valor'] ?? '';
+        }
+
+        $opcoes = array_values(array_unique(array_filter(array_merge($originais ?? [], $atuais ?? [], $opcoes))));
+        sort($opcoes);
+
+        return ['opcoes' => $opcoes, 'atuais' => $atuais ?? [], 'originais' => $originais ?? [], 'editados' => $editados];
+    }
+
+    public function redefinirTipos(array $tipos): void
+    {
+        $this->resetErrorBag('correcao');
+        $data = $this->dadosDaBusca();
+
+        if (! $this->podeCorrigir($data)) {
+            $this->addError('correcao', 'Correções ficam disponíveis quando todos os repositórios responderem.');
+
+            return;
+        }
+
+        $preferidos = $this->tiposPreferidos($data);
+        $tipos = RuleClassifier::normalizarTipos(array_filter($tipos, 'is_string'));
+
+        if (! $preferidos['opcoes'] && ! $preferidos['originais']) {
+            $this->addError('correcao', 'Nenhum REA desta busca é comparado com os tipos preferidos.');
+
+            return;
+        }
+
+        if (array_diff($tipos, $preferidos['opcoes'])) {
+            $this->addError('correcao', 'Escolha os tipos entre as opções oferecidas.');
+
+            return;
+        }
+
+        $restaura = empty(array_diff($tipos, $preferidos['originais'])) && empty(array_diff($preferidos['originais'], $tipos));
+
+        $this->aplicarEmTodos(
+            $data,
+            fn (array $rea) => UserCorrections::redefinirTipos($rea, $tipos),
+            ['acao' => $restaura ? 'desfazer' : 'corrigir', 'alvo' => 'tipos',
+                'valor_anterior' => $preferidos['atuais'], 'valor_novo' => $tipos]
+        );
+
+        if ($this->contexto) {
+            $this->contexto['tipos_usuario'] = $restaura ? null : $tipos;
+        }
+    }
+
+    /**
+     * Desfaz todas as correções da busca: nível, meta e tipos preferidos.
+     */
+    public function desfazerTodas(): void
+    {
+        $this->resetErrorBag('correcao');
+        $data = $this->dadosDaBusca();
+
+        if (! $this->podeCorrigir($data)) {
+            return;
+        }
+
+        $this->aplicarEmTodos(
+            $data,
+            fn (array $rea) => UserCorrections::desfazer(UserCorrections::desfazer(UserCorrections::desfazer($rea, 'nivel'), 'meta'), 'tipo'),
+            ['acao' => 'desfazer', 'alvo' => 'todas']
+        );
+
+        if ($this->contexto) {
+            $this->contexto['tipos_usuario'] = null;
+        }
+    }
+
+    private function dadosDaBusca(): ?Data
+    {
+        return $this->timestampSession ? Data::query()->where('searched_at', $this->timestampSession)->first() : null;
+    }
+
+    /**
+     * Aplica a correção em todas as ocorrências do REA (a mesma chave pode vir em mais de uma página) e registra.
+     */
+    private function corrigirItem(string $alvo, string $chave, callable $correcao, string $acao = 'corrigir'): void
+    {
+        $this->resetErrorBag('correcao');
+        $data = $this->dadosDaBusca();
+
+        if (! $this->podeCorrigir($data)) {
+            $this->addError('correcao', 'Correções ficam disponíveis quando todos os repositórios responderem.');
+
+            return;
+        }
+
+        $reas = json_decode($data->data, true) ?? [];
+        $antes = null;
+        $depois = null;
+
+        try {
+            foreach ($reas as $i => $rea) {
+                if ($chave === '' || ($rea['chave'] ?? null) !== $chave) {
+                    continue;
+                }
+
+                $reas[$i] = $correcao($rea);
+                $antes ??= $rea;
+                $depois ??= $reas[$i];
+            }
+        } catch (InvalidArgumentException) {
+            $this->addError('correcao', 'Esta correção não é válida para este REA.');
+
+            return;
+        }
+
+        if ($antes === null || $antes === $depois) {
+            return;
+        }
+
+        DB::transaction(function () use ($data, $reas, $antes, $depois, $alvo, $acao, $chave) {
+            $data->update(['data' => json_encode($reas)]);
+
+            $this->registrarCorrecao([
+                'acao' => $acao,
+                'alvo' => $alvo,
+                'chave_rea' => $chave,
+                'repositorio' => $antes['repositorio'] ?? null,
+                'titulo' => isset($antes['title']) ? mb_substr($antes['title'], 0, 255) : null,
+                'valor_anterior' => $antes['explicacao']['criterios'][$alvo] ?? null,
+                'valor_novo' => $depois['explicacao']['criterios'][$alvo] ?? null,
+                'faixa_anterior' => $antes['recommended'] ?? null,
+                'faixa_nova' => $depois['recommended'] ?? null,
+                'itens_afetados' => ($antes['recommended'] ?? null) !== ($depois['recommended'] ?? null) ? 1 : 0,
+            ]);
+        });
+    }
+
+    /**
+     * Aplica a correção a todos os REAs da busca; `itens_afetados` conta os que mudaram de faixa.
+     */
+    private function aplicarEmTodos(Data $data, callable $correcao, array $registro): void
+    {
+        $reas = json_decode($data->data, true) ?? [];
+        $mudou = false;
+        $mudaramFaixa = 0;
+
+        foreach ($reas as $i => $rea) {
+            $novo = $correcao($rea);
+            $mudou = $mudou || $novo !== $rea;
+            $mudaramFaixa += ($novo['recommended'] ?? null) !== ($rea['recommended'] ?? null) ? 1 : 0;
+            $reas[$i] = $novo;
+        }
+
+        if (! $mudou) {
+            return;
+        }
+
+        DB::transaction(function () use ($data, $reas, $registro, $mudaramFaixa) {
+            $data->update(['data' => json_encode($reas)]);
+
+            $this->registrarCorrecao($registro + ['itens_afetados' => $mudaramFaixa]);
+        });
+    }
+
+    private function registrarCorrecao(array $campos): void
+    {
+        Correction::create($campos + [
+            'searched_at' => $this->timestampSession,
+            'user_id' => auth()->id(),
         ]);
     }
 
