@@ -112,6 +112,33 @@ class RuleClassifierTest extends TestCase
         $this->assertSame($esperado, RuleClassifier::rotular($criterios, $comMeta));
     }
 
+    public function test_chave_e_estavel_e_distingue_repositorio_link_e_titulo(): void
+    {
+        $chave = RuleClassifier::chave('Aquarela', 'http://a', 'Grafos');
+
+        $this->assertSame($chave, RuleClassifier::chave('Aquarela', 'http://a', 'Grafos'));
+        $this->assertSame(12, strlen($chave));
+        $this->assertNotSame($chave, RuleClassifier::chave('Eduplay', 'http://a', 'Grafos'));
+        $this->assertNotSame($chave, RuleClassifier::chave('Aquarela', 'http://b', 'Grafos'));
+        $this->assertNotSame($chave, RuleClassifier::chave('Aquarela', 'http://a', 'Árvores'));
+    }
+
+    public function test_corrigivel_so_para_estimativas(): void
+    {
+        $this->assertTrue(RuleClassifier::corrigivel(['fonte' => 'regex']));
+        $this->assertTrue(RuleClassifier::corrigivel(['fonte' => 'llm']));
+        $this->assertTrue(RuleClassifier::corrigivel(['fonte' => 'usuario', 'original' => ['fonte' => 'regex']]));
+        $this->assertFalse(RuleClassifier::corrigivel(['fonte' => 'colaboradores']));
+        $this->assertFalse(RuleClassifier::corrigivel(['fonte' => 'filtro_api']));
+        $this->assertFalse(RuleClassifier::corrigivel(['fonte' => 'padrao_repositorio']));
+        $this->assertFalse(RuleClassifier::corrigivel(null));
+    }
+
+    public function test_niveis_validos_incluem_o_nivel_padrao(): void
+    {
+        $this->assertSame(['educacao infantil', 'ensino fundamental', 'ensino medio', 'ensino superior'], RuleClassifier::NIVEIS_VALIDOS);
+    }
+
     public function test_explicacao_tem_versao_e_faixa(): void
     {
         $explicacao = RuleClassifier::explicacao(['tema' => ['status' => 'ok']], 'interest', 'obs');

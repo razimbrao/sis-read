@@ -28,6 +28,32 @@ class RuleClassifier
 
     private const NIVEL_PADRAO = 'ensino superior';
 
+    /**
+     * Etapas que o usuário pode informar ao corrigir o nível de um REA.
+     */
+    public const NIVEIS_VALIDOS = ['educacao infantil', 'ensino fundamental', 'ensino medio', self::NIVEL_PADRAO];
+
+    /**
+     * Fontes estimadas pelo sistema, as únicas que o usuário pode corrigir (docs/plano-escrutabilidade.md).
+     */
+    public const FONTES_CORRIGIVEIS = ['regex', 'llm'];
+
+    /**
+     * Identificador estável de um REA dentro da busca, usado para apontar correções.
+     */
+    public static function chave(string $repositorio, ?string $link, ?string $titulo): string
+    {
+        return substr(sha1($repositorio.'|'.($link ?? '').'|'.($titulo ?? '')), 0, 12);
+    }
+
+    /**
+     * Um critério é corrigível quando foi estimado pelo sistema (ou já corrigido a partir de uma estimativa).
+     */
+    public static function corrigivel(?array $criterio): bool
+    {
+        return in_array($criterio['original']['fonte'] ?? $criterio['fonte'] ?? null, self::FONTES_CORRIGIVEIS, true);
+    }
+
     public static function normalizar(?string $texto): string
     {
         return trim(Str::lower(Str::ascii($texto ?? '')));

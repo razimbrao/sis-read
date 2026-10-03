@@ -27,7 +27,14 @@ class JobsExplicacaoTest extends TestCase
 
     private function reas(): array
     {
-        return json_decode(Data::where('searched_at', $this->searchedAt)->first()->data, true);
+        $reas = json_decode(Data::where('searched_at', $this->searchedAt)->first()->data, true);
+
+        // Escrutabilidade: todo item precisa de uma chave para receber correções.
+        foreach ($reas as $rea) {
+            $this->assertMatchesRegularExpression('/^[0-9a-f]{12}$/', $rea['chave'] ?? '');
+        }
+
+        return $reas;
     }
 
     private function fakeAquarela(?string $respostaOllama = '{"meta": "Aprendizagem"}'): void
@@ -59,6 +66,8 @@ class JobsExplicacaoTest extends TestCase
         $reas = $this->reas();
         $this->assertCount(3, $reas);
         $this->assertSame(['both', 'interest', 'interest'], array_column($reas, 'recommended'));
+        $this->assertSame(RuleClassifier::chave('Aquarela', 'http://a', 'Algoritmos no sexto ano'), $reas[0]['chave']);
+        $this->assertCount(3, array_unique(array_column($reas, 'chave')));
 
         foreach ($reas as $rea) {
             $this->assertSame($rea['recommended'], $rea['explicacao']['faixa']);
