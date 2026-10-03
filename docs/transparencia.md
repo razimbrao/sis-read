@@ -3,6 +3,7 @@
 > Especificação técnica da implementação da transparência no SisREAd. O plano e a justificativa
 > baseada no mapeamento sistemático (MSL) estão em [plano-transparencia.md](plano-transparencia.md).
 > Escrutabilidade e explicações contrafactuais ficam para a próxima fase e usam as mesmas estruturas.
+> O caminho dos dados, com diagramas, está em [fluxos-transparencia.md](fluxos-transparencia.md).
 
 ## 1. Objetivo e princípios
 
@@ -239,10 +240,10 @@ em que os itens de todos os colaboradores entravam como arrays e nunca casavam.
 |---|---|
 | `searched_at` | chave da busca (`Data.searched_at`) |
 | `user_id` | usuário logado ou `null` |
-| `acao` | `abriu_explicacao`, `abriu_ordenacao`, `abriu_contexto` |
+| `acao` | `abriu_explicacao`, `abriu_ordenacao`, `abriu_contexto`, `abriu_ocultos` |
 | `repositorio`, `titulo`, `faixa` | preenchidos em `abriu_explicacao` |
 
-`FindREA::registrarExplicacao()` é `#[Renderless]` (não re-renderiza) e só aceita as três ações.
+`FindREA::registrarExplicacao()` é `#[Renderless]` (não re-renderiza) e só aceita as ações de `ExplanationEvent::ACOES`.
 Uma migration acrescenta dois motivos de feedback ligados à explicação, e o
 `FeedbackReasonSeeder` também:
 
