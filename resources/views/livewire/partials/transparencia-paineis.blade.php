@@ -19,6 +19,15 @@
                     <li><strong>{{ $faixa['titulo'] }}</strong>: {{ $faixa['descricao'] }} ({{ $resumo['faixas'][$rotulo] }} {{ $resumo['faixas'][$rotulo] === 1 ? 'REA' : 'REAs' }})</li>
                 @endforeach
             </ol>
+            @if ($resumo['corrigidos'] > 0)
+                <p class="text-amber-700">
+                    {{ ExplanationRenderer::MARCA_CORRECAO }}
+                    Você corrigiu {{ $resumo['corrigidos'] }} {{ $resumo['corrigidos'] === 1 ? 'REA' : 'REAs' }};
+                    {{ $resumo['mudaram_faixa'] }} {{ $resumo['mudaram_faixa'] === 1 ? 'mudou' : 'mudaram' }} de faixa.
+                    <button type="button" class="text-blue-600 hover:underline" wire:click="desfazerTodas"
+                        wire:confirm="Desfazer todas as suas correções nesta busca?">Desfazer todas</button>
+                </p>
+            @endif
             @if ($resumo['ocultos'] > 0)
                 @php
                     $textosMotivos = [
@@ -41,11 +50,27 @@
                     <details wire:ignore.self class="mt-2" x-on:toggle="if ($el.open) $wire.registrarExplicacao('abriu_ocultos')">
                         <summary class="cursor-pointer text-blue-600 hover:underline">Ver os REAs que não aparecem</summary>
                         <ul class="mt-2 space-y-2">
+                            @php $ocorrenciasOcultos = []; @endphp
                             @foreach ($ocultos as $o)
                                 <li>
                                     <span class="font-medium">{{ $o['titulo'] }}</span>
                                     <span class="text-gray-500">({{ $o['repositorio'] }})</span><br>
                                     <span class="text-xs">{{ $textosMotivos[$o['motivo']] ?? $o['motivo'] }} — {{ $o['resumo'] }}</span>
+                                    {{-- A meta é o que tira o REA da lista; corrigi-la pode trazê-lo de volta. --}}
+                                    @if ($o['chave'] && $podeCorrigir && in_array('meta', $o['corrigiveis'], true))
+                                        <div class="mt-1">
+                                            <span class="text-xs text-gray-600">A meta deste REA está errada?</span>
+                                            @include('livewire.partials.corrigir-criterio', [
+                                                'criterio' => 'meta',
+                                                'chave' => $o['chave'],
+                                                'prefixo' => 'oculto-'.$o['chave'].'-'.($ocorrenciasOcultos[$o['chave']] = ($ocorrenciasOcultos[$o['chave']] ?? 0) + 1),
+                                                'corrigido' => in_array('meta', $o['corrigidos'], true),
+                                                'repositorio' => $o['repositorio'],
+                                                'titulo' => $o['titulo'],
+                                                'faixa' => null,
+                                            ])
+                                        </div>
+                                    @endif
                                 </li>
                             @endforeach
                         </ul>
