@@ -36,6 +36,23 @@
                         @endif
                     @endforeach
                 </ul>
+                @if (!empty($ocultos))
+                    <details wire:ignore.self class="mt-2" x-on:toggle="if ($el.open) $wire.registrarExplicacao('abriu_ocultos')">
+                        <summary class="cursor-pointer text-blue-600 hover:underline">Ver os REAs que não aparecem</summary>
+                        <ul class="mt-2 space-y-2">
+                            @foreach ($ocultos as $o)
+                                <li>
+                                    <span class="font-medium">{{ $o['titulo'] }}</span>
+                                    <span class="text-gray-500">({{ $o['repositorio'] }})</span><br>
+                                    <span class="text-xs">{{ $textosMotivos[$o['motivo']] ?? $o['motivo'] }} — {{ $o['resumo'] }}</span>
+                                </li>
+                            @endforeach
+                        </ul>
+                        @if ($resumo['ocultos'] > count($ocultos))
+                            <p class="text-xs text-gray-500 mt-2">Mostrando {{ count($ocultos) }} de {{ $resumo['ocultos'] }}.</p>
+                        @endif
+                    </details>
+                @endif
             @endif
             <div>
                 <p class="font-medium text-gray-900">Repositórios consultados</p>

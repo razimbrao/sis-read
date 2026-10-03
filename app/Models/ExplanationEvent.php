@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 class ExplanationEvent extends Model
 {
-    public const ACOES = ['abriu_explicacao', 'abriu_ordenacao', 'abriu_contexto'];
+    public const ACOES = ['abriu_explicacao', 'abriu_ordenacao', 'abriu_contexto', 'abriu_ocultos'];
 
     protected $fillable = [
         'searched_at',
