@@ -23,6 +23,7 @@
                 @php
                     $textosMotivos = [
                         'meta_incompativel' => 'incompatíveis com a sua meta',
+                        'meta_corrigida_incompativel' => 'incompatíveis com a sua meta (corrigido por você)',
                         'meta_nao_avaliada' => 'sem classificação de meta (a IA não conseguiu classificar)',
                         'sem_meta_usuario' => 'que dependem de uma meta de aprendizagem',
                         'outros' => 'sem faixa definida',
