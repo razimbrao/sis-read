@@ -226,6 +226,35 @@ class FindREATransparenciaTest extends TestCase
             ->assertSee('identificado pelo trecho “sexto ano”', false)
             ->assertSee('Explicação indisponível para esta busca.')
             ->assertSee('Repositórios consultados')
-            ->assertSee('Derivado do tipo de interatividade (dtype) informado pelo repositório.');
+            ->assertDontSee('Derivado do tipo de interatividade (dtype) informado pelo repositório.');
+    }
+
+    public function test_paginacao_numerada_e_nova_busca_volta_a_primeira_pagina(): void
+    {
+        Queue::fake();
+
+        $componente = Livewire::test(FindREA::class)
+            ->set('userType', 'usuario')
+            ->set('profile', 'Ensino fundamental')
+            ->set('interest', 'Algoritmos')
+            ->call('search');
+
+        $itens = array_map(fn ($i) => [
+            'title' => "REA $i", 'type' => '', 'repositorio' => 'Aquarela', 'recommended' => 'interest',
+            'interatividade' => '', 'nivel_interatividade' => '', 'estilo_aprendizagem' => '', 'estrategia' => '',
+        ], range(1, 75));
+        Data::first()->update(['finished' => true, 'time' => 2, 'data' => json_encode($itens)]);
+
+        $componente->call('irParaPagina', 5)
+            ->assertSet('page', 5)
+            ->assertSee('41–50', false)
+            ->assertSee('irParaPagina(8)', false)
+            ->call('irParaPagina', 0)
+            ->assertSet('page', 1)
+            ->call('irParaPagina', 4)
+            ->set('profile', 'Ensino fundamental')
+            ->set('interest', 'Algoritmos')
+            ->call('search')
+            ->assertSet('page', 1);
     }
 }

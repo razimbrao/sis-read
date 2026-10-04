@@ -126,6 +126,11 @@ class FindREA extends Component
         $this->page++;
     }
 
+    public function irParaPagina(int $pagina)
+    {
+        $this->page = max(1, $pagina);
+    }
+
     private function temMeta(): bool
     {
         return (bool) auth()->user()?->questionnaire?->dominant;
@@ -626,6 +631,7 @@ class FindREA extends Component
         }
 
         $this->timestampSession = now()->setTimezone('UTC');
+        $this->page = 1;
 
         Searches::create([
             'interest' => $this->sanitizeSearch($this->interest),
