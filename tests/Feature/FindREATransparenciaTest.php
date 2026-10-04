@@ -226,6 +226,6 @@ class FindREATransparenciaTest extends TestCase
             ->assertSee('identificado pelo trecho “sexto ano”', false)
             ->assertSee('Explicação indisponível para esta busca.')
             ->assertSee('Repositórios consultados')
-            ->assertSee('Derivado do tipo de interatividade (dtype) informado pelo repositório.');
+            ->assertDontSee('Derivado do tipo de interatividade (dtype) informado pelo repositório.');
     }
 }

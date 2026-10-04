@@ -771,7 +771,7 @@ REA do Aquarela. Se ela casar com a dele, o REA volta para a lista ([Fluxo 9](#1
 | O que ficou de fora e por quê? | `Ranking::motivo` | — | **Ver os REAs que não aparecem** |
 | Algum repositório falhou? | jobs (`timeouts_errors`) | `search_metrics` | progresso + **Repositórios consultados** |
 | O que o sistema sabe sobre mim? | `FindREA::findInApi` | `$contexto` (só na sessão) | painel **O que usamos sobre você** |
-| De onde vem a interatividade? | cada job | `fonte_interatividade` | *tooltip* das colunas |
+| De onde vem a interatividade? | cada job | `fonte_interatividade` | não é exibido na tela |
 | O usuário olhou as explicações? | `FindREA::registrarExplicacao` | `explanation_events` | — (dado de avaliação) |
 | O usuário discordou de alguma estimativa? | `FindREA::corrigir*`, `UserCorrections` | `corrections` + `original` no critério | ✎ e "informado por você" na explicação |
 
