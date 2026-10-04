@@ -44,7 +44,7 @@
                             $data = \App\Models\Data::query()->where('searched_at', $this->timestampSession)->first();
                         @endphp
                         @if ($data)
-                            <span class="font-semibold text-lg text-gray-900 text-center block mb-4">@lang('Tabela de REAs encontrados nos repositórios: ')</span>
+                            <span class="font-semibold text-lg text-gray-900 text-center block mb-4">@lang('REAs encontrados nos repositórios')</span>
 
                             @php
                                 $podeCorrigir = $this->podeCorrigir($data);
