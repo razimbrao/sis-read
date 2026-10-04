@@ -128,31 +128,6 @@
                                                         @endif
                                                     </h3>
                                                 </div>
-                                                <div class="flex items-center gap-2 shrink-0" x-data="{ selection: null }">
-                                                    <span class="text-xs text-gray-500">@lang('Avalie')</span>
-                                                    <button
-                                                        type="button"
-                                                        @click="selection = selection === 'accepted' ? null : 'accepted'"
-                                                        :class="selection === 'accepted' ? 'text-green-600 border-green-300 bg-green-50' : 'text-gray-400 border-gray-200 hover:text-green-500'"
-                                                        class="p-1 rounded-full border transition-all duration-200 focus:outline-none"
-                                                        title="Aceitar"
-                                                    >
-                                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-                                                        </svg>
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        @click="selection = selection === 'denied' ? null : 'denied'"
-                                                        :class="selection === 'denied' ? 'text-red-600 border-red-300 bg-red-50' : 'text-gray-400 border-gray-200 hover:text-red-500'"
-                                                        class="p-1 rounded-full border transition-all duration-200 focus:outline-none"
-                                                        title="Negar"
-                                                    >
-                                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                                        </svg>
-                                                    </button>
-                                                </div>
                                             </div>
 
                                             <dl class="grid grid-cols-2 lg:grid-cols-5 gap-x-4 gap-y-3 text-sm">
