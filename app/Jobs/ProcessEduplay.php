@@ -109,6 +109,7 @@ class ProcessEduplay implements ShouldQueue
                 }
 
                 $allData[] = array_merge([
+                    'chave'        => RuleClassifier::chave('Eduplay', $rea['contentUrl'] ?? null, $rea['name'] ?? null),
                     'title'        => $rea['name'],
                     'link'         => $rea['contentUrl'],
                     'type'         => 'Vídeo',

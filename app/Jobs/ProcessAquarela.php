@@ -110,6 +110,7 @@ class ProcessAquarela implements ShouldQueue
                 }
 
                 $allData[] = array_merge([
+                    'chave' => RuleClassifier::chave('Aquarela', $rea['links'][0]['href'] ?? null, $rea['titulo']),
                     'title' => $rea['titulo'],
                     'link' => $rea['links'][0]['href'] ?? null,
                     'type' => $rea['tipoConteudo'],

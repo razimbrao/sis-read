@@ -119,6 +119,7 @@ class ProcessMecRed implements ShouldQueue
                 }
 
                 $allData[] = array_merge([
+                    'chave'        => RuleClassifier::chave('MECRED', (string) ($rea['id'] ?? ''), $rea['name'] ?? null),
                     'title'        => $rea['name'] ?? 'Sem título',
                     'link'         => '',
                     'type'         => '',

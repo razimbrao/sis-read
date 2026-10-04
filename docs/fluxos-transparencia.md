@@ -3,7 +3,7 @@
 > Como a transparência funciona de ponta a ponta, da resposta ao EMAPRE até o texto que aparece
 > na tela e o registro de uso. A especificação dos campos e dos textos está em
 > [transparencia.md](transparencia.md); este documento mostra **o caminho que os dados percorrem**.
-> Estado do código: branch `feat/transparencia-avisos` (fase 1 + fase 1b).
+> Estado do código: branch `feat/escrutabilidade` (fase 1, fase 1b e escrutabilidade).
 
 Os diagramas usam [Mermaid](https://mermaid.js.org/) e são renderizados pelo GitHub e pelo VS Code
 (com a extensão *Markdown Preview Mermaid Support*).
@@ -19,9 +19,10 @@ Os diagramas usam [Mermaid](https://mermaid.js.org/) e são renderizados pelo Gi
 7. [Fluxo 6: explicação de um REA](#7-fluxo-6-explicação-de-um-rea)
 8. [Fluxo 7: REAs que não aparecem](#8-fluxo-7-reas-que-não-aparecem)
 9. [Fluxo 8: registro de uso](#9-fluxo-8-registro-de-uso)
-10. [Cenários de ponta a ponta](#10-cenários-de-ponta-a-ponta)
-11. [Onde cada pergunta é respondida](#11-onde-cada-pergunta-é-respondida)
-12. [Limites atuais](#12-limites-atuais)
+10. [Fluxo 9: escrutabilidade](#10-fluxo-9-escrutabilidade)
+11. [Cenários de ponta a ponta](#11-cenários-de-ponta-a-ponta)
+12. [Onde cada pergunta é respondida](#12-onde-cada-pergunta-é-respondida)
+13. [Limites atuais](#13-limites-atuais)
 
 ---
 
@@ -590,6 +591,7 @@ sequenceDiagram
 | painel **Como ordenamos** | `abriu_ordenacao` | — |
 | painel **O que usamos sobre você** | `abriu_contexto` | — |
 | **Ver os REAs que não aparecem** | `abriu_ocultos` | — |
+| **Corrigir** (nível, meta) ou **Editar tipos preferidos** | `abriu_correcao` | repositório, título, faixa (vazios no painel de tipos) |
 
 Os painéis usam `<details>` com `wire:ignore.self`, para que o *poll* não feche o painel que o
 usuário abriu. O evento é disparado no `toggle`, só quando o painel abre.
@@ -602,9 +604,114 @@ O feedback da busca também ganhou dois motivos ligados às explicações (migra
 
 ---
 
-## 10. Cenários de ponta a ponta
+## 10. Fluxo 9: escrutabilidade
 
-### 10.1 Visitante sem login, perfil *Ensino fundamental*, interesse *Algoritmos*
+O usuário corrige o que o sistema **estimou**, e a lista se reordena na hora. É o único fluxo em
+que `data.data` é escrito fora dos jobs. Decisões e alternativas estão em
+[plano-escrutabilidade.md](plano-escrutabilidade.md).
+
+### 10.1 O que é corrigível
+
+```mermaid
+flowchart TD
+    C["Critério de um REA"] --> P{"item de política?<br/>(observacao preenchida)"}
+    P -- sim --> N0["não corrigível<br/>'posição definida por política do repositório'"]
+    P -- não --> T{"critério"}
+    T -- tema --> N1["não corrigível"]
+    T -- "nivel (regex)" --> S1["Corrigir: escolhe entre as 4 etapas"]
+    T -- "meta (llm)" --> S2["Corrigir: escolhe entre as 3 metas<br/>também nos ocultos"]
+    T -- tipo --> S3["o tipo do REA não se corrige;<br/>edita-se a lista de tipos preferidos no painel"]
+```
+
+### 10.2 Corrigir nível ou meta
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as Usuário
+    participant A as Alpine
+    participant F as FindREA
+    participant UC as UserCorrections
+    participant DB as SQLite
+
+    U->>A: Corrigir → escolhe o valor
+    A->>F: registrarExplicacao('abriu_correcao', …)
+    A->>F: corrigirNivel(chave, valor) ou corrigirMeta(chave, valor)
+    F->>DB: podeCorrigir: os 3 repositórios responderam?
+    alt algum aguardando
+        F-->>U: "Correções ficam disponíveis quando todos os repositórios responderem."
+    else liberado
+        F->>UC: item(s) com essa chave
+        UC->>UC: critério novo (fonte usuario) + original do job
+        UC->>UC: rotular → recommended, faixa_original
+        F->>DB: grava data.data e corrections (transação)
+        F-->>U: re-render: REA na nova faixa, ✎ e "Desfazer"
+    end
+```
+
+O usuário informa **o que o REA é**. O status sai da mesma comparação do job (nível igual ao perfil,
+`casaMeta` com a meta do usuário), e o rótulo de `RuleClassifier::rotular`. Por isso a explicação
+continua sendo o registro da decisão.
+
+### 10.3 Ciclo de vida de um critério
+
+```mermaid
+stateDiagram-v2
+    [*] --> estimado: job grava (regex ou llm)
+    estimado --> corrigido: Corrigir
+    corrigido --> corrigido: Corrigir de novo<br/>(original continua o do job)
+    corrigido --> estimado: Desfazer, Desfazer todas<br/>ou escolher o valor estimado
+```
+
+### 10.4 Editar os tipos preferidos
+
+```mermaid
+flowchart LR
+    A["Painel 'O que usamos sobre você'<br/>Editar tipos preferidos"] --> B["checklist: tipos do sistema<br/>∪ tipos dos REAs da busca<br/>com origem e nº de REAs"]
+    B --> C["redefinirTipos(lista)"]
+    C --> D["todo REA com tipo de fonte colaboradores:<br/>esperado = lista nova<br/>esperado_original guardado"]
+    D --> E["rotular → nova faixa"]
+    E --> F[("data.data + corrections<br/>itens_afetados = REAs que mudaram de faixa")]
+    F --> G["painel: 'Definidos por você nesta busca'<br/>+ Voltar aos tipos do sistema"]
+```
+
+Os itens do MEC RED e do Eduplay não mudam: o tipo deles não é comparado com os preferidos.
+
+### 10.5 Como a correção aparece
+
+| Lugar | O que muda |
+|---|---|
+| Selo e posição | faixa recalculada; a linha mantém a explicação aberta (`wire:key` pela `chave`) |
+| **Por que este REA?** | "Faixa alterada pela sua correção: antes X, agora Y", ✎ na linha do critério, "informado por você (o sistema tinha estimado …)", botões Corrigir de novo e Desfazer |
+| Aviso de estimativa | some para o critério corrigido |
+| **Como ordenamos** | "N REAs mudaram de faixa por correções suas" + Desfazer todas |
+| **Ver os REAs que não aparecem** | Corrigir a meta; motivo "incompatíveis com a sua meta (corrigido por você)" |
+| **O que usamos sobre você** | tipos definidos por você e os que o sistema tinha usado |
+
+### 10.6 Registro
+
+```mermaid
+erDiagram
+    DATA ||--o{ CORRECTIONS : "searched_at"
+    CORRECTIONS {
+        timestamp searched_at
+        int user_id "null para visitante"
+        string acao "corrigir | desfazer"
+        string alvo "nivel | meta | tipos | todas"
+        string chave_rea "null para tipos e todas"
+        json valor_anterior
+        json valor_novo
+        string faixa_anterior
+        string faixa_nova
+        int itens_afetados "REAs que mudaram de faixa"
+    }
+```
+
+---
+
+## 11. Cenários de ponta a ponta
+
+### 11.1 Visitante sem login, perfil *Ensino fundamental*, interesse *Algoritmos*
 
 ```mermaid
 flowchart LR
@@ -620,7 +727,7 @@ No mesmo cenário, um item do MEC RED também fica em `both`, mas com o selo **N
 (política)** e o resumo "Atende: tema. Não verificado: nível, tipo." seguido da observação de
 política. Um vídeo do Eduplay fica em `interest` (**Só tema (política)**).
 
-### 10.2 Usuário com meta *Aprendizagem* e Ollama no ar
+### 11.2 Usuário com meta *Aprendizagem* e Ollama no ar
 
 ```mermaid
 flowchart LR
@@ -636,7 +743,7 @@ flowchart LR
 Eduplay entra em `meta_one` (vídeos considerados adequados a `ma`/`mpa`); MEC RED em `meta_both`
 por política.
 
-### 10.3 Usuário com meta e Ollama fora do ar
+### 11.3 Usuário com meta e Ollama fora do ar
 
 ```mermaid
 flowchart LR
@@ -648,10 +755,12 @@ flowchart LR
 ```
 
 A lista mostra só MEC RED e Eduplay, e o painel explica a ausência do Aquarela pelo motivo certo.
+Com a escrutabilidade, o usuário pode abrir **Ver os REAs que não aparecem** e informar a meta de um
+REA do Aquarela. Se ela casar com a dele, o REA volta para a lista ([Fluxo 9](#10-fluxo-9-escrutabilidade)).
 
 ---
 
-## 11. Onde cada pergunta é respondida
+## 12. Onde cada pergunta é respondida
 
 | Pergunta | Onde é decidida | Onde é gravada | Onde é exibida |
 |---|---|---|---|
@@ -664,10 +773,11 @@ A lista mostra só MEC RED e Eduplay, e o painel explica a ausência do Aquarela
 | O que o sistema sabe sobre mim? | `FindREA::findInApi` | `$contexto` (só na sessão) | painel **O que usamos sobre você** |
 | De onde vem a interatividade? | cada job | `fonte_interatividade` | *tooltip* das colunas |
 | O usuário olhou as explicações? | `FindREA::registrarExplicacao` | `explanation_events` | — (dado de avaliação) |
+| O usuário discordou de alguma estimativa? | `FindREA::corrigir*`, `UserCorrections` | `corrections` + `original` no critério | ✎ e "informado por você" na explicação |
 
 ---
 
-## 12. Limites atuais
+## 13. Limites atuais
 
 A transparência descreve o que o sistema faz, inclusive quando o sistema faz algo questionável.
 Os pontos abaixo são **declarados** na tela, mas não resolvidos:
@@ -685,10 +795,13 @@ Outros detalhes observados no código:
 - O destaque amarelo da linha usa `auth()->user()` para decidir entre `meta_both` e `both`, e não
   `temMeta()`. Um usuário logado **sem** meta não vê nenhuma linha destacada, porque seus itens
   são `both`, e não `meta_both`.
+- Correções valem só para a busca atual. A mesma estimativa errada volta na próxima busca, para o
+  mesmo usuário e para os outros. `corrections` permite medir se valeria tornar isso persistente.
+- A meta EMAPRE do usuário não é editável na tela (fora do escopo da escrutabilidade).
 - `$contexto` não é persistido. Recarregar a página perde o painel **O que usamos sobre você** da
   busca atual, e a avaliação com usuários não tem como reconstruir o que foi mostrado a partir do
   banco.
 
-A próxima fase (contrafactual e escrutabilidade) usa as mesmas estruturas; ver
+A próxima fase (contrafactual) usa as mesmas estruturas; ver
 [transparencia.md §12](transparencia.md#12-próxima-fase-diferenciais) e
 [continuidade-transparencia.md](continuidade-transparencia.md).

@@ -35,19 +35,28 @@ class Ranking
     }
 
     /**
-     * Motivos dos ocultos: meta_nao_avaliada (IA não classificou), meta_incompativel, sem_meta_usuario
-     * (item de meta numa busca sem meta) e outros.
+     * Motivos dos ocultos: meta_nao_avaliada (IA não classificou), meta_incompativel,
+     * meta_corrigida_incompativel (o usuário informou outra meta), sem_meta_usuario
+     * (item de meta numa busca sem meta) e outros. `corrigidos` e `mudaram_faixa` contam as correções do usuário.
      *
-     * @return array{faixas: array<string, int>, ocultos: int, motivos_ocultos: array<string, int>}
+     * @return array{faixas: array<string, int>, ocultos: int, motivos_ocultos: array<string, int>, corrigidos: int, mudaram_faixa: int}
      */
     public static function contar(iterable $reas, bool $comMeta): array
     {
         $faixas = array_fill_keys(self::ordem($comMeta), 0);
         $ocultos = 0;
-        $motivos = ['meta_nao_avaliada' => 0, 'meta_incompativel' => 0, 'sem_meta_usuario' => 0, 'outros' => 0];
+        $motivos = ['meta_nao_avaliada' => 0, 'meta_incompativel' => 0, 'meta_corrigida_incompativel' => 0, 'sem_meta_usuario' => 0, 'outros' => 0];
+        $corrigidos = 0;
+        $mudaramFaixa = 0;
 
         foreach ($reas as $rea) {
             $rotulo = self::rotulo($rea);
+            $faixaOriginal = self::paraArray($rea)['explicacao']['faixa_original'] ?? null;
+
+            if ($faixaOriginal !== null) {
+                $corrigidos++;
+                $mudaramFaixa += $faixaOriginal !== $rotulo ? 1 : 0;
+            }
 
             if (array_key_exists($rotulo, $faixas)) {
                 $faixas[$rotulo]++;
@@ -59,7 +68,13 @@ class Ranking
             $motivos[self::motivoOculto($rea, $rotulo, $comMeta)]++;
         }
 
-        return ['faixas' => $faixas, 'ocultos' => $ocultos, 'motivos_ocultos' => $motivos];
+        return [
+            'faixas' => $faixas,
+            'ocultos' => $ocultos,
+            'motivos_ocultos' => $motivos,
+            'corrigidos' => $corrigidos,
+            'mudaram_faixa' => $mudaramFaixa,
+        ];
     }
 
     /**
@@ -76,13 +91,18 @@ class Ranking
             return in_array($rotulo, self::ORDEM_COM_META, true) ? 'sem_meta_usuario' : 'outros';
         }
 
-        $rea = json_decode(json_encode($rea), true);
+        $meta = self::paraArray($rea)['explicacao']['criterios']['meta'] ?? [];
 
-        return match ($rea['explicacao']['criterios']['meta']['status'] ?? null) {
+        return match ($meta['status'] ?? null) {
             'nao_avaliado' => 'meta_nao_avaliada',
-            'falhou' => 'meta_incompativel',
+            'falhou' => ($meta['fonte'] ?? null) === 'usuario' ? 'meta_corrigida_incompativel' : 'meta_incompativel',
             default => 'outros',
         };
+    }
+
+    private static function paraArray($rea): array
+    {
+        return is_array($rea) ? $rea : json_decode(json_encode($rea), true);
     }
 
     private static function rotulo($rea): ?string
