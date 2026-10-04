@@ -64,7 +64,7 @@
                             @endif
                             
                             {{-- Um cartão por REA: a parte branca é o recurso; o painel azul embaixo é a transparência. --}}
-                            <div class="w-full space-y-4">
+                            <div id="lista-reas" class="w-full space-y-4 scroll-mt-4">
                                 <p class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500 px-1">
                                     <span class="font-medium text-gray-700">Como ler os cartões:</span>
                                     <span>em branco, o recurso recomendado;</span>
@@ -218,15 +218,63 @@
                                 @endforeach
                             </div>
 
-                            @if ($this->paginate($data))
-                                <div class="mt-4 flex flex-col sm:flex-row gap-4 justify-between w-full">
-                                    @if ($this->paginate($data)->currentPage() !== 1)
-                                        <span wire:click='prevPage' class="font-medium text-blue-600 dark:text-blue-500 hover:underline cursor-pointer text-center sm:text-left">Página Anterior</span>
-                                    @endif
-                                    @if ($this->paginate($data)->currentPage() < $this->paginate($data)->lastPage())
-                                        <span wire:click='nextPage' class="font-medium text-blue-600 dark:text-blue-500 hover:underline cursor-pointer text-center sm:text-right">Próxima Página</span>
-                                    @endif
-                                </div>
+                            @if ($pagina && $pagina->lastPage() > 1)
+                                @php
+                                    $atual = $pagina->currentPage();
+                                    $ultima = $pagina->lastPage();
+                                    // Primeira, última e duas vizinhas da atual; o resto vira reticências.
+                                    $numeros = collect([1, $ultima, ...range(max(1, $atual - 2), min($ultima, $atual + 2))])
+                                        ->unique()->sort()->values();
+                                    $irParaLista = "document.getElementById('lista-reas')?.scrollIntoView({ behavior: 'smooth' })";
+                                @endphp
+                                <nav class="mt-6 flex flex-col sm:flex-row items-center justify-between gap-3 w-full" aria-label="Paginação dos REAs">
+                                    <p class="text-sm text-gray-600">
+                                        Mostrando <span class="font-medium text-gray-900">{{ $pagina->firstItem() }}–{{ $pagina->lastItem() }}</span>
+                                        de <span class="font-medium text-gray-900">{{ $pagina->total() }}</span> REAs
+                                    </p>
+                                    <div class="flex items-center gap-1">
+                                        <button
+                                            type="button"
+                                            wire:click="prevPage"
+                                            x-on:click="{{ $irParaLista }}"
+                                            @disabled($atual === 1)
+                                            class="inline-flex items-center gap-1 h-9 px-3 rounded-md border border-gray-200 bg-white text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 6l-6 6 6 6" />
+                                            </svg>
+                                            <span class="hidden sm:inline">Anterior</span>
+                                        </button>
+                                        @foreach ($numeros as $i => $numero)
+                                            @if ($i > 0 && $numero - $numeros[$i - 1] > 1)
+                                                <span class="w-6 text-center text-gray-400" aria-hidden="true">…</span>
+                                            @endif
+                                            <button
+                                                type="button"
+                                                wire:click="irParaPagina({{ $numero }})"
+                                                x-on:click="{{ $irParaLista }}"
+                                                @if ($numero === $atual) aria-current="page" @endif
+                                                @class([
+                                                    'h-9 min-w-9 px-2 rounded-md text-sm tabular-nums',
+                                                    'bg-blue-600 text-white font-semibold' => $numero === $atual,
+                                                    'border border-gray-200 bg-white text-gray-700 hover:bg-gray-50' => $numero !== $atual,
+                                                ])
+                                            >{{ $numero }}</button>
+                                        @endforeach
+                                        <button
+                                            type="button"
+                                            wire:click="nextPage"
+                                            x-on:click="{{ $irParaLista }}"
+                                            @disabled($atual === $ultima)
+                                            class="inline-flex items-center gap-1 h-9 px-3 rounded-md border border-gray-200 bg-white text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                                        >
+                                            <span class="hidden sm:inline">Próxima</span>
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 6l6 6-6 6" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </nav>
                             @endif
 
                             @php
