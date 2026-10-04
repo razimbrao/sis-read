@@ -7,6 +7,9 @@
 2. **`finished` prematuro**: o primeiro job que termina já marca a busca como concluída.
 3. **Condição de corrida no merge do JSON**: os jobs leem e escrevem `Data.data` sem lock. Com mais de
    um worker, resultados podem ser sobrescritos.
+   Observado em 2026-10-03 com dois workers: os 10 itens do MEC RED sumiram de `data.data`, embora
+   `search_metrics` registrasse 10 itens retornados. Por isso as correções do usuário (escrutabilidade)
+   só são liberadas depois que os três repositórios responderam (`FindREA::podeCorrigir`).
 4. ~~**Prompt do Ollama incompatível com o parser**: o prompt pede texto puro, mas o código lê
    `result['meta']` de um JSON. E `analisarMeta` procura `performance_aproximacao` com underscore.
    Na prática, a classificação quase sempre dá "Não classificado".~~ **Corrigido** (2026-09-18): o prompt pede

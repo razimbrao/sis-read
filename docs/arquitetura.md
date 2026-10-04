@@ -15,6 +15,8 @@ app/Livewire/FindREA.php  componente principal: busca, cadastro de colaborador, 
 app/Livewire/Emapre.php   questionário EMAPRE (28 itens) → meta dominante do usuário
 app/Livewire/Auth/*       login e cadastro simples
 app/Jobs/Process*.php     um job por repositório externo (Aquarela, MecRed, Eduplay)
+app/Recommendation/*      regras (RuleClassifier), ordem (Ranking), textos (ExplanationRenderer)
+                          e correções do usuário (UserCorrections)
 app/Helpers/helpers.php   getMecRedURL(): monta a URL da API MEC RED com filtros
 app/Console/Commands/RunRecommendationSimulation.php  simulation:run-all
 resources/views/welcome.blade.php              layout da home (sidebar "pesquisas mais acessadas")
