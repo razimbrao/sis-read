@@ -63,130 +63,159 @@
                                 ])
                             @endif
                             
-                            <div class="relative overflow-x-auto shadow-md sm:rounded-lg w-full">
-                                <table class="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400">
-                                    <thead class="text-xs text-gray-700 uppercase bg-gray-50 whitespace-nowrap">
-                                        <tr>
-                                            <th scope="col" class="px-6 py-3">@lang('Avalie')</th>
-                                            <th scope="col" class="px-6 py-3">@lang('Título')</th>
-                                            <th scope="col" class="px-6 py-3">@lang('Item')</th>
-                                            <th scope="col" class="px-6 py-3">@lang('Repositório')</th>
-                                            <th scope="col" class="px-6 py-3">@lang('Tipo de Interatividade')</th>
-                                            <th scope="col" class="px-6 py-3">@lang('Nível de Interatividade')</th>
-                                            <th scope="col" class="px-6 py-3">@lang('Estilo de Aprendizagem')</th>
-                                            <th scope="col" class="px-6 py-3">@lang('Estratégia')</th>
-                                            <th scope="col" class="px-6 py-3">@lang('Meta')</th>
-                                            <th scope="col" class="px-6 py-3">@lang('Link')</th>
-                                        </tr>
-                                    </thead>
+                            {{-- Um cartão por REA: a parte branca é o recurso; o painel azul embaixo é a transparência. --}}
+                            <div class="w-full space-y-4">
+                                <p class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500 px-1">
+                                    <span class="font-medium text-gray-700">Como ler os cartões:</span>
+                                    <span>em branco, o recurso recomendado;</span>
+                                    <span class="inline-flex items-center gap-1">
+                                        <span class="inline-block w-3 h-3 rounded-sm bg-blue-50 border border-blue-200" aria-hidden="true"></span>
+                                        no painel azul, por que o sistema o colocou nessa posição.
+                                    </span>
+                                </p>
+                                @php
+                                    $pagina = $data->data ? $this->paginate($data) : null;
+                                    $ocorrencias = [];
+                                    $coresMeta = ['ok' => 'text-green-700', 'falhou' => 'text-red-700', 'filtro_api' => 'text-blue-700'];
+                                    $textosMeta = ['ok' => 'Compatível', 'falhou' => 'Incompatível', 'filtro_api' => 'Filtrado pelo repositório'];
+                                @endphp
+                                @foreach ($pagina ?? [] as $rea)
                                     @php
-                                        $reaIndex = 0;
-                                        $ocorrencias = [];
+                                        $posicao = $pagina->firstItem() + $loop->index;
+                                        // A chave mantém a explicação aberta no REA certo quando uma correção reordena a lista.
+                                        $chaveLinha = isset($rea->chave)
+                                            ? 'rea-'.$rea->chave.'-'.($ocorrencias[$rea->chave] = ($ocorrencias[$rea->chave] ?? 0) + 1)
+                                            : 'rea-'.$this->page.'-'.$loop->iteration;
+                                        $explicacao = $rea->explicacao ?? null;
+                                        $faixa = \App\Recommendation\ExplanationRenderer::faixa($rea->recommended ?? null, $explicacao);
+                                        $criterioMeta = collect(\App\Recommendation\ExplanationRenderer::linhas($explicacao))->firstWhere('criterio', 'meta');
+                                        $destaque = auth()->user() ? $rea->recommended === 'meta_both' : $rea->recommended === 'both';
+                                        $links = array_values(array_filter([
+                                            $rea->link ?? null,
+                                            isset($rea->id) && ($rea->repositorio ?? null) === 'MECRED' ? 'https://plataformaintegrada.mec.gov.br/recurso/'.$rea->id : null,
+                                        ]));
+                                        $caracteristicas = [
+                                            'Tipo de interatividade' => $rea->interatividade ?? null,
+                                            'Nível de interatividade' => $rea->nivel_interatividade ?? null,
+                                            'Estilo de aprendizagem' => $rea->estilo_aprendizagem ?? null,
+                                            'Estratégia' => $rea->estrategia ?? null,
+                                        ];
                                     @endphp
-                                        @if ($data->data)
-                                            @foreach ($this->paginate($data) as $rea)
-                                                @php
-                                                    $reaIndex++;
-                                                    // A chave mantém a explicação aberta no REA certo quando uma correção reordena a lista.
-                                                    $chaveLinha = isset($rea->chave)
-                                                        ? 'rea-'.$rea->chave.'-'.($ocorrencias[$rea->chave] = ($ocorrencias[$rea->chave] ?? 0) + 1)
-                                                        : 'rea-'.$this->page.'-'.$reaIndex;
-                                                    $explicacao = $rea->explicacao ?? null;
-                                                    $faixa = \App\Recommendation\ExplanationRenderer::faixa($rea->recommended ?? null, $explicacao);
-                                                    $fontesInteratividade = [
-                                                        'dtype' => 'Derivado do tipo de interatividade (dtype) informado pelo repositório.',
-                                                        'meta_usuario' => 'Derivado da sua meta de aprendizagem, não do recurso.',
-                                                        'padrao_repositorio' => 'Valor padrão do repositório (todos os itens são vídeos).',
-                                                        'indisponivel' => 'O repositório não informa este dado.',
-                                                    ];
-                                                    $fonteInteratividade = $fontesInteratividade[$rea->fonte_interatividade ?? ''] ?? 'Fonte não registrada (busca anterior à transparência).';
-                                                @endphp
-                                            <tbody x-data="{ aberto: false }" wire:key="{{ $chaveLinha }}">
-                                                <tr @class([
-                                                    "bg-white border-b",
-                                                    "bg-yellow-50" => auth()->user() ? $rea->recommended === 'meta_both' : $rea->recommended === 'both'
-                                                ])>
-                                                    <td class="px-6 py-4" x-data="{ selection: null }">
-                                                        <div class="flex items-center space-x-3">
-                                                            <button 
-                                                                type="button" 
-                                                                @click="selection = selection === 'accepted' ? null : 'accepted'"
-                                                                :class="selection === 'accepted' ? 'text-green-600 scale-110' : 'text-gray-400 hover:text-green-500'"
-                                                                class="transition-all duration-200 focus:outline-none"
-                                                                title="Aceitar"
-                                                            >
-                                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-                                                                </svg>
-                                                            </button>
-
-                                                            <button 
-                                                                type="button" 
-                                                                @click="selection = selection === 'denied' ? null : 'denied'"
-                                                                :class="selection === 'denied' ? 'text-red-600 scale-110' : 'text-gray-400 hover:text-red-500'"
-                                                                class="transition-all duration-200 focus:outline-none"
-                                                                title="Negar"
-                                                            >
-                                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                                                </svg>
-                                                            </button>
-                                                        </div>
-                                                    </td>
-                                                    <td class="px-6 py-4 min-w-[200px]">
-                                                        <span class="block">{{ $rea->title }}</span>
-                                                        <span class="inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700" title="{{ $faixa['descricao'] }}">
-                                                            {{ $faixa['titulo'] }}
-                                                        </span>
-                                                        <button
-                                                            type="button"
-                                                            class="block mt-1 text-xs text-blue-600 hover:underline focus:outline-none"
-                                                            :aria-expanded="aberto"
-                                                            @click="aberto = !aberto; if (aberto) $wire.registrarExplicacao('abriu_explicacao', @js($rea->repositorio ?? null), @js($rea->title ?? null), @js($rea->recommended ?? null))"
-                                                        >
-                                                            <span x-text="aberto ? 'Ocultar explicação' : 'Por que este REA?'">Por que este REA?</span>
-                                                        </button>
-                                                    </td>
-                                                    <td class="px-6 py-4 whitespace-nowrap">{{ $rea->type }}</td>
-                                                    <td class="px-6 py-4 whitespace-nowrap">{{ $rea->repositorio }}</td>
-                                                    <td class="px-6 py-4 whitespace-nowrap" title="{{ $fonteInteratividade }}">{{ $rea->interatividade }}</td>
-                                                    <td class="px-6 py-4 whitespace-nowrap" title="{{ $fonteInteratividade }}">{{ $rea->nivel_interatividade }}</td>
-                                                    <td class="px-6 py-4 whitespace-nowrap" title="{{ $fonteInteratividade }}">{{ $rea->estilo_aprendizagem }}</td>
-                                                    <td class="px-6 py-4 whitespace-nowrap" title="{{ $fonteInteratividade }}">{{ $rea->estrategia }}</td>
-                                                    <td class="px-6 py-4 min-w-[150px]">
-                                                        @php
-                                                            $criterioMeta = collect(\App\Recommendation\ExplanationRenderer::linhas($explicacao))->firstWhere('criterio', 'meta');
-                                                        @endphp
-                                                        @if ($criterioMeta)
-                                                            <span title="{{ $criterioMeta['texto'] }}">{{ $criterioMeta['icone'] }} {{ ['ok' => 'Compatível', 'falhou' => 'Incompatível', 'filtro_api' => 'Filtrado pelo repositório'][$criterioMeta['status']] ?? 'Não verificado' }}</span>
+                                    <article
+                                        x-data="{ aberto: false }"
+                                        wire:key="{{ $chaveLinha }}"
+                                        @class([
+                                            'bg-white rounded-lg shadow-sm overflow-hidden border',
+                                            'border-yellow-300 ring-1 ring-yellow-200' => $destaque,
+                                            'border-gray-200' => ! $destaque,
+                                        ])
+                                    >
+                                        <div class="p-4 md:p-5 space-y-4">
+                                            <div class="flex flex-col sm:flex-row sm:items-start gap-3">
+                                                <div class="flex-1 min-w-0">
+                                                    <div class="flex flex-wrap items-center gap-2 mb-1 text-xs">
+                                                        <span class="font-semibold text-gray-400" title="Posição na lista">#{{ $posicao }}</span>
+                                                        <span class="px-2 py-0.5 rounded bg-gray-100 text-gray-700 font-medium">{{ $rea->repositorio }}</span>
+                                                        @if (!empty($rea->type))
+                                                            <span class="px-2 py-0.5 rounded bg-gray-100 text-gray-700">{{ $rea->type }}</span>
                                                         @endif
-                                                    </td>
-                                                    @if (isset($rea->link) || isset($rea->id))
-                                                        <td class="px-6 py-4 whitespace-nowrap">
-                                                            @if (isset($rea->link))
-                                                                <a href="{{ $rea->link }}" target="_blank" class="block truncate max-w-xs">
-                                                                    <span class="text-blue-500 underline">{{ $rea->link }}</span>
-                                                                </a>
-                                                            @endif
-                                                            @if (isset($rea->id) && $rea->repositorio === 'MECRED')
-                                                                <a href="https://plataformaintegrada.mec.gov.br/recurso/{{ $rea->id }}" target="_blank" class="block truncate max-w-xs">
-                                                                    <span class="text-blue-500 underline">
-                                                                        https://plataformaintegrada.mec.gov.br/recurso/{{ $rea->id }}
-                                                                    </span>
-                                                                </a>
-                                                            @endif
-                                                        </td>
-                                                    @endif
-                                                </tr>
-                                                <tr x-show="aberto" class="bg-gray-50 border-b">
-                                                    <td colspan="10" class="px-6 py-4 text-gray-700">
-                                                        @include('livewire.partials.explicacao-rea', ['explicacao' => $explicacao, 'faixa' => $faixa, 'rea' => $rea, 'podeCorrigir' => $podeCorrigir, 'prefixo' => $chaveLinha])
-                                                    </td>
-                                                </tr>
-                                            </tbody>
+                                                    </div>
+                                                    <h3 class="text-base font-semibold text-gray-900 break-words">
+                                                        @if ($links)
+                                                            <a href="{{ $links[0] }}" target="_blank" class="hover:text-blue-700 hover:underline">{{ $rea->title }}</a>
+                                                        @else
+                                                            {{ $rea->title }}
+                                                        @endif
+                                                    </h3>
+                                                </div>
+                                                <div class="flex items-center gap-2 shrink-0" x-data="{ selection: null }">
+                                                    <span class="text-xs text-gray-500">@lang('Avalie')</span>
+                                                    <button
+                                                        type="button"
+                                                        @click="selection = selection === 'accepted' ? null : 'accepted'"
+                                                        :class="selection === 'accepted' ? 'text-green-600 border-green-300 bg-green-50' : 'text-gray-400 border-gray-200 hover:text-green-500'"
+                                                        class="p-1 rounded-full border transition-all duration-200 focus:outline-none"
+                                                        title="Aceitar"
+                                                    >
+                                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                                                        </svg>
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        @click="selection = selection === 'denied' ? null : 'denied'"
+                                                        :class="selection === 'denied' ? 'text-red-600 border-red-300 bg-red-50' : 'text-gray-400 border-gray-200 hover:text-red-500'"
+                                                        class="p-1 rounded-full border transition-all duration-200 focus:outline-none"
+                                                        title="Negar"
+                                                    >
+                                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                                        </svg>
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <dl class="grid grid-cols-2 lg:grid-cols-5 gap-x-4 gap-y-3 text-sm">
+                                                @foreach ($caracteristicas as $rotulo => $valor)
+                                                    <div class="min-w-0">
+                                                        <dt class="text-xs text-gray-500">{{ $rotulo }}</dt>
+                                                        <dd class="text-gray-800 break-words">{{ filled($valor) ? $valor : '—' }}</dd>
+                                                    </div>
+                                                @endforeach
+                                                <div class="min-w-0">
+                                                    <dt class="text-xs text-gray-500">@lang('Meta')</dt>
+                                                    <dd @class(['break-words', $coresMeta[$criterioMeta['status'] ?? ''] ?? 'text-gray-600'])>
+                                                        @if ($criterioMeta)
+                                                            <span title="{{ $criterioMeta['texto'] }}">{{ $criterioMeta['icone'] }} {{ $textosMeta[$criterioMeta['status']] ?? 'Não verificado' }}</span>
+                                                        @else
+                                                            —
+                                                        @endif
+                                                    </dd>
+                                                </div>
+                                            </dl>
+
+
+                                            @foreach ($links as $link)
+                                                <a href="{{ $link }}" target="_blank" class="flex items-center gap-1 text-sm text-blue-600 hover:underline min-w-0">
+                                                    <span class="truncate">{{ $link }}</span>
+                                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M14 5h5v5M19 5l-9 9M17 14v5H5V7h5" />
+                                                    </svg>
+                                                </a>
                                             @endforeach
-                                        @endif
-                                </table>
+                                        </div>
+
+                                        {{-- Transparência: separada do recurso pela cor e pela borda. --}}
+                                        <div class="border-t border-blue-100 bg-blue-50">
+                                            <button
+                                                type="button"
+                                                class="w-full flex items-center justify-between gap-3 px-4 md:px-5 py-3 text-left text-sm text-blue-800 hover:bg-blue-100 focus:outline-none"
+                                                :aria-expanded="aberto"
+                                                @click="aberto = !aberto; if (aberto) $wire.registrarExplicacao('abriu_explicacao', @js($rea->repositorio ?? null), @js($rea->title ?? null), @js($rea->recommended ?? null))"
+                                            >
+                                                <span class="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                                        <circle cx="12" cy="12" r="9" />
+                                                        <path stroke-linecap="round" d="M12 11v5M12 8h.01" />
+                                                    </svg>
+                                                    <span class="font-medium">Por que este REA?</span>
+                                                    <span class="px-2 py-0.5 rounded-full text-xs bg-white border border-blue-200 text-blue-700" title="{{ $faixa['descricao'] }}">
+                                                        {{ $faixa['titulo'] }}
+                                                    </span>
+                                                </span>
+                                                <span class="flex items-center gap-1 shrink-0 text-xs">
+                                                    <span x-text="aberto ? 'Ocultar' : 'Ver explicação'">Ver explicação</span>
+                                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform" :class="aberto && 'rotate-180'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 9l6 6 6-6" />
+                                                    </svg>
+                                                </span>
+                                            </button>
+                                            <div x-show="aberto" style="display: none" class="px-4 md:px-5 pb-4 text-gray-700">
+                                                @include('livewire.partials.explicacao-rea', ['explicacao' => $explicacao, 'faixa' => $faixa, 'rea' => $rea, 'podeCorrigir' => $podeCorrigir, 'prefixo' => $chaveLinha])
+                                            </div>
+                                        </div>
+                                    </article>
+                                @endforeach
                             </div>
 
                             @if ($this->paginate($data))
