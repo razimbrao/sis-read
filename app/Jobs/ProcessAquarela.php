@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\Data;
 use App\Recommendation\RuleClassifier;
+use App\Recommendation\TiposPreferidos;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -28,6 +29,12 @@ class ProcessAquarela implements ShouldQueue
 
     public ?string $meta;
 
+    /**
+     * De onde veio a lista de tipos preferidos (TiposPreferidos::ORIGENS). Jobs enfileirados antes
+     * desta propriedade existir ficam com o padrão, os colaboradores.
+     */
+    public string $origemTipos = TiposPreferidos::COLABORADORES;
+
     private array $metrics = [
         'api_time' => 0,
         'api_calls' => 0,
@@ -43,13 +50,14 @@ class ProcessAquarela implements ShouldQueue
         ],
     ];
 
-    public function __construct($search, $types, $profile, $time, $meta = null)
+    public function __construct($search, $types, $profile, $time, $meta = null, string $origemTipos = TiposPreferidos::COLABORADORES)
     {
         $this->search = $search;
         $this->types = $types;
         $this->profile = $profile;
         $this->time = $time;
         $this->meta = $meta;
+        $this->origemTipos = $origemTipos;
     }
 
     public function handle()
@@ -200,7 +208,8 @@ class ProcessAquarela implements ShouldQueue
             ),
             'tipo' => RuleClassifier::criterioTipo(
                 $rea['tipoConteudo'] ?? '',
-                RuleClassifier::normalizarTipos($this->types)
+                RuleClassifier::normalizarTipos($this->types),
+                $this->origemTipos
             ),
         ];
 

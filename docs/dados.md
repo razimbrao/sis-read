@@ -2,7 +2,7 @@
 
 | Tabela | Uso |
 |---|---|
-| `users` | contas (login/cadastro) |
+| `users` | contas (login/cadastro). `tipos_preferidos` (JSON, `null` = sem preferência salva) e `incluir_tipos_colaboradores` (bool): tipos preferidos da conta ([plano-escrutabilidade.md §15](plano-escrutabilidade.md#15-tipos-preferidos-salvos-na-conta)) |
 | `questionnaires` | resultado do EMAPRE: `ma`, `mpa`, `mpe`, `dominant`, `user_id` |
 | `data` | uma linha por busca: `searched_at` (chave), `data` (JSON com os REAs), `finished`, `time` (soma dos segundos dos jobs), `stars` |
 | `feedback_reasons` | 6 motivos fixos (seeder `FeedbackReasonSeeder`) |
@@ -12,7 +12,7 @@
 | `feedbacks` | feedback livre sobre o sistema |
 | `search_metrics` | métricas por job: tempos de API/Ollama, chamadas, itens, erros e `breakdown` (JSON) |
 | `explanation_events` | uso das explicações: `searched_at`, `user_id`, `acao` (`abriu_explicacao`, `abriu_ordenacao`, `abriu_contexto`, `abriu_ocultos`, `abriu_correcao`), repositório, título, faixa |
-| `corrections` | correções do usuário (escrutabilidade): `searched_at`, `user_id`, `acao` (`corrigir`/`desfazer`), `alvo` (`nivel`/`meta`/`tipos`/`todas`), `chave_rea`, repositório, título, `valor_anterior`/`valor_novo` (JSON), faixa antes e depois, `itens_afetados` |
+| `corrections` | correções do usuário (escrutabilidade): `searched_at`, `user_id`, `acao` (`corrigir`/`desfazer`/`salvar_preferencia`), `alvo` (`nivel`/`meta`/`tipos`/`todas`), `chave_rea`, repositório, título, `valor_anterior`/`valor_novo` (JSON), faixa antes e depois, `itens_afetados`. `salvar_preferencia` registra a mudança dos tipos da conta; `searched_at` fica `null` quando ela é feita na tela Minhas preferências |
 | `jobs`, `failed_jobs`, `job_batches` | fila do Laravel |
 | `sessions`, `cache`, `cache_locks` | infraestrutura do Laravel |
 

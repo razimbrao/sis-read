@@ -123,16 +123,36 @@ class RuleClassifier
         ];
     }
 
-    public static function criterioTipo(?string $tipo, array $tiposPreferidos): array
+    /**
+     * `$origem` diz de onde veio a lista (TiposPreferidos::ORIGENS). Com a preferência da conta, a fonte é
+     * `usuario`, e `inclui_colaboradores` diz se a lista também tem os tipos dos colaboradores.
+     */
+    public static function criterioTipo(?string $tipo, array $tiposPreferidos, string $origem = TiposPreferidos::COLABORADORES): array
     {
         $valor = self::normalizar($tipo);
 
-        return [
+        $criterio = [
             'status' => $valor !== '' && in_array($valor, $tiposPreferidos, true) ? 'ok' : 'falhou',
             'valor' => $valor,
             'esperado' => array_values($tiposPreferidos),
             'fonte' => 'colaboradores',
         ];
+
+        if ($origem !== TiposPreferidos::COLABORADORES) {
+            $criterio['fonte'] = 'usuario';
+            $criterio['inclui_colaboradores'] = $origem === TiposPreferidos::CONTA_E_COLABORADORES;
+        }
+
+        return $criterio;
+    }
+
+    /**
+     * O tipo do REA é comparado com a lista de tipos preferidos (e a lista pode ser editada na busca).
+     * Itens de política (MEC RED, Eduplay) têm outra fonte e ficam de fora.
+     */
+    public static function tipoComparavel(?array $criterio): bool
+    {
+        return in_array($criterio['fonte'] ?? null, ['colaboradores', 'usuario'], true);
     }
 
     /**

@@ -14,6 +14,7 @@ use App\Models\Searches;
 use App\Recommendation\ExplanationRenderer;
 use App\Recommendation\Ranking;
 use App\Recommendation\RuleClassifier;
+use App\Recommendation\TiposPreferidos;
 use App\Recommendation\UserCorrections;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -94,6 +95,11 @@ class FindREA extends Component
      * O que o SisREAd usou sobre o usuário na última busca (painel "O que usamos sobre você").
      */
     public array $contexto = [];
+
+    /**
+     * Confirmação de que os tipos escolhidos na busca foram salvos na conta.
+     */
+    public ?string $avisoPreferencia = null;
 
     public function updatedMessage($value)
     {
@@ -396,7 +402,10 @@ class FindREA extends Component
      *
      * `contagem`: quantos REAs comparáveis da busca têm cada tipo (o efeito de marcar aquele tipo).
      *
-     * @return array{opcoes: array<int, string>, atuais: array<int, string>, originais: array<int, string>, editados: bool, contagem: array<string, int>}
+     * `fonte`: de onde veio a lista com que a busca começou (`colaboradores` ou `usuario`, a conta), e
+     * `inclui_colaboradores`: se a lista da conta foi unida à dos colaboradores.
+     *
+     * @return array{opcoes: array<int, string>, atuais: array<int, string>, originais: array<int, string>, editados: bool, contagem: array<string, int>, fonte: ?string, inclui_colaboradores: bool}
      */
     public function tiposPreferidos($data): array
     {
@@ -405,11 +414,13 @@ class FindREA extends Component
         $atuais = null;
         $originais = null;
         $editados = false;
+        $fonte = null;
+        $incluiColaboradores = false;
 
         foreach (json_decode($data->data ?? '[]', true) ?? [] as $rea) {
             $tipo = $rea['explicacao']['criterios']['tipo'] ?? null;
 
-            if (($tipo['fonte'] ?? null) !== 'colaboradores') {
+            if (! RuleClassifier::tipoComparavel($tipo)) {
                 continue;
             }
 
@@ -417,6 +428,8 @@ class FindREA extends Component
             $atuais ??= $tipo['esperado'] ?? [];
             $originais ??= $tipo['esperado_original'] ?? $tipo['esperado'] ?? [];
             $editados = $editados || isset($tipo['esperado_original']);
+            $fonte ??= $tipo['fonte'];
+            $incluiColaboradores = $incluiColaboradores || ! empty($tipo['inclui_colaboradores']);
 
             $opcoes[] = $tipo['valor'] ?? '';
 
@@ -434,10 +447,17 @@ class FindREA extends Component
             'originais' => $originais ?? [],
             'editados' => $editados,
             'contagem' => $contagem,
+            'fonte' => $fonte,
+            'inclui_colaboradores' => $incluiColaboradores,
         ];
     }
 
-    public function redefinirTipos(array $tipos): void
+    /**
+     * Redefine os tipos preferidos desta busca. Com `$salvarNaConta` (só para quem está logado), a mesma
+     * lista vira a preferência da conta e passa a valer nas próximas buscas, substituindo os tipos dos
+     * colaboradores. Desfazer na busca não mexe na conta.
+     */
+    public function redefinirTipos(array $tipos, bool $salvarNaConta = false): void
     {
         $this->resetErrorBag('correcao');
         $data = $this->dadosDaBusca();
@@ -450,6 +470,13 @@ class FindREA extends Component
 
         $preferidos = $this->tiposPreferidos($data);
         $tipos = RuleClassifier::normalizarTipos(array_filter($tipos, 'is_string'));
+        $user = $salvarNaConta ? auth()->user() : null;
+
+        if ($user && ! $tipos) {
+            $this->addError('correcao', 'Para salvar na sua conta, marque ao menos um tipo.');
+
+            return;
+        }
 
         if (! $preferidos['opcoes'] && ! $preferidos['originais']) {
             $this->addError('correcao', 'Nenhum REA desta busca é comparado com os tipos preferidos.');
@@ -474,6 +501,17 @@ class FindREA extends Component
 
         if ($this->contexto) {
             $this->contexto['tipos_usuario'] = $restaura ? null : $tipos;
+        }
+
+        if ($user) {
+            // A escolha feita na busca é exatamente a lista que o usuário quer: salva sem unir aos colaboradores.
+            TiposPreferidos::salvar($user, $tipos, false, $this->timestampSession);
+
+            if ($this->contexto) {
+                $this->contexto['tipos_conta'] = $tipos;
+            }
+
+            $this->avisoPreferencia = 'Tipos preferidos salvos na sua conta. Valem a partir da próxima busca.';
         }
     }
 
@@ -632,6 +670,7 @@ class FindREA extends Component
 
         $this->timestampSession = now()->setTimezone('UTC');
         $this->page = 1;
+        $this->avisoPreferencia = null;
 
         Searches::create([
             'interest' => $this->sanitizeSearch($this->interest),
@@ -687,9 +726,14 @@ class FindREA extends Component
             RuleClassifier::normalizarTipos(Collaborator::query()->pluck('item')->all()),
             $tiposBusca
         ));
-        $types = array_merge($tiposBusca, $tiposGerais);
 
-        $questionnaire = auth()->user()?->questionnaire;
+        // A preferência salva na conta substitui os tipos dos colaboradores (ou se une a eles, se o usuário pediu).
+        $user = auth()->user();
+        $tiposConta = TiposPreferidos::daConta($user);
+        $preferidos = TiposPreferidos::resolver($tiposConta, (bool) $user?->incluir_tipos_colaboradores, array_merge($tiposBusca, $tiposGerais));
+        $types = $preferidos['tipos'];
+
+        $questionnaire = $user?->questionnaire;
 
         $this->contexto = [
             'perfil' => $this->profile,
@@ -697,6 +741,8 @@ class FindREA extends Component
             'termo_api' => $this->interestApiSearch,
             'tipos_busca' => $tiposBusca,
             'tipos_gerais' => $tiposGerais,
+            'tipos_conta' => $tiposConta,
+            'origem_tipos' => $preferidos['origem'],
             'meta' => $questionnaire?->dominant ? [
                 'dominante' => $questionnaire->dominant,
                 'ma' => round((float) $questionnaire->ma, 2),
@@ -707,7 +753,7 @@ class FindREA extends Component
 
         $this->data = Data::create(['searched_at' => $this->timestampSession]);
 
-        ProcessAquarela::dispatch($this->interestApiSearch, $types, $this->profile, $this->timestampSession, auth()->user()?->questionnaire?->dominant);
+        ProcessAquarela::dispatch($this->interestApiSearch, $types, $this->profile, $this->timestampSession, auth()->user()?->questionnaire?->dominant, $preferidos['origem']);
 
         ProcessMecRed::dispatch($this->interestApiSearch, $types, $this->profile, $this->interest, $this->timestampSession, auth()->user()?->questionnaire?->dominant);
 

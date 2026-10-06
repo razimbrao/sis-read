@@ -5,7 +5,8 @@
 > Estado: **implementado** (passos 1 a 6), branch `feat/escrutabilidade`, PR #4. A especificação
 > do que ficou no código está em [transparencia.md §13](transparencia.md#13-escrutabilidade) e o
 > fluxo em [fluxos-transparencia.md §10](fluxos-transparencia.md#10-fluxo-9-escrutabilidade).
-> Diferenças em relação a este plano estão na §14.
+> Diferenças em relação a este plano estão na §14. Tipos preferidos salvos na conta (branch
+> `feat/preferencias-por-conta`): §15.
 
 ## 1. O que é escrutabilidade aqui
 
@@ -25,6 +26,7 @@ Decisões já tomadas (2026-10-03):
 
 1. **Escopo:** nível do REA, meta do REA e tipos preferidos. A meta EMAPRE do usuário fica fora.
 2. **Alcance:** a correção vale **só para a busca atual**. Não afeta outras buscas nem outros usuários.
+   Exceção posterior (2026-10-06): o usuário logado pode salvar os tipos preferidos na conta (§15).
 3. **Efeito:** a correção **reordena a lista na hora** e fica registrada.
 
 Princípios, herdados da transparência:
@@ -368,7 +370,8 @@ existe.
 
 - **Meta EMAPRE do usuário** (trocar a dominante, resolver o empate #19).
 - **Correção que vale para buscas futuras** ou para todos os usuários. Os registros de `corrections`
-  já permitem medir se valeria a pena, mas uma correção compartilhada pede moderação.
+  já permitem medir se valeria a pena, mas uma correção compartilhada pede moderação. Para os
+  **tipos preferidos** do próprio usuário isso já existe (§15); nível e meta de um REA continuam por busca.
 - **Contrafactual** ("se o tipo fosse vídeo, subiria para Nível e tipo"). Combina bem com a
   escrutabilidade, porque o contrafactual mostra o que mudaria e a correção permite mudar. Mas é
   independente.
@@ -388,3 +391,75 @@ existe.
   ele se distingue da abertura de uma correção de item.
 - `wire:ignore` nos formulários de correção, com `wire:key` que inclui o estado (estimado ou
   corrigido): sem isso o poll de 2,5 s fechava o formulário ou deixava rótulos desatualizados.
+
+## 15. Tipos preferidos salvos na conta
+
+> Branch `feat/preferencias-por-conta` (2026-10-06). Decisões tomadas com o autor do TCC.
+
+Até aqui, os tipos preferidos vinham dos colaboradores, e o usuário só podia trocá-los **por busca**.
+Agora o usuário logado salva a sua lista na conta, e ela vale em todas as buscas seguintes.
+
+### 15.1 Decisões
+
+1. **A preferência da conta substitui os tipos dos colaboradores.** Com a opção "Incluir também os
+   tipos sugeridos pelos colaboradores", as duas listas são unidas. Sem preferência salva (ou depois
+   de "Remover minha preferência"), vale o comportamento anterior. Uma lista vazia não é salva: ela
+   significa "sem preferência".
+2. **Na busca, editar os tipos vale para a busca e, opcionalmente, para a conta.** O checklist ganha a
+   caixa "Salvar também como minha preferência", marcada por padrão para quem está logado. Salvar pela
+   busca grava exatamente a lista escolhida e desliga a união com os colaboradores, porque a lista
+   escolhida já é a que o usuário quer.
+3. **Desfazer na busca não mexe na conta.** "Voltar aos tipos da sua conta" e "Desfazer todas" restauram a
+   lista com que a busca começou (a da conta, se havia). A conta só muda pela caixa ou pela tela
+   Minhas preferências.
+4. **Visitante não muda nada**: edita por busca, como antes, e não vê a caixa nem o link.
+5. **Independente das flags de explicabilidade.** A tela da conta e a aplicação da preferência na busca
+   são funcionalidade básica. Os painéis podem ficar desligados que a preferência continua valendo.
+
+```mermaid
+flowchart TD
+    U{"usuário logado com<br/>tipos_preferidos?"} -- não --> C["tipos dos colaboradores<br/>fonte: colaboradores"]
+    U -- sim --> I{"incluir_tipos_colaboradores?"}
+    I -- não --> S["tipos da conta<br/>fonte: usuario, inclui_colaboradores: false"]
+    I -- sim --> UN["conta ∪ colaboradores<br/>fonte: usuario, inclui_colaboradores: true"]
+    C & S & UN --> J["ProcessAquarela → criterioTipo<br/>(rótulo pela mesma regra)"]
+    J --> B["busca: Editar tipos preferidos<br/>(esperado_original = lista inicial)"]
+    B -- "Salvar também como minha preferência" --> CT[("users.tipos_preferidos")]
+    CT -. próxima busca .-> U
+```
+
+### 15.2 Dados
+
+| Onde | O quê |
+|---|---|
+| `users.tipos_preferidos` | JSON com a lista normalizada; `null` = sem preferência |
+| `users.incluir_tipos_colaboradores` | une a lista da conta aos tipos dos colaboradores |
+| `corrections` | `acao = salvar_preferencia`, `alvo = tipos`, lista antes e depois. `searched_at` é a busca, quando salvo por ela, ou `null`, quando salvo na tela da conta |
+| critério `tipo` em `data.data` | `fonte: usuario` e `inclui_colaboradores` quando a lista veio da conta |
+
+`fonte: usuario` no critério de tipo não é uma correção: `corrigido` continua dependendo de
+`esperado_original` (edição na busca). O texto diz "entre os tipos preferidos da sua conta". As
+funções que antes exigiam `fonte = colaboradores` passam a usar `RuleClassifier::tipoComparavel`
+(`colaboradores` ou `usuario`).
+
+### 15.3 Tela Minhas preferências
+
+Rota autenticada `/conta/preferencias` (`App\Livewire\Preferencias`), com link no bloco do usuário da
+tela de busca e no painel **O que usamos sobre você**. É um checklist fechado, pelo mesmo motivo do
+checklist da busca (§6). Cada opção mostra a origem: salvo na sua conta, sugerido por colaboradores
+ou aparece nos repositórios. A última são os tipos comparáveis das 30 buscas mais recentes. Visual
+simples, no estilo atual; o redesign da UI aplica o visual definitivo.
+
+### 15.4 Arquivos
+
+| Arquivo | Mudança |
+|---|---|
+| `database/migrations/2026_10_06_000000_add_tipos_preferidos_to_users_table.php` | colunas em `users` (reversível) |
+| `app/Recommendation/TiposPreferidos.php` | **novo**: `resolver`, `daConta`, `salvar` |
+| `app/Recommendation/RuleClassifier.php` | `criterioTipo(..., $origem)`, `tipoComparavel` |
+| `app/Recommendation/ExplanationRenderer.php` | texto "tipos preferidos da sua conta" |
+| `app/Jobs/ProcessAquarela.php` | recebe `origemTipos` |
+| `app/Livewire/FindREA.php` | aplica a preferência em `findInApi`; `redefinirTipos($tipos, $salvarNaConta)` |
+| `app/Livewire/Preferencias.php` + view | **nova** tela |
+| `resources/views/livewire/partials/transparencia-paineis.blade.php` | "Da sua conta", link, caixa de salvar |
+| `tests/Feature/PreferenciasPorContaTest.php`, `tests/Unit/TiposPreferidosTest.php` | salvar, aplicar na busca seguinte, anônimo inalterado, isolamento entre usuários, desfazer |
