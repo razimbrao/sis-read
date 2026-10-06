@@ -9,7 +9,10 @@ use Illuminate\Database\Eloquent\Model;
  */
 class Correction extends Model
 {
-    public const ACOES = ['corrigir', 'desfazer'];
+    /**
+     * `salvar_preferencia`: o usuário salvou (ou removeu) os tipos preferidos da conta.
+     */
+    public const ACOES = ['corrigir', 'desfazer', 'salvar_preferencia'];
 
     public const ALVOS = ['nivel', 'meta', 'tipos', 'todas'];
 

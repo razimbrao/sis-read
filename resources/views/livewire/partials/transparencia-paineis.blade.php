@@ -219,10 +219,20 @@
                     <div class="sm:col-span-2 p-3 rounded-lg bg-gray-50">
                         <dt class="text-xs uppercase tracking-wide text-gray-500">Tipos preferidos</dt>
                         <dd class="mt-0.5 text-gray-800">
+                            @php $daConta = $tipos['fonte'] === 'usuario'; @endphp
                             @if ($tipos['editados'])
                                 <span class="text-amber-700">{{ ExplanationRenderer::MARCA_CORRECAO }} Definidos por você nesta busca:</span>
                                 {{ $tipos['atuais'] ? implode(', ', $tipos['atuais']) : 'nenhum' }}.
-                                <span class="block text-xs text-gray-500">O sistema tinha usado: {{ $tipos['originais'] ? implode(', ', $tipos['originais']) : 'nenhum' }}.</span>
+                                <span class="block text-xs text-gray-500">{{ $daConta ? 'A busca começou com os tipos da sua conta' : 'O sistema tinha usado' }}: {{ $tipos['originais'] ? implode(', ', $tipos['originais']) : 'nenhum' }}.</span>
+                            @elseif ($daConta)
+                                {{-- Preferência salva na conta (docs/plano-escrutabilidade.md §15). --}}
+                                <span class="font-medium text-gray-900">Da sua conta:</span>
+                                {{ implode(', ', $contexto['tipos_conta'] ?? []) ?: implode(', ', $tipos['originais']) }}.
+                                @if ($tipos['inclui_colaboradores'])
+                                    <span class="block text-xs text-gray-500">Unidos aos tipos dos colaboradores, como você pediu: {{ implode(', ', $tipos['originais']) }}.</span>
+                                @else
+                                    <span class="block text-xs text-gray-500">Substituem os tipos cadastrados pelos colaboradores.</span>
+                                @endif
                             @else
                                 @if ($contexto['tipos_busca'] ?? [])
                                     De colaboradores com o mesmo interesse e perfil: {{ implode(', ', $contexto['tipos_busca']) }}.
@@ -233,6 +243,14 @@
                                     <span class="block">De outros colaboradores: {{ implode(', ', $contexto['tipos_gerais']) }}.</span>
                                 @endif
                             @endif
+                            @auth
+                                <a href="{{ route('preferencias') }}" class="inline-block mt-1 text-xs text-blue-700 hover:underline">
+                                    {{ $daConta ? 'Editar os tipos da sua conta' : 'Salvar tipos preferidos na sua conta' }}
+                                </a>
+                            @endauth
+                            @if ($avisoPreferencia)
+                                <p class="mt-1 text-xs text-emerald-700" role="status">{{ $avisoPreferencia }}</p>
+                            @endif
 
                             @if (! $tipos['opcoes'])
                                 {{-- Nenhum REA comparável (ex.: Aquarela não respondeu): editar não teria efeito. --}}
@@ -242,6 +260,7 @@
                                 @php
                                     $origemTipo = function (string $tipo) use ($contexto, $tipos) {
                                         return match (true) {
+                                            $tipos['fonte'] === 'usuario' && in_array($tipo, $contexto['tipos_conta'] ?? [], true) => 'da sua conta',
                                             in_array($tipo, $contexto['tipos_busca'] ?? [], true) => 'colaboradores, mesmo interesse e perfil',
                                             in_array($tipo, $contexto['tipos_gerais'] ?? [], true) => 'outros colaboradores',
                                             in_array($tipo, $tipos['originais'], true) => 'usado pelo sistema',
@@ -253,7 +272,7 @@
                                 <div
                                     wire:ignore
                                     wire:key="tipos-{{ md5(json_encode($tipos['atuais'])) }}"
-                                    x-data="{ editando: false, selecionados: @js($tipos['atuais']) }"
+                                    x-data="{ editando: false, selecionados: @js($tipos['atuais']), salvarNaConta: @js(auth()->check()) }"
                                     class="mt-2"
                                 >
                                     <div x-show="!editando" class="flex flex-wrap gap-2">
@@ -267,7 +286,7 @@
                                                 type="button"
                                                 class="px-3 py-1 rounded-md text-xs text-blue-700 hover:underline focus:outline-none"
                                                 @click="$wire.redefinirTipos(@js($tipos['originais']))"
-                                            >Voltar aos tipos do sistema</button>
+                                            >{{ $daConta ? 'Voltar aos tipos da sua conta' : 'Voltar aos tipos do sistema' }}</button>
                                         @endif
                                     </div>
                                     <div x-show="editando" style="display: none" class="mt-1 space-y-3 p-3 rounded-lg bg-white border border-gray-200 text-xs">
@@ -289,12 +308,21 @@
                                                 </label>
                                             @endforeach
                                         </fieldset>
+                                        @auth
+                                            <label class="flex items-start gap-2 text-gray-700">
+                                                <input type="checkbox" x-model="salvarNaConta" class="mt-0.5 rounded border-gray-300">
+                                                <span>
+                                                    Salvar também como minha preferência
+                                                    <span class="block text-gray-500">Vale nas próximas buscas e substitui os tipos dos colaboradores. Desfazer aqui não muda a sua conta.</span>
+                                                </span>
+                                            </label>
+                                        @endauth
                                         <div class="flex flex-wrap gap-2">
                                             <button
                                                 type="button"
                                                 class="px-3 py-1 rounded-md bg-blue-600 text-white font-medium hover:bg-blue-700"
-                                                @click="$wire.redefinirTipos(selecionados); editando = false"
-                                            >Salvar</button>
+                                                @click="$wire.redefinirTipos(selecionados, salvarNaConta); editando = false"
+                                            >Aplicar</button>
                                             <button
                                                 type="button"
                                                 class="px-3 py-1 rounded-md text-gray-600 hover:bg-gray-100"

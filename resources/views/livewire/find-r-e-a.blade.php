@@ -60,6 +60,7 @@
                                     'ocultos' => $this->ocultos($data),
                                     'podeCorrigir' => $podeCorrigir,
                                     'tipos' => $this->tiposPreferidos($data),
+                                    'avisoPreferencia' => $avisoPreferencia,
                                 ])
                             @endif
                             
@@ -573,6 +574,10 @@
                     <span class="font-semibold text-lg mb-2">
                         {{ auth()->user()->name }}
                     </span>
+                    {{-- Preferências da conta: não dependem dos painéis de transparência. --}}
+                    <a href="{{ route('preferencias') }}" class="text-sm text-blue-600 hover:underline mb-2">
+                        Minhas preferências
+                    </a>
                     @if(!auth()->user()->questionnaire)
                         <a href="{{ route('emapre') }}">
                             <button 

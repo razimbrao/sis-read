@@ -225,6 +225,15 @@ class ExplanationRenderer
             };
         }
 
+        // Lista da preferência salva na conta (docs/plano-escrutabilidade.md §15).
+        if (($c['fonte'] ?? null) === 'usuario') {
+            $deOnde = empty($c['inclui_colaboradores']) ? 'da sua conta' : 'da sua conta e dos colaboradores';
+
+            return $status === 'ok'
+                ? "Tipo {$valor}, entre os tipos preferidos {$deOnde} ({$lista})."
+                : "Tipo {$valor} não está entre os tipos preferidos {$deOnde} ({$lista}).";
+        }
+
         return match (true) {
             $status === 'nao_avaliado' => 'Tipo não comparado com os preferidos: '.($c['evidencia'] ?? 'informação indisponível').'.',
             $status === 'ok' => "Tipo {$valor}, entre os tipos preferidos ({$lista}).",

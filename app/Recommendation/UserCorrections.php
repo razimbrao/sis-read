@@ -73,7 +73,7 @@ class UserCorrections
     {
         $criterio = $rea['explicacao']['criterios']['tipo'] ?? null;
 
-        if (($criterio['fonte'] ?? null) !== 'colaboradores') {
+        if (! RuleClassifier::tipoComparavel($criterio)) {
             return $rea;
         }
 

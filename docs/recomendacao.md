@@ -26,6 +26,16 @@ Cada REA retornado recebe um rótulo `recommended`:
 A regra está em `App\Recommendation\RuleClassifier` e a ordem em `App\Recommendation\Ranking`.
 Cada REA também grava a `explicacao` da decisão; veja [transparencia.md](transparencia.md).
 
+## Tipos preferidos
+A lista com que o tipo do REA é comparado vem, por padrão, dos colaboradores: os tipos cadastrados
+com o mesmo interesse e perfil, mais os de todos os outros colaboradores. O usuário logado pode
+salvar os seus tipos preferidos na conta (tela **Minhas preferências**, `/conta/preferencias`). Com
+preferência salva, ela **substitui** os tipos dos colaboradores em todas as buscas; com a opção
+"incluir também os tipos sugeridos pelos colaboradores", as duas listas são unidas. O critério de
+tipo grava a fonte `usuario` nesse caso (`App\Recommendation\TiposPreferidos`,
+[plano-escrutabilidade.md §15](plano-escrutabilidade.md#15-tipos-preferidos-salvos-na-conta)).
+Visitantes continuam com os tipos dos colaboradores.
+
 O usuário pode corrigir o nível e a meta estimados de um REA e os tipos preferidos da busca. O
 rótulo é recalculado pela mesma regra (`RuleClassifier::rotular`), só para a busca atual; veja
 [transparencia.md §13](transparencia.md#13-escrutabilidade).

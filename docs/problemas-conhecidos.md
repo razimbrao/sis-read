@@ -27,7 +27,10 @@
 11. ~~**Tipos preferidos de todos os colaboradores nunca casavam**: entravam como arrays (`[[item]]`) e sem
     normalização.~~ **Corrigido** (2026-09-18) com `RuleClassifier::normalizarTipos`. Efeito colateral: agora
     qualquer tipo cadastrado por **qualquer** colaborador conta como preferido, o que aumenta os itens `both`.
-    O painel "O que usamos sobre você" separa as duas origens.
+    O painel "O que usamos sobre você" separa as duas origens. **Mitigado** (2026-10-06): o usuário logado pode
+    salvar os seus tipos preferidos na conta, e eles substituem os dos colaboradores
+    ([plano-escrutabilidade.md §15](plano-escrutabilidade.md#15-tipos-preferidos-salvos-na-conta)). Visitantes
+    continuam com o comportamento acima.
 12. Tipos cadastrados por colaboradores incluem valores ruidosos (ex.: `item`, `programacao`) que viram
     "tipos preferidos". Vale revisar a tabela `collaborators`.
 13. A linha "Eficiência" da tela de resultados divide por `Data.time`. Se `time` for `null` (nenhum job
