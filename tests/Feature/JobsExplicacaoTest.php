@@ -7,6 +7,7 @@ use App\Jobs\ProcessEduplay;
 use App\Jobs\ProcessMecRed;
 use App\Models\Data;
 use App\Recommendation\RuleClassifier;
+use App\Recommendation\TiposPreferidos;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\DB;
@@ -92,6 +93,20 @@ class JobsExplicacaoTest extends TestCase
         $this->assertTrue($reas[2]['explicacao']['criterios']['nivel']['assumido']);
 
         Http::assertNotSent(fn (Request $r) => str_contains($r->url(), '11434'));
+    }
+
+    public function test_aquarela_com_tipos_da_conta_grava_fonte_usuario(): void
+    {
+        $this->fakeAquarela();
+
+        (new ProcessAquarela('algoritmos', ['jogo'], 'Ensino fundamental', $this->searchedAt, null, TiposPreferidos::CONTA))->handle();
+
+        $tipos = array_map(fn ($rea) => $rea['explicacao']['criterios']['tipo'], $this->reas());
+
+        $this->assertSame(['usuario', 'usuario', 'usuario'], array_column($tipos, 'fonte'));
+        $this->assertSame([false, false, false], array_column($tipos, 'inclui_colaboradores'));
+        $this->assertSame(['falhou', 'falhou', 'ok'], array_column($tipos, 'status'));
+        $this->assertSame(['profile', 'interest', 'interest'], array_column($this->reas(), 'recommended'));
     }
 
     public function test_aquarela_com_meta_usa_a_classificacao_do_llm(): void
@@ -255,6 +270,19 @@ class JobsExplicacaoTest extends TestCase
         $this->assertSame(['interest', 'both'], array_column($reas, 'recommended'));
         $this->assertSame([1, 3], $this->graus($reas));
         $this->assertSame('padrao_repositorio', $reas[0]['fonte_interatividade']);
+    }
+
+    public function test_eduplay_com_tipos_da_conta_grava_fonte_usuario_e_soma_o_tipo_no_grau(): void
+    {
+        $this->fakeEduplay(null, [['name' => 'Aula de ensino médio', 'contentUrl' => 'http://v2']]);
+
+        (new ProcessEduplay('algoritmos', 'Ensino medio', $this->searchedAt, null, ['video'], TiposPreferidos::CONTA))->handle();
+
+        $rea = $this->reas()[0];
+        $tipo = $rea['explicacao']['criterios']['tipo'];
+        $this->assertSame(['ok', 'usuario', false], [$tipo['status'], $tipo['fonte'], $tipo['inclui_colaboradores']]);
+        $this->assertSame('both', $rea['recommended']);
+        $this->assertSame(1, $rea['explicacao']['grau']['pontos']['tipo']);
     }
 
     public function test_eduplay_classifica_a_meta_por_ia_e_rotula_pela_regra_comum(): void
