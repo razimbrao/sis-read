@@ -18,7 +18,7 @@ class Emapre extends Component
         $this->validate($rules);
 
         $fatores = [
-            'ma'  => [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+            'ma' => [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
             'mpa' => [13, 14, 15, 16, 17, 18, 19, 20, 21],
             'mpe' => [22, 23, 24, 25, 26, 27, 28],
         ];
@@ -36,7 +36,8 @@ class Emapre extends Component
 
         $dominante = array_keys($resultados, max($resultados))[0];
 
-        auth()->user()->questionnaire()->create([
+        // Refazer o questionário substitui a resposta anterior (uma linha por usuário).
+        auth()->user()->questionnaire()->updateOrCreate([], [
             'ma' => $resultados['ma'],
             'mpa' => $resultados['mpa'],
             'mpe' => $resultados['mpe'],
@@ -82,7 +83,7 @@ class Emapre extends Component
                 26 => 'Uma razão pela qual eu não participo da aula é evitar parecer ignorante.',
                 27 => 'Não questiono o professor quando tenho dúvidas na matéria para não correr o risco de parecer menos inteligente que meus colegas.',
                 28 => 'Não participo das aulas para evitar que meus colegas e professores me achem pouco inteligente.',
-            ]
+            ],
         ];
 
         return view('livewire.emapre', compact('questions'))->layout('layouts.app', ['title' => 'Questionário']);

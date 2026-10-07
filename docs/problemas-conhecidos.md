@@ -78,5 +78,6 @@
     primeira linha é o **cabeçalho da planilha**, o que criou o interesse "Interesse" e o tipo "Item".
 21. 61 `failed_jobs` acumulados, nunca revisados.
 22. Os REAs do MEC RED não têm link: `ProcessMecRed` grava `'link' => ''` e não grava o `id`, que a tela
-    usava para montar `plataformaintegrada.mec.gov.br/recurso/{id}`. O cartão aparece sem o botão "Abrir
-    recurso" (desde antes do redesign; era o mesmo na tabela e nos cartões antigos).
+    usava para montar `plataformaintegrada.mec.gov.br/recurso/{id}`. Desde 2026-10-07 o cartão mostra o botão
+    "Abrir recurso" desabilitado, com o tooltip "O repositório não informou o link deste recurso." (antes o
+    botão sumia). A causa, no job, continua aberta.

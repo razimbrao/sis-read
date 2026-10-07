@@ -64,7 +64,6 @@
         </div>
     </form>
 
-    {{-- Só leitura: refazer o questionário depende de Emapre::submit não criar uma segunda linha. --}}
     <section class="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 space-y-4">
         <div>
             <h2 class="text-lg font-bold">Meta de aprendizagem</h2>
@@ -85,6 +84,7 @@
                 @endforeach
             </ul>
             <p class="text-sm text-slate-600">Médias de 1 a 5. A maior define a meta.</p>
+            <a href="{{ route('emapre') }}" class="inline-flex items-center min-h-12 px-5 rounded-xl border border-emerald-700 text-emerald-800 font-bold hover:bg-emerald-50">Refazer o questionário</a>
         @else
             <p class="text-[15px] text-slate-700">Você ainda não respondeu. São 28 frases rápidas (uns 5 minutos).</p>
             <a href="{{ route('emapre') }}" class="inline-flex items-center min-h-12 px-5 rounded-xl bg-emerald-700 text-white font-bold hover:bg-emerald-800">Responder o questionário</a>
