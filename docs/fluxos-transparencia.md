@@ -766,7 +766,7 @@ REA do Aquarela. Se ela casar com a dele, o REA volta para a lista ([Fluxo 9](#1
 |---|---|---|---|
 | Por que este REA está nesta faixa? | `RuleClassifier::rotular` / regra fixa do job | `recommended` + `explicacao` em `data.data` | selo + `explicacao-rea.blade.php` |
 | Como o nível foi descoberto? | `RuleClassifier::inferirNivel` | `criterios.nivel.evidencia`, `assumido` | `ExplanationRenderer::textoNivel` |
-| Quem classificou a meta? | `ProcessAquarela::classificarMetaComLLM` | `criterios.meta.modelo`, `duracao` | `textoMeta` + aviso |
+| Quem classificou a meta? | `MetaClassifier` (nos três jobs) | `criterios.meta.modelo`, `duracao` | `textoMeta` + aviso |
 | Por que a lista tem esta ordem? | `Ranking::ordem` | — (calculado do rótulo) | painel **Como ordenamos** |
 | O que ficou de fora e por quê? | `Ranking::motivo` | — | **Ver os REAs que não aparecem** |
 | Algum repositório falhou? | jobs (`timeouts_errors`) | `search_metrics` | progresso + **Repositórios consultados** |

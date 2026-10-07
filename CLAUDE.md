@@ -16,6 +16,7 @@ Documentação completa em `docs/` (comece por `docs/README.md` e `docs/arquitet
 - Questionário de metas (EMAPRE): `app/Livewire/Emapre.php`
 - URL do MEC RED: `app/Helpers/helpers.php`
 - Regras, ordenação e textos das explicações: `app/Recommendation/` (spec em `docs/transparencia.md`)
+- Classificação de meta por LLM (os três jobs): `app/Recommendation/MetaClassifier.php` + `app/Recommendation/Llm/`, configuração em `config/llm.php` (`docs/integracoes.md`)
 - Feature flags de explicabilidade e grupos do experimento: `app/Experimento/Experimento.php` + `config/experimento.php`, diretiva `@explicabilidade` (`docs/feature-flags.md`)
 - Correções do usuário (escrutabilidade): `app/Recommendation/UserCorrections.php` + ações no `FindREA` (`docs/plano-escrutabilidade.md`)
 

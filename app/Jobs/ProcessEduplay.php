@@ -10,6 +10,7 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\DB;
 use App\Models\Data;
+use App\Recommendation\MetaClassifier;
 use App\Recommendation\RuleClassifier;
 
 class ProcessEduplay implements ShouldQueue
@@ -48,6 +49,7 @@ class ProcessEduplay implements ShouldQueue
 
         $allData = [];
         $model = Data::query()->where('searched_at', $this->time)->first();
+        $classificador = app(MetaClassifier::class);
 
         while ($page < 10) {
             $metrics['api_calls']++;
@@ -83,14 +85,21 @@ class ProcessEduplay implements ShouldQueue
                 'estrategia'           => 'Ativa / Abstrata / Visual/Verbal',
             ];
 
-            foreach ($search['contents'] as $rea) {
-                // Eduplay segue uma regra mais direta nas recomendações atuais do seu sistema
-                $recommended = ($this->meta === 'ma' || $this->meta === 'mpa') ? 'meta_one' : 'interest';
-                $explicacao = RuleClassifier::explicacao(
-                    $this->criterios(),
-                    $recommended,
-                    'O Eduplay só tem vídeos e não informa etapa; a faixa é definida por política do SisREAd a partir da sua meta.'
-                );
+            $conteudos = array_values(array_filter($search['contents'], 'is_array'));
+
+            // Com meta, a página inteira vai para a LLM de uma vez (cache e chamadas simultâneas).
+            $metas = $this->meta ? $classificador->criterios($this->meta, array_map(fn ($rea) => [
+                'chave'     => $this->chave($rea),
+                'titulo'    => $rea['name'] ?? null,
+                'descricao' => $rea['metatagDescription'] ?? null,
+                'tipo'      => 'Vídeo',
+            ], $conteudos)) : [];
+
+            foreach ($conteudos as $i => $rea) {
+                // Nível e tipo não são conferidos no Eduplay; a faixa sai da mesma regra dos outros repositórios.
+                $criterios = $this->criterios($metas[$i] ?? null);
+                $recommended = RuleClassifier::rotular($criterios, (bool) $this->meta);
+                $explicacao = RuleClassifier::explicacao($criterios, $recommended);
 
                 // 📊 1. Incrementa a radiografia
                 if (isset($metrics['breakdown'][$recommended])) {
@@ -109,7 +118,7 @@ class ProcessEduplay implements ShouldQueue
                 }
 
                 $allData[] = array_merge([
-                    'chave'        => RuleClassifier::chave('Eduplay', $rea['contentUrl'] ?? null, $rea['name'] ?? null),
+                    'chave'        => $this->chave($rea),
                     'title'        => $rea['name'],
                     'link'         => $rea['contentUrl'],
                     'type'         => 'Vídeo',
@@ -147,13 +156,18 @@ class ProcessEduplay implements ShouldQueue
             'breakdown'       => json_encode($metrics['breakdown']),
             'created_at'      => now(),
             'updated_at'      => now(),
-        ]);
+        ] + $classificador->metricas());
+    }
+
+    private function chave(array $rea): string
+    {
+        return RuleClassifier::chave('Eduplay', $rea['contentUrl'] ?? null, $rea['name'] ?? null);
     }
 
     /**
-     * Critérios do Eduplay: nível e tipo não são verificados; a meta segue uma regra fixa do repositório.
+     * Critérios do Eduplay: nível e tipo não são verificados; a meta é classificada por IA (MetaClassifier).
      */
-    private function criterios(): array
+    private function criterios(?array $meta): array
     {
         $criterios = [
             'tema'  => RuleClassifier::criterioTema($this->search, 'Eduplay'),
@@ -173,14 +187,8 @@ class ProcessEduplay implements ShouldQueue
             ],
         ];
 
-        if ($this->meta) {
-            $criterios['meta'] = [
-                'status'    => in_array($this->meta, ['ma', 'mpa'], true) ? 'ok' : 'falhou',
-                'valor'     => 'video',
-                'esperado'  => $this->meta,
-                'fonte'     => 'padrao_repositorio',
-                'evidencia' => 'Vídeos do Eduplay são considerados adequados às metas Aprendizagem e Performance-aproximação.',
-            ];
+        if ($this->meta && $meta !== null) {
+            $criterios['meta'] = $meta;
         }
 
         return $criterios;
