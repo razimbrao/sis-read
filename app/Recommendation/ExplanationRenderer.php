@@ -48,7 +48,7 @@ class ExplanationRenderer
 
     /**
      * Título e descrição da faixa. Numa busca com meta, as faixas sem meta reúnem os REAs cuja meta não
-     * pôde ser conferida. `observacao` só existe em REAs gravados antes do grau (versao_regras 1), quando
+     * pôde ser conferida ou é diferente da do usuário (Ranking::grupoMeta). `observacao` só existe em REAs gravados antes do grau (versao_regras 1), quando
      * MEC RED e Eduplay tinham faixa fixa por política.
      */
     public static function faixa(?string $rotulo, $explicacao = null, bool $comMeta = false): array
@@ -65,9 +65,16 @@ class ExplanationRenderer
         }
 
         if (($comMeta || isset($explicacao['criterios']['meta'])) && in_array($rotulo, Ranking::ORDEM_SEM_META, true)) {
+            [$sufixo, $motivo] = match ($explicacao['criterios']['meta']['status'] ?? null) {
+                // Sem o REA (painel "Como ordenamos"), a faixa reúne os dois grupos.
+                null => [', meta não conferida ou diferente da sua', 'a meta do REA não pôde ser conferida ou é diferente da sua, por isso ele fica abaixo dos compatíveis com a sua meta'],
+                'falhou' => [', meta diferente da sua', 'a meta do REA é diferente da sua, por isso ele fica no fim da lista, abaixo dos compatíveis e dos de meta não conferida'],
+                default => [', meta não conferida', 'a meta do REA não pôde ser conferida, por isso ele fica abaixo dos compatíveis com a sua meta'],
+            };
+
             return [
-                'titulo' => $faixa['titulo'].', meta não conferida',
-                'descricao' => $faixa['descricao'].'; a meta do REA não pôde ser conferida, por isso ele fica abaixo dos compatíveis com a sua meta',
+                'titulo' => $faixa['titulo'].$sufixo,
+                'descricao' => $faixa['descricao'].'; '.$motivo,
                 'graus' => $faixa['graus'],
             ];
         }

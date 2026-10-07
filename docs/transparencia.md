@@ -5,6 +5,7 @@
 > A escrutabilidade (o usuário corrige o que o sistema estimou) está em §13 e no
 > [plano-escrutabilidade.md](plano-escrutabilidade.md). Explicações contrafactuais ficam para a próxima fase.
 > O caminho dos dados, com diagramas, está em [fluxos-transparencia.md](fluxos-transparencia.md).
+> Cada funcionalidade descrita aqui fica atrás de uma flag do experimento ([feature-flags.md](feature-flags.md)).
 
 ## 1. Objetivo e princípios
 
@@ -40,7 +41,7 @@ Princípios:
 
 | Nível | Pergunta do usuário | Onde aparece |
 |---|---|---|
-| Item | "Por que este REA está aqui?" | Selo com grau e faixa ("Grau 5 de 7 · Meta e nível ou tipo") + botão **Por que este REA?** com a conta do grau e o desempate |
+| Item | "Por que este REA está aqui?" | Selo com grau e faixa ("Grau 5 de 7 · Meta e nível ou tipo"; abaixo dos compatíveis, ", meta não conferida" ou ", meta diferente da sua") + botão **Por que este REA?** com a conta do grau e o desempate |
 | Lista | "Como esta lista foi ordenada?" | Painel **Como ordenamos** (fórmula do grau, contagem por faixa, desempate, itens ocultos) |
 | Usuário | "O que o sistema usou sobre mim?" | Painel **O que usamos sobre você** (perfil, termo, tipos preferidos com origem, meta EMAPRE com médias) |
 
@@ -164,7 +165,7 @@ conta como conferência:
 | Critério | Status | Evidência |
 |---|---|---|
 | tema | `ok` | termo da busca |
-| nível | regex sobre `name` e `description`, como no Aquarela (fonte `regex`, corrigível) | trecho casado, ou *assumido* (0 ponto) |
+| nível | regex sobre `name` e `description`, como no Aquarela (fonte `regex`, corrigível). A busca não devolve `description` (conferido em 2026-10-06), então na prática só o título conta | trecho casado, ou *assumido* (0 ponto) |
 | tipo | `nao_avaliado` | o MEC RED não informa o tipo |
 | meta | com meta: classificada por IA (§5.4), só pelo título | "classificado só pelo título, porque o MEC RED não informa descrição nem tipo; a busca já pediu tipos de objeto associados à sua meta (object_type=…)" |
 
@@ -223,16 +224,19 @@ desempate estável e documentado:
 
 A ordem de chegada dos jobs não influi (testado com a entrada embaralhada em `RankingTest`).
 
-| Contexto | Faixas exibidas | Ocultos |
+| Contexto | Ordem | Ocultos |
 |---|---|---|
-| Usuário com meta dominante | `meta_both` → `meta_one` → `meta` → `both` → `profile` → `interest` (as três últimas com "meta não conferida") | REAs com meta **conferida** como incompatível (`falhou`) |
+| Usuário com meta dominante | compatíveis (`meta_both` → `meta_one` → `meta`) → meta não conferida (`both` → `profile` → `interest`) → meta diferente da sua (`both` → `profile` → `interest`) | nenhum por causa da meta |
 | Sem meta | `both` → `profile` → `interest` | `meta*` |
 
+O grupo vem de `Ranking::grupoMeta` e é o primeiro item da chave de ordenação, antes do grau. A
+justificativa de manter dois grupos abaixo dos compatíveis está em [recomendacao.md](recomendacao.md).
 `Ranking::visivel` decide o que aparece. `Ranking::contar` devolve a contagem por faixa, o total de
-ocultos, o **motivo** de cada oculto (`meta_incompativel`, `meta_corrigida_incompativel`,
-`sem_meta_usuario`, `outros`) e `meta_nao_conferida`: quantos REAs aparecem no fim da lista porque a
-meta deles não pôde ser conferida. O motivo `meta_nao_avaliada` deixou de existir, porque esses REAs
-não são mais ocultados (problema #16). O painel **Como ordenamos** mostra a fórmula, as faixas com o
+ocultos, o **motivo** de cada oculto (`sem_meta_usuario`, `outros`) e quantos REAs estão abaixo dos
+compatíveis: `meta_nao_conferida`, `meta_incompativel` (a IA classificou diferente) e
+`meta_corrigida_incompativel` (o usuário informou uma meta diferente). Os motivos `meta_nao_avaliada`
+(problema #16) e, depois, `meta_incompativel` deixaram de ocultar REAs: a meta não esconde ninguém
+(problema #18). O painel **Como ordenamos** mostra a fórmula, as faixas com o
 intervalo de grau, o desempate e também a situação de cada repositório (`FindREA::statusRepositorios`,
 lida de `search_metrics`): itens retornados, falha (tempo esgotado ou erro) ou ainda consultando.
 Assim, uma lista sem itens do Aquarela é explicada ("não respondeu"), e não fica só a ausência.
@@ -332,7 +336,7 @@ Os testes rodam em SQLite em memória (`phpunit.xml`), sem tocar em `database/da
 | Arquivo | Cobre |
 |---|---|
 | `tests/Unit/RuleClassifierTest.php` | normalização, tipos, inferência de nível com evidência, critérios, `casaMeta`, tabela de rótulos, tabela de graus, grau e rótulo concordam, nível assumido não conta |
-| `tests/Unit/RankingTest.php` | ordem por grau com e sem meta, desempate por posição e repositório, ordem de chegada não influi, só a meta incompatível oculta, contagem |
+| `tests/Unit/RankingTest.php` | ordem por grau com e sem meta, desempate por posição e repositório, ordem de chegada não influi, grupos de meta (compatível → não conferida → diferente), a meta não oculta, contagem |
 | `tests/Unit/ExplanationRendererTest.php` | texto por status, nunca ✓ para não avaliado, resumo, avisos, faixa, item legado sem explicação |
 | `tests/Feature/JobsExplicacaoTest.php` | os três jobs com `Http::fake`: todo item tem `explicacao` e grau coerentes com `recommended`, posição gravada, MEC RED e Eduplay sem prioridade fixa, meta por IA nos três, Ollama fora do ar → `nao_avaliado`, métricas da LLM em `search_metrics` |
 | `tests/Feature/MetaClassifierTest.php` | sucesso, JSON inválido/ambíguo, timeout, provedor que lança exceção, cache entre buscas (e o que não entra nele), parada após falhas, orçamento, lotes, aquecimento, `LLM_PROVEDOR=nenhum`, configuração por `config/llm.php` |
@@ -373,7 +377,7 @@ diagramas: [plano-escrutabilidade.md](plano-escrutabilidade.md). Fluxo:
 | O que se corrige | Onde | Efeito |
 |---|---|---|
 | Nível do REA (fonte `regex`) | **Por que este REA?** → Corrigir | status recalculado contra o perfil |
-| Meta do REA (fonte `llm`) | **Por que este REA?** e **Ver os REAs que não aparecem** | status recalculado contra a meta do usuário; um oculto pode voltar |
+| Meta do REA (fonte `llm`) | **Por que este REA?** | status recalculado contra a meta do usuário; o REA muda de grupo (sobe para os compatíveis ou desce para meta diferente) |
 | Tipos preferidos | **O que usamos sobre você** → Editar tipos preferidos | critério de tipo recalculado em todos os REAs comparáveis; logado, pode também salvar na conta |
 | Tipos preferidos da conta | **Minhas preferências** (`/conta/preferencias`) | vale em todas as buscas seguintes do usuário |
 
@@ -408,8 +412,8 @@ Textos novos (`ExplanationRenderer`):
 | resumo | Atende: tema, nível (corrigido por você). Não atende: tipo. |
 
 O aviso de estimativa automática some para o critério corrigido. O painel **Como ordenamos** mostra
-"N REAs mudaram de faixa por correções suas" e **Desfazer todas**. Um oculto cuja meta o usuário
-marcou como diferente da dele aparece com o motivo `meta_corrigida_incompativel`.
+"N REAs mudaram de faixa por correções suas" e **Desfazer todas**. Um REA cuja meta o usuário
+marcou como diferente da dele vai para o fim da lista e é contado em `meta_corrigida_incompativel`.
 
 Registro: cada correção e cada desfazer viram uma linha em `corrections` (ver [dados.md](dados.md)),
 e abrir um formulário de correção grava o evento `abriu_correcao` em `explanation_events`. No painel

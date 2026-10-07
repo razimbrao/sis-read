@@ -10,7 +10,7 @@
     $mudancaFaixa = ExplanationRenderer::mudancaFaixa($explicacao);
     $grau = ExplanationRenderer::grau($explicacao);
     $chave = $rea->chave ?? null;
-    $temCorrigivel = $chave && collect($linhas)->contains('corrigivel', true);
+    $temCorrigivel = $chave && \App\Experimento\Experimento::ativa('escrutabilidade') && collect($linhas)->contains('corrigivel', true);
     $politica = ! empty(is_array($explicacao) ? ($explicacao['observacao'] ?? null) : ($explicacao->observacao ?? null));
 @endphp
 <div class="bg-white rounded-md border border-blue-100 p-4 space-y-3 text-sm">

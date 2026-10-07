@@ -11,6 +11,7 @@
 @endphp
 <div class="grid gap-4 md:grid-cols-2 items-start mb-6 text-sm text-gray-700">
     {{-- Painel 1: como a lista foi montada. --}}
+    @explicabilidade('painel-ordenacao')
     <details wire:ignore.self class="group bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden" x-on:toggle="if ($el.open) $wire.registrarExplicacao('abriu_ordenacao')">
         <summary class="flex items-center gap-3 p-4 cursor-pointer list-none [&::-webkit-details-marker]:hidden hover:bg-gray-50">
             <span class="flex items-center justify-center w-9 h-9 rounded-full bg-blue-50 text-blue-600 shrink-0" aria-hidden="true">
@@ -57,15 +58,29 @@
                         </li>
                     @endforeach
                 </ol>
-                @if ($resumo['com_meta'] && $resumo['meta_nao_conferida'] > 0)
-                    <p class="text-xs text-gray-600">
-                        {{ $resumo['meta_nao_conferida'] }} {{ $resumo['meta_nao_conferida'] === 1 ? 'REA aparece' : 'REAs aparecem' }} abaixo dos compatíveis com a sua meta
-                        porque a meta deles não pôde ser conferida. Só saem da lista os REAs cuja meta foi conferida como incompatível.
-                    </p>
+                @if ($resumo['com_meta'])
+                    @php
+                        $incompativeis = $resumo['meta_incompativel'] + $resumo['meta_corrigida_incompativel'];
+                    @endphp
+                    <div class="text-xs text-gray-600 space-y-1">
+                        <p>
+                            Abaixo dos compatíveis com a sua meta vêm primeiro os REAs cuja meta não pôde ser conferida e, no fim,
+                            os de meta diferente da sua. Em cada grupo, a ordem é a mesma: do maior grau para o menor.
+                            A meta não tira nenhum REA da lista, porque a classificação por IA pode errar.
+                        </p>
+                        @if ($resumo['meta_nao_conferida'] > 0)
+                            <p>{{ $resumo['meta_nao_conferida'] }} {{ $resumo['meta_nao_conferida'] === 1 ? 'REA está' : 'REAs estão' }} com a meta não conferida.</p>
+                        @endif
+                        @if ($incompativeis > 0)
+                            <p>
+                                {{ $incompativeis }} {{ $incompativeis === 1 ? 'REA está' : 'REAs estão' }} com a meta diferente da sua{{ $resumo['meta_corrigida_incompativel'] > 0 ? ' ('.$resumo['meta_corrigida_incompativel'].' por correção sua)' : '' }}.
+                            </p>
+                        @endif
+                    </div>
                 @endif
             </section>
 
-            @if ($resumo['corrigidos'] > 0)
+            @if ($resumo['corrigidos'] > 0 && $podeCorrigir)
                 <div class="flex flex-wrap items-center gap-x-3 gap-y-1 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800">
                     <span>
                         {{ ExplanationRenderer::MARCA_CORRECAO }}
@@ -84,8 +99,6 @@
             @if ($resumo['ocultos'] > 0)
                 @php
                     $textosMotivos = [
-                        'meta_incompativel' => 'incompatíveis com a sua meta',
-                        'meta_corrigida_incompativel' => 'incompatíveis com a sua meta (corrigido por você)',
                         'sem_meta_usuario' => 'que dependem de uma meta de aprendizagem',
                         'outros' => 'sem faixa definida',
                     ];
@@ -106,7 +119,7 @@
                             @endforeach
                         </ul>
                     </div>
-                    @if (!empty($ocultos))
+                    @if (!empty($ocultos) && \App\Experimento\Experimento::ativa('reas-ocultos'))
                         <details wire:ignore.self class="group/ocultos border-t border-gray-200" x-on:toggle="if ($el.open) $wire.registrarExplicacao('abriu_ocultos')">
                             <summary class="flex items-center justify-between gap-2 px-3 py-2 cursor-pointer list-none [&::-webkit-details-marker]:hidden text-blue-700 font-medium hover:bg-blue-50">
                                 <span>Ver os REAs que não aparecem</span>
@@ -178,8 +191,10 @@
             </p>
         </div>
     </details>
+    @endexplicabilidade
 
     {{-- Painel 2: os dados do usuário que entraram na recomendação. --}}
+    @explicabilidade('painel-contexto')
     <details wire:ignore.self class="group bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden" x-on:toggle="if ($el.open) $wire.registrarExplicacao('abriu_contexto')">
         <summary class="flex items-center gap-3 p-4 cursor-pointer list-none [&::-webkit-details-marker]:hidden hover:bg-gray-50">
             <span class="flex items-center justify-center w-9 h-9 rounded-full bg-emerald-50 text-emerald-600 shrink-0" aria-hidden="true">
@@ -256,7 +271,7 @@
                                 <p class="mt-1 text-xs text-emerald-700" role="status">{{ $avisoPreferencia }}</p>
                             @endif
 
-                            @if (! $tipos['opcoes'])
+                            @if (! $tipos['opcoes'] || ! \App\Experimento\Experimento::ativa('escrutabilidade'))
                                 {{-- Nenhum REA comparável (ex.: Aquarela não respondeu): editar não teria efeito. --}}
                             @elseif (! $podeCorrigir)
                                 <p class="text-xs text-gray-500 mt-1">Você poderá editar os tipos preferidos quando todos os repositórios responderem.</p>
@@ -375,4 +390,5 @@
             @endif
         </div>
     </details>
+    @endexplicabilidade
 </div>
