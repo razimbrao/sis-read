@@ -98,14 +98,21 @@
         @else
             {{-- Sem link (ex.: a busca do MEC RED não devolve o endereço, problema #22). --}}
             @php $semLinkId = 'sem-link-'.substr(md5(($rea->chave ?? '').($rea->title ?? '')), 0, 10); @endphp
+            {{-- Tooltip próprio: o navegador não mostra `title` sobre botão desabilitado. Abre ao passar o
+                 mouse e ao focar pelo teclado (o span é focável; o botão desabilitado não é). --}}
             <div class="flex-[1_1_180px] flex flex-col justify-center gap-2">
-                <span class="inline-flex" title="O repositório não informou o link deste recurso.">
-                    <button type="button" disabled aria-describedby="{{ $semLinkId }}"
-                            class="w-full inline-flex justify-center items-center gap-2 min-h-12 px-5 rounded-xl bg-slate-200 text-slate-500 text-[15px] font-bold cursor-not-allowed">
-                        Abrir recurso
-                    </button>
-                </span>
-                <span id="{{ $semLinkId }}" class="sr-only">Link indisponível: o repositório não informou o endereço deste recurso.</span>
+                <div class="relative group">
+                    <span tabindex="0" aria-describedby="{{ $semLinkId }}" class="block rounded-xl cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 focus-visible:ring-offset-2">
+                        <button type="button" disabled tabindex="-1"
+                                class="pointer-events-none w-full inline-flex justify-center items-center gap-2 min-h-12 px-5 rounded-xl bg-slate-200 text-slate-500 text-[15px] font-bold">
+                            Abrir recurso
+                        </button>
+                    </span>
+                    <span id="{{ $semLinkId }}" role="tooltip"
+                          class="pointer-events-none absolute z-20 bottom-full left-1/2 -translate-x-1/2 mb-2 sm:bottom-auto sm:left-auto sm:right-full sm:top-1/2 sm:-translate-y-1/2 sm:translate-x-0 sm:mb-0 sm:mr-3 w-max max-w-[15rem] rounded-lg bg-slate-900 px-3 py-2 text-center text-sm font-medium text-white shadow-lg opacity-0 invisible transition-opacity duration-150 group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible">
+                        O repositório não informou o link deste recurso.
+                    </span>
+                </div>
             </div>
         @endif
     </article>
