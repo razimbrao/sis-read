@@ -280,11 +280,10 @@ class FindREA extends Component
     public function ocultos($data, int $limite = 20): array
     {
         $comMeta = $this->temMeta();
-        $exibidas = Ranking::ordem($comMeta);
         $ocultos = [];
 
         foreach (json_decode($data->data ?? '[]') ?? [] as $rea) {
-            if (in_array($rea->recommended ?? null, $exibidas, true)) {
+            if (Ranking::visivel($rea, $comMeta)) {
                 continue;
             }
 
@@ -711,7 +710,7 @@ class FindREA extends Component
 
         ProcessMecRed::dispatch($this->interestApiSearch, $types, $this->profile, $this->interest, $this->timestampSession, auth()->user()?->questionnaire?->dominant);
 
-        ProcessEduplay::dispatch($this->interestApiSearch, $this->profile, $this->timestampSession, auth()->user()?->questionnaire?->dominant);
+        ProcessEduplay::dispatch($this->interestApiSearch, $this->profile, $this->timestampSession, auth()->user()?->questionnaire?->dominant, $types);
 
         $this->loading = false;
     }

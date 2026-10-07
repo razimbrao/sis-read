@@ -20,13 +20,15 @@ class ProcessEduplay implements ShouldQueue
     public string $profile;
     public $time;
     public ?string $meta;
+    public array $types;
 
-    public function __construct($search, $profile, $time, $meta)
+    public function __construct($search, $profile, $time, $meta, array $types = [])
     {
         $this->search = $search;
         $this->profile = $profile;
         $this->time = $time;
         $this->meta = $meta;
+        $this->types = $types;
     }
 
     public function handle(): void
@@ -47,6 +49,7 @@ class ProcessEduplay implements ShouldQueue
         ];
 
         $allData = [];
+        $posicao = 0;
         $model = Data::query()->where('searched_at', $this->time)->first();
 
         while ($page < 10) {
@@ -84,13 +87,10 @@ class ProcessEduplay implements ShouldQueue
             ];
 
             foreach ($search['contents'] as $rea) {
-                // Eduplay segue uma regra mais direta nas recomendações atuais do seu sistema
-                $recommended = ($this->meta === 'ma' || $this->meta === 'mpa') ? 'meta_one' : 'interest';
-                $explicacao = RuleClassifier::explicacao(
-                    $this->criterios(),
-                    $recommended,
-                    'O Eduplay só tem vídeos e não informa etapa; a faixa é definida por política do SisREAd a partir da sua meta.'
-                );
+                // Mesma regra dos outros repositórios: rótulo e grau vêm só dos critérios conferidos.
+                $criterios = $this->criterios($rea);
+                $recommended = RuleClassifier::rotular($criterios, (bool) $this->meta);
+                $explicacao = RuleClassifier::explicacao($criterios, $recommended, ++$posicao);
 
                 // 📊 1. Incrementa a radiografia
                 if (isset($metrics['breakdown'][$recommended])) {
@@ -151,35 +151,28 @@ class ProcessEduplay implements ShouldQueue
     }
 
     /**
-     * Critérios do Eduplay: nível e tipo não são verificados; a meta segue uma regra fixa do repositório.
+     * Critérios do Eduplay, pela mesma regra dos outros repositórios: nível pelo regex sobre título e
+     * descrição, e tipo (sempre vídeo) comparado com os preferidos. O Eduplay não informa nada que permita
+     * conferir a meta, então ela fica não avaliada e não pontua.
      */
-    private function criterios(): array
+    private function criterios(array $rea): array
     {
         $criterios = [
             'tema'  => RuleClassifier::criterioTema($this->search, 'Eduplay'),
-            'nivel' => [
-                'status'    => 'nao_avaliado',
-                'valor'     => null,
-                'esperado'  => RuleClassifier::normalizar($this->profile),
-                'fonte'     => 'padrao_repositorio',
-                'evidencia' => 'o Eduplay não informa a etapa de ensino',
-            ],
-            'tipo'  => [
-                'status'    => 'nao_avaliado',
-                'valor'     => 'video',
-                'esperado'  => [],
-                'fonte'     => 'padrao_repositorio',
-                'evidencia' => 'o Eduplay só tem vídeos e o tipo não é comparado com os preferidos',
-            ],
+            'nivel' => RuleClassifier::criterioNivel(
+                $this->profile,
+                RuleClassifier::inferirNivel($rea['name'] ?? '', $rea['metatagDescription'] ?? '')
+            ),
+            'tipo'  => RuleClassifier::criterioTipo('Vídeo', RuleClassifier::normalizarTipos($this->types)),
         ];
 
         if ($this->meta) {
             $criterios['meta'] = [
-                'status'    => in_array($this->meta, ['ma', 'mpa'], true) ? 'ok' : 'falhou',
-                'valor'     => 'video',
+                'status'    => 'nao_avaliado',
+                'valor'     => null,
                 'esperado'  => $this->meta,
                 'fonte'     => 'padrao_repositorio',
-                'evidencia' => 'Vídeos do Eduplay são considerados adequados às metas Aprendizagem e Performance-aproximação.',
+                'evidencia' => 'o Eduplay não informa dados para conferir a meta do recurso',
             ];
         }
 

@@ -93,14 +93,11 @@ class ProcessMecRed implements ShouldQueue
         ];
 
         if (is_array($search)) {
-            foreach ($search as $rea) {
-                // MecRed devolve dados mais diretos baseados na API construída
-                $recommended = $this->meta ? 'meta_both' : 'both';
-                $explicacao = RuleClassifier::explicacao(
-                    $this->criterios(),
-                    $recommended,
-                    'Por política do SisREAd, os itens do MEC RED ficam na faixa mais alta, mas nível, tipo e meta não puderam ser conferidos neste repositório.'
-                );
+            foreach (array_values($search) as $indice => $rea) {
+                // Mesma regra dos outros repositórios: rótulo e grau vêm só dos critérios conferidos.
+                $criterios = $this->criterios($rea);
+                $recommended = RuleClassifier::rotular($criterios, (bool) $this->meta);
+                $explicacao = RuleClassifier::explicacao($criterios, $recommended, $indice + 1);
 
                 // 📊 1. Incrementa a radiografia
                 if (isset($metrics['breakdown'][$recommended])) {
@@ -127,7 +124,7 @@ class ProcessMecRed implements ShouldQueue
                     'recommended'  => $recommended,
                     'explicacao'   => $explicacao,
                     'titulo'       => $rea['name'] ?? '',
-                    'descricao'    => '',
+                    'descricao'    => $rea['description'] ?? '',
                     'tipoConteudo' => '',
                     'dtype'        => '',
                 ], $interactivityData);
@@ -161,30 +158,18 @@ class ProcessMecRed implements ShouldQueue
     }
 
     /**
-     * Critérios do MEC RED. Os filtros de etapa e tipo são enviados na URL, mas a API não devolve a etapa
-     * nem o tipo de cada item (e, em 2026-09-18, ignorava os filtros): nada disso pode ser conferido,
-     * então os critérios ficam como não avaliados, com o pedido feito como evidência.
+     * Critérios do MEC RED. A API não devolve a etapa nem o tipo de cada item (e, em 2026-09-18, ignorava
+     * os filtros da URL): o nível é estimado pelo mesmo regex do Aquarela sobre título e descrição, e tipo
+     * e meta ficam como não avaliados, com o pedido feito como evidência. Nada disso pontua sem conferência.
      */
-    private function criterios(): array
+    private function criterios(array $rea): array
     {
         $criterios = ['tema' => RuleClassifier::criterioTema($this->search, 'MEC RED')];
 
-        $etapas = mecRedEtapas($this->profile);
-        $criterios['nivel'] = $etapas
-            ? [
-                'status'    => 'nao_avaliado',
-                'valor'     => null,
-                'esperado'  => RuleClassifier::normalizar($this->profile),
-                'fonte'     => 'filtro_api',
-                'evidencia' => 'o SisREAd pediu ao MEC RED itens desta etapa (educational_stages=' . implode(',', $etapas) . '), mas o repositório não informa a etapa de cada item para conferir',
-            ]
-            : [
-                'status'    => 'nao_avaliado',
-                'valor'     => null,
-                'esperado'  => RuleClassifier::normalizar($this->profile),
-                'fonte'     => 'filtro_api',
-                'evidencia' => 'seu perfil não corresponde a uma etapa do MEC RED; nenhum filtro de nível foi aplicado',
-            ];
+        $criterios['nivel'] = RuleClassifier::criterioNivel(
+            $this->profile,
+            RuleClassifier::inferirNivel($rea['name'] ?? '', $rea['description'] ?? '')
+        );
 
         $criterios['tipo'] = [
             'status'    => 'nao_avaliado',

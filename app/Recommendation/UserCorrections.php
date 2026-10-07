@@ -8,7 +8,7 @@ use InvalidArgumentException;
  * Correções do usuário sobre o que o sistema estimou (escrutabilidade, docs/plano-escrutabilidade.md).
  *
  * Funções puras: recebem um REA de `Data.data` (array) e devolvem o REA corrigido. O critério corrigido
- * guarda o original do job em `original`, e o rótulo é recalculado por RuleClassifier::rotular,
+ * guarda o original do job em `original`, e o rótulo e o grau são recalculados por RuleClassifier,
  * de modo que decisão e explicação continuam vindo da mesma fonte.
  */
 class UserCorrections
@@ -141,7 +141,7 @@ class UserCorrections
     }
 
     /**
-     * Grava o critério e recalcula o rótulo. `faixa_original` guarda o rótulo do job enquanto houver correção.
+     * Grava o critério e recalcula o rótulo e o grau. `faixa_original` guarda o rótulo do job enquanto houver correção.
      */
     private static function aplicar(array $rea, string $nome, array $criterio): array
     {
@@ -153,6 +153,7 @@ class UserCorrections
         $criterios = $rea['explicacao']['criterios'];
         $rea['recommended'] = RuleClassifier::rotular($criterios, isset($criterios['meta']));
         $rea['explicacao']['faixa'] = $rea['recommended'];
+        $rea['explicacao']['grau'] = RuleClassifier::grau($criterios, $rea['explicacao']['grau']['posicao'] ?? null);
 
         if (self::corrigido($rea)) {
             $rea['explicacao']['faixa_original'] = $faixaOriginal;
