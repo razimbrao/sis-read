@@ -37,12 +37,18 @@
     `search()` valida o termo antes de disparar os jobs e mostra a mensagem com os interesses disponíveis.
 15. **O MEC RED ignora os filtros enviados**: em 2026-09-18, `educational_stages` e `object_type` na URL
     devolveram os mesmos 10 itens de uma busca sem filtros (ex.: "Anos Iniciais do Ensino Fundamental" para
-    perfil *Ensino médio*). Mesmo assim, a política coloca todo item do MEC RED na faixa mais alta
-    (`both`/`meta_both`). A explicação já declara que nível, tipo e meta não foram conferidos, mas a
-    **ordenação** continua favorecendo esses itens. Caminhos possíveis: usar o parâmetro `filters` (JSON com
-    `nivel`), buscar a etapa de cada item em `/public/resource/{id}`, ou tirar o MEC RED da faixa mais alta.
-16. Busca com meta e Ollama fora do ar: todos os REAs do Aquarela ficam ocultos (meta não avaliada). O painel
-    "Como ordenamos" mostra esse motivo separadamente.
+    perfil *Ensino médio*). ~~Mesmo assim, a política colocava todo item do MEC RED na faixa mais alta
+    (`both`/`meta_both`), e a ordenação favorecia esses itens.~~ **Corrigida a ordenação** (2026-10-06): não
+    há mais prioridade fixa por repositório. A lista é ordenada pelo grau de recomendação, calculado só dos
+    critérios conferidos (meta 4, nível 2, tipo 1; o que não foi conferido vale 0), com desempate pela posição
+    no repositório (`docs/recomendacao.md`). O nível do MEC RED passou a vir do regex sobre título e descrição.
+    **Continua aberto**: a API ignora os filtros e não informa etapa nem tipo, então os itens do MEC RED
+    costumam ficar com grau 0. Caminhos para dar dados ao grau: usar o parâmetro `filters` (JSON com `nivel`)
+    ou buscar a etapa de cada item em `/public/resource/{id}`.
+16. ~~Busca com meta e Ollama fora do ar: todos os REAs do Aquarela ficam ocultos (meta não avaliada).~~
+    **Corrigido** (2026-10-06): só fica oculto o REA com meta conferida como incompatível. Com a meta não
+    avaliada, o REA aparece com 0 ponto de meta, abaixo dos compatíveis, e o painel "Como ordenamos" diz
+    quantos estão nessa situação.
 17. ~~**Interesses cadastrados por colaboradores nunca funcionavam na busca**: `interestOptions` é uma
     propriedade privada, que o Livewire não persiste entre requisições. O `mount()` carregava a lista, mas
     no request do `search()` ela já tinha voltado só aos 4 termos fixos.~~ **Corrigido** (2026-09-30):

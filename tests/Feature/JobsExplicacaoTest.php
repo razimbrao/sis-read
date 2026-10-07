@@ -128,55 +128,120 @@ class JobsExplicacaoTest extends TestCase
         $this->assertSame('nao_avaliado', $this->reas()[0]['explicacao']['criterios']['meta']['status']);
     }
 
-    public function test_mec_red_explica_os_filtros_enviados(): void
+    /**
+     * Mesma checagem para os três repositórios: rótulo, faixa e grau vêm dos critérios gravados.
+     */
+    private function assertGrauCoerente(array $reas, bool $comMeta): void
     {
-        Http::fake(['*' => Http::response([['name' => 'Recurso 1'], ['name' => 'Recurso 2']])]);
+        foreach ($reas as $i => $rea) {
+            $criterios = $rea['explicacao']['criterios'];
+            $this->assertSame(RuleClassifier::VERSAO_REGRAS, $rea['explicacao']['versao_regras']);
+            $this->assertNull($rea['explicacao']['observacao']);
+            $this->assertSame($rea['recommended'], $rea['explicacao']['faixa']);
+            $this->assertSame($rea['recommended'], RuleClassifier::rotular($criterios, $comMeta));
+            $this->assertSame(RuleClassifier::grau($criterios, $i + 1), $rea['explicacao']['grau']);
+        }
+    }
+
+    private function graus(array $reas): array
+    {
+        return array_map(fn ($r) => $r['explicacao']['grau']['total'], $reas);
+    }
+
+    public function test_aquarela_grava_grau_e_posicao(): void
+    {
+        $this->fakeAquarela('{"meta": "Aprendizagem"}');
+
+        (new ProcessAquarela('algoritmos', ['Vídeo'], 'Ensino fundamental', $this->searchedAt, 'ma'))->handle();
+
+        $reas = $this->reas();
+        $this->assertGrauCoerente($reas, true);
+        $this->assertSame([7, 5, 4], $this->graus($reas));
+        $this->assertSame([1, 2, 3], array_map(fn ($r) => $r['explicacao']['grau']['posicao'], $reas));
+    }
+
+    public function test_mec_red_sem_prioridade_fixa(): void
+    {
+        Http::fake(['*' => Http::response([
+            ['name' => 'Recurso 1'],
+            ['name' => 'Algoritmos para o ensino fundamental', 'description' => 'Atividade do 6º ano'],
+        ])]);
 
         (new ProcessMecRed('algoritmos', ['Vídeo'], 'Ensino fundamental', 'Algoritmos', $this->searchedAt, 'mpe'))->handle();
 
         $reas = $this->reas();
         $this->assertCount(2, $reas);
-        $explicacao = $reas[0]['explicacao'];
-        $this->assertSame('meta_both', $reas[0]['recommended']);
-        // A API não devolve etapa/tipo dos itens: nada é marcado como atendido.
-        foreach (['nivel', 'tipo', 'meta'] as $criterio) {
-            $this->assertSame('nao_avaliado', $explicacao['criterios'][$criterio]['status']);
+        $this->assertGrauCoerente($reas, true);
+
+        // Sem conferência, nada pontua: o MEC RED não fica mais na faixa mais alta.
+        $this->assertSame('interest', $reas[0]['recommended']);
+        $this->assertSame([0, 2], $this->graus($reas));
+        $this->assertTrue($reas[0]['explicacao']['criterios']['nivel']['assumido']);
+        foreach (['tipo', 'meta'] as $criterio) {
+            $this->assertSame('nao_avaliado', $reas[0]['explicacao']['criterios'][$criterio]['status']);
         }
-        $this->assertStringContainsString('educational_stages=2,3', $explicacao['criterios']['nivel']['evidencia']);
-        $this->assertStringContainsString('object_type=17,22,6,18,13', $explicacao['criterios']['meta']['evidencia']);
-        $this->assertNotNull($explicacao['observacao']);
+        $this->assertStringContainsString('object_type=17,22,6,18,13', $reas[0]['explicacao']['criterios']['meta']['evidencia']);
+
+        // O nível é estimado pelo mesmo regex dos outros repositórios, e pode ser corrigido.
+        $nivel = $reas[1]['explicacao']['criterios']['nivel'];
+        $this->assertSame(['ok', 'fundamental', 'regex'], [$nivel['status'], $nivel['evidencia'], $nivel['fonte']]);
+        $this->assertSame('profile', $reas[1]['recommended']);
+        $this->assertTrue(RuleClassifier::corrigivel($nivel));
+        $this->assertSame('Atividade do 6º ano', $reas[1]['descricao']);
         $this->assertSame('meta_usuario', $reas[0]['fonte_interatividade']);
 
         // D8: o typo obkect_type não existe mais na URL.
         Http::assertSent(fn (Request $r) => ! str_contains($r->url(), 'obkect') && str_contains($r->url(), 'object_type=17'));
     }
 
-    public function test_mec_red_perfil_sem_etapa_nao_finge_filtro_de_nivel(): void
+    public function test_mec_red_sem_meta(): void
     {
         Http::fake(['*' => Http::response([['name' => 'Recurso 1']])]);
 
         (new ProcessMecRed('algoritmos', [], 'Professor', 'Algoritmos', $this->searchedAt, null))->handle();
 
         $rea = $this->reas()[0];
-        $this->assertSame('both', $rea['recommended']);
-        $this->assertSame('nao_avaliado', $rea['explicacao']['criterios']['nivel']['status']);
+        $this->assertGrauCoerente([$rea], false);
+        $this->assertSame('interest', $rea['recommended']);
+        $this->assertSame(3, $rea['explicacao']['grau']['maximo']);
         $this->assertArrayNotHasKey('meta', $rea['explicacao']['criterios']);
         $this->assertSame('indisponivel', $rea['fonte_interatividade']);
         Http::assertSent(fn (Request $r) => ! str_contains($r->url(), 'educational_stages'));
     }
 
-    public function test_eduplay_explica_a_regra_fixa(): void
+    public function test_eduplay_usa_a_mesma_regra(): void
+    {
+        Http::fake(['*' => Http::sequence()
+            ->push(['contents' => [
+                ['name' => 'Vídeo 1', 'contentUrl' => 'http://v1'],
+                ['name' => 'Aula de ensino médio', 'contentUrl' => 'http://v2', 'metatagDescription' => 'Revisão'],
+            ]])
+            ->push(['contents' => []])]);
+
+        (new ProcessEduplay('algoritmos', 'Ensino medio', $this->searchedAt, 'ma', [['Vídeo'], 'Jogo']))->handle();
+
+        $reas = $this->reas();
+        $this->assertGrauCoerente($reas, true);
+
+        // A meta não é conferida no Eduplay: não pontua e não oculta (nada de faixa fixa por meta).
+        $this->assertSame('nao_avaliado', $reas[0]['explicacao']['criterios']['meta']['status']);
+        $tipo = $reas[0]['explicacao']['criterios']['tipo'];
+        $this->assertSame(['ok', 'video', 'colaboradores'], [$tipo['status'], $tipo['valor'], $tipo['fonte']]);
+        $this->assertSame(['interest', 'both'], array_column($reas, 'recommended'));
+        $this->assertSame([1, 3], $this->graus($reas));
+        $this->assertSame('padrao_repositorio', $reas[0]['fonte_interatividade']);
+    }
+
+    public function test_eduplay_sem_tipos_preferidos_nao_pontua_o_tipo(): void
     {
         Http::fake(['*' => Http::sequence()
             ->push(['contents' => [['name' => 'Vídeo 1', 'contentUrl' => 'http://v1']]])
             ->push(['contents' => []])]);
 
-        (new ProcessEduplay('algoritmos', 'Ensino fundamental', $this->searchedAt, 'mpe'))->handle();
+        (new ProcessEduplay('algoritmos', 'Ensino fundamental', $this->searchedAt, null))->handle();
 
         $rea = $this->reas()[0];
-        $this->assertSame('interest', $rea['recommended']);
-        $this->assertSame('falhou', $rea['explicacao']['criterios']['meta']['status']);
-        $this->assertSame('nao_avaliado', $rea['explicacao']['criterios']['nivel']['status']);
-        $this->assertSame('padrao_repositorio', $rea['fonte_interatividade']);
+        $this->assertSame('falhou', $rea['explicacao']['criterios']['tipo']['status']);
+        $this->assertSame(0, $rea['explicacao']['grau']['total']);
     }
 }
