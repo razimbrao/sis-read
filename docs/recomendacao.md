@@ -54,11 +54,14 @@ ar, resposta inválida, tempo esgotado), o critério de meta fica não avaliado 
 - **MEC RED** (1 chamada, 10 itens): os filtros de nível e `object_type` vão na URL (`getMecRedURL`),
   mas a API não devolve a etapa nem o tipo de cada item e, em 2026-09-18, ignorava os filtros
   (problema #15). O nível vem do regex sobre o título e a descrição, e o tipo fica `nao_avaliado`, com o
-  pedido feito como evidência. A LLM só recebe o título.
+  pedido feito como evidência. Na prática, o nível é inferido só pelo título: em 2026-10-06, a busca
+  (`/public/elastic/search`) não devolvia `description`, só id, nome, contadores e scores. A LLM só recebe o título.
 - **Eduplay** (até 9 páginas): tudo é vídeo. O nível vem do regex sobre o título e a descrição, e o
   tipo `video` é comparado com os tipos preferidos. A LLM recebe título e descrição.
 
 ## Ordenação (`Ranking::ordenar`, chamada em `FindREA::paginate`)
+0. **Grupo da meta** (só numa busca com meta, `Ranking::grupoMeta`): compatíveis (faixas `meta*`) →
+   meta não conferida → meta diferente da do usuário.
 1. **Grau**, do maior para o menor.
 2. **Posição do REA no próprio repositório**, da menor para a maior. É a ordem de relevância da API,
    gravada pelo job em `explicacao.grau.posicao`. Isso intercala os repositórios: o 1º de cada um, depois
@@ -70,10 +73,21 @@ A ordem de chegada dos jobs não influi. REAs antigos, sem critérios, usam o me
 posição, a ordem em que aparecem em `Data.data`.
 
 Visibilidade:
-- **Com meta**: só fica oculto o REA cuja meta foi **conferida como incompatível** (`falhou`). O REA
-  com meta não conferida aparece com 0 ponto de meta, abaixo de todos os compatíveis, nas faixas
-  `both` → `profile` → `interest` ("meta não conferida").
+- **Com meta**: a meta **não esconde nenhum REA**. Abaixo dos compatíveis vêm os REAs de meta não
+  conferida e, no fim, os de meta diferente da do usuário (`falhou`, pela IA ou por correção). Nos dois
+  grupos, a meta vale 0 ponto e a ordem é a mesma (grau e desempate); o selo diz "meta não conferida" ou
+  "meta diferente da sua".
 - **Sem meta**: `both` → `profile` → `interest`. Os itens `meta*` (de uma busca feita com meta) não aparecem.
+
+Por que a meta diferente não esconde mais o REA (decisão de 2026-10-06): o classificador (`gemma3:4b`)
+classifica quase tudo como "Aprendizagem" (problema #18). Numa busca real com meta `mpa`, os 39 REAs
+saíram com meta `falhou`, e a lista ficava vazia.
+
+Por que dois grupos, e não um só ordenado pelo grau: o REA de meta não conferida pode ser compatível,
+enquanto o de meta diferente foi classificado como incompatível. Juntar os dois deixaria um REA de meta
+diferente com nível e tipo (grau 3) acima de um que ninguém conferiu. Separados, a ordem continua
+honesta sobre o que se sabe, e dentro de cada grupo o grau ainda ordena por nível e tipo. Se a IA
+melhorar, o grupo de meta diferente encolhe sozinho. Se ela errar, o REA continua visível e corrigível.
 
 Cada REA grava a `explicacao` da decisão, com o grau e a conta; veja [transparencia.md](transparencia.md).
 

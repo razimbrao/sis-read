@@ -140,19 +140,20 @@ class EscrutabilidadeTest extends TestCase
         $this->assertNull($correcao->user_id);
     }
 
-    public function test_corrigir_meta_traz_de_volta_um_rea_oculto(): void
+    public function test_corrigir_meta_sobe_um_rea_de_meta_diferente(): void
     {
-        $oculto = $this->aquarela('Grafos', 'Vídeo', 'ma', 'Performance Evitação');
-        $this->busca([$oculto]);
+        $diferente = $this->aquarela('Grafos', 'Vídeo', 'ma', 'Performance Evitação');
+        $this->busca([$diferente, $this->aquarela('Árvores', 'Jogo', 'ma', 'Aprendizagem')]);
         $user = $this->usuarioComMeta('ma');
         $componente = $this->componente($user);
 
-        $this->assertSame([], $this->titulosExibidos($componente));
-        $this->assertSame($oculto['chave'], $componente->instance()->ocultos(Data::first())[0]['chave']);
+        // A meta diferente não esconde o REA: ele fica no fim da lista.
+        $this->assertSame(['Árvores', 'Grafos'], $this->titulosExibidos($componente));
+        $this->assertSame([], $componente->instance()->ocultos(Data::first()));
 
-        $componente->call('corrigirMeta', $oculto['chave'], 'ma')->assertHasNoErrors();
+        $componente->call('corrigirMeta', $diferente['chave'], 'ma')->assertHasNoErrors();
 
-        $this->assertSame(['Grafos'], $this->titulosExibidos($componente));
+        $this->assertSame(['Grafos', 'Árvores'], $this->titulosExibidos($componente));
         $this->assertSame($user->id, Correction::sole()->user_id);
     }
 
@@ -328,15 +329,17 @@ class EscrutabilidadeTest extends TestCase
             ->assertSee('Corrigir de novo');
     }
 
-    public function test_tela_oferece_corrigir_a_meta_dos_ocultos(): void
+    public function test_tela_mostra_meta_diferente_no_fim_com_correcao(): void
     {
-        $oculto = $this->aquarela('Grafos', 'Vídeo', 'ma', 'Performance Evitação');
-        $this->busca([$oculto]);
+        $diferente = $this->aquarela('Grafos', 'Vídeo', 'ma', 'Performance Evitação');
+        $this->busca([$diferente]);
 
         $this->componente($this->usuarioComMeta('ma'))->set('userType', 'usuario')->set('interestApiSearch', 'algoritmos')
-            ->assertSee('A meta deste REA está errada?')
+            ->assertSee('Tipo ou só tema, meta diferente da sua')
+            ->assertSee('1 REA está com a meta diferente da sua.')
             ->assertSee('Qual é a meta deste REA?')
-            ->assertSee('wire:key="oculto-'.$oculto['chave'].'-1-meta-estimado"', false);
+            ->assertDontSee('A meta deste REA está errada?')
+            ->assertDontSee('Ver os REAs que não aparecem');
     }
 
     public function test_erro_de_correcao_aparece_na_tela(): void

@@ -58,11 +58,25 @@
                         </li>
                     @endforeach
                 </ol>
-                @if ($resumo['com_meta'] && $resumo['meta_nao_conferida'] > 0)
-                    <p class="text-xs text-gray-600">
-                        {{ $resumo['meta_nao_conferida'] }} {{ $resumo['meta_nao_conferida'] === 1 ? 'REA aparece' : 'REAs aparecem' }} abaixo dos compatíveis com a sua meta
-                        porque a meta deles não pôde ser conferida. Só saem da lista os REAs cuja meta foi conferida como incompatível.
-                    </p>
+                @if ($resumo['com_meta'])
+                    @php
+                        $incompativeis = $resumo['meta_incompativel'] + $resumo['meta_corrigida_incompativel'];
+                    @endphp
+                    <div class="text-xs text-gray-600 space-y-1">
+                        <p>
+                            Abaixo dos compatíveis com a sua meta vêm primeiro os REAs cuja meta não pôde ser conferida e, no fim,
+                            os de meta diferente da sua. Em cada grupo, a ordem é a mesma: do maior grau para o menor.
+                            A meta não tira nenhum REA da lista, porque a classificação por IA pode errar.
+                        </p>
+                        @if ($resumo['meta_nao_conferida'] > 0)
+                            <p>{{ $resumo['meta_nao_conferida'] }} {{ $resumo['meta_nao_conferida'] === 1 ? 'REA está' : 'REAs estão' }} com a meta não conferida.</p>
+                        @endif
+                        @if ($incompativeis > 0)
+                            <p>
+                                {{ $incompativeis }} {{ $incompativeis === 1 ? 'REA está' : 'REAs estão' }} com a meta diferente da sua{{ $resumo['meta_corrigida_incompativel'] > 0 ? ' ('.$resumo['meta_corrigida_incompativel'].' por correção sua)' : '' }}.
+                            </p>
+                        @endif
+                    </div>
                 @endif
             </section>
 
@@ -85,8 +99,6 @@
             @if ($resumo['ocultos'] > 0)
                 @php
                     $textosMotivos = [
-                        'meta_incompativel' => 'incompatíveis com a sua meta',
-                        'meta_corrigida_incompativel' => 'incompatíveis com a sua meta (corrigido por você)',
                         'sem_meta_usuario' => 'que dependem de uma meta de aprendizagem',
                         'outros' => 'sem faixa definida',
                     ];

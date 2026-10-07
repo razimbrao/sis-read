@@ -137,20 +137,23 @@ class FindREATransparenciaTest extends TestCase
         $instancia = $componente->instance();
 
         $titulos = collect($instancia->paginate($data)->items())->pluck('title')->all();
-        $this->assertSame(['aqu-tudo', 'aqu-tipo', 'edu', 'mec'], $titulos);
+        // Compatíveis, depois meta não conferida, e no fim a meta diferente (mesmo com grau 3).
+        $this->assertSame(['aqu-tudo', 'aqu-tipo', 'edu', 'mec', 'aqu-incompativel'], $titulos);
 
         $resumo = $instancia->resumoOrdenacao($data);
-        $this->assertSame(1, $resumo['ocultos']);
-        $this->assertSame(1, $resumo['motivos_ocultos']['meta_incompativel']);
+        $this->assertSame(0, $resumo['ocultos']);
+        $this->assertSame(1, $resumo['meta_incompativel']);
         $this->assertSame(2, $resumo['meta_nao_conferida']);
-        $this->assertSame('aqu-incompativel', $instancia->ocultos($data)[0]['titulo']);
+        $this->assertSame([], $instancia->ocultos($data));
 
         $componente->set('timestampSession', '2026-10-06 12:00:00')->set('userType', 'usuario')->set('interestApiSearch', 'algoritmos')
             ->assertSee('grau de recomendação')
             ->assertSee('meta +4, nível +2, tipo +1, de 0 a 7')
             ->assertSee('Grau 7 de 7 · Meta, nível e tipo')
             ->assertSee('Grau 3 de 7 · Nível e tipo, meta não conferida')
-            ->assertSee('2 REAs aparecem abaixo dos compatíveis com a sua meta')
+            ->assertSee('Grau 3 de 7 · Nível e tipo, meta diferente da sua')
+            ->assertSee('2 REAs estão com a meta não conferida.')
+            ->assertSee('1 REA está com a meta diferente da sua.')
             ->assertSee('este é o 2º resultado do Aquarela')
             ->assertDontSee('Por política do SisREAd');
     }
