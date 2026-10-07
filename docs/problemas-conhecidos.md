@@ -77,3 +77,6 @@
 20. Os 24 `collaborators` vieram de uma planilha de artigos (o "nome" é uma referência bibliográfica), e a
     primeira linha é o **cabeçalho da planilha**, o que criou o interesse "Interesse" e o tipo "Item".
 21. 61 `failed_jobs` acumulados, nunca revisados.
+22. Os REAs do MEC RED não têm link: `ProcessMecRed` grava `'link' => ''` e não grava o `id`, que a tela
+    usava para montar `plataformaintegrada.mec.gov.br/recurso/{id}`. O cartão aparece sem o botão "Abrir
+    recurso" (desde antes do redesign; era o mesmo na tabela e nos cartões antigos).

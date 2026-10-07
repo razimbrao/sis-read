@@ -10,6 +10,8 @@ Route::get('/', function () {
     return view('welcome');
 });
 
+Route::view('/privacidade', 'privacidade')->name('privacidade');
+
 Route::get('/login', Login::class)->name('login');
 Route::get('/register', Register::class)->name('register');
 
