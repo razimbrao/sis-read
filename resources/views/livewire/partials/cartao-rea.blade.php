@@ -95,6 +95,18 @@
                     <a href="{{ $links[1] }}" target="_blank" rel="noopener" class="text-center text-sm font-semibold text-emerald-800 hover:underline underline-offset-4">Ver no MEC RED</a>
                 @endif
             </div>
+        @else
+            {{-- Sem link (ex.: a busca do MEC RED não devolve o endereço, problema #22). --}}
+            @php $semLinkId = 'sem-link-'.substr(md5(($rea->chave ?? '').($rea->title ?? '')), 0, 10); @endphp
+            <div class="flex-[1_1_180px] flex flex-col justify-center gap-2">
+                <span class="inline-flex" title="O repositório não informou o link deste recurso.">
+                    <button type="button" disabled aria-describedby="{{ $semLinkId }}"
+                            class="w-full inline-flex justify-center items-center gap-2 min-h-12 px-5 rounded-xl bg-slate-200 text-slate-500 text-[15px] font-bold cursor-not-allowed">
+                        Abrir recurso
+                    </button>
+                </span>
+                <span id="{{ $semLinkId }}" class="sr-only">Link indisponível: o repositório não informou o endereço deste recurso.</span>
+            </div>
         @endif
     </article>
 
