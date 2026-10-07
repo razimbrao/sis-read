@@ -54,13 +54,8 @@
                 @endif
             </div>
 
-            <h2 class="text-lg sm:text-xl font-bold leading-snug break-words">
-                @if ($links)
-                    <a href="{{ $links[0] }}" target="_blank" rel="noopener" class="hover:text-emerald-800 hover:underline underline-offset-4">{{ $rea->title }}</a>
-                @else
-                    {{ $rea->title }}
-                @endif
-            </h2>
+            {{-- O título não é link: abrir o recurso é só pelo botão, uma ação por elemento. --}}
+            <h2 class="text-lg sm:text-xl font-bold leading-snug break-words">{{ $rea->title }}</h2>
 
             @if ($descricao)
                 <p class="text-[15px] leading-relaxed text-slate-600 max-w-prose line-clamp-2">{{ $descricao }}</p>
@@ -89,7 +84,7 @@
                    class="inline-flex justify-center items-center gap-2 min-h-12 px-5 rounded-xl bg-emerald-700 text-white text-[15px] font-bold hover:bg-emerald-800">
                     Abrir recurso
                     <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 5h5v5M19 5l-9 9M17 14v5H5V7h5"/></svg>
-                    <span class="sr-only">(abre em nova aba)</span>
+                    <span class="sr-only">: {{ $rea->title }} (abre em nova aba)</span>
                 </a>
                 @if (isset($links[1]))
                     <a href="{{ $links[1] }}" target="_blank" rel="noopener" class="text-center text-sm font-semibold text-emerald-800 hover:underline underline-offset-4">Ver no MEC RED</a>
