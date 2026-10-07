@@ -19,6 +19,7 @@ use App\Recommendation\RuleClassifier;
 use App\Recommendation\TiposPreferidos;
 use App\Recommendation\UserCorrections;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Livewire\Attributes\Renderless;
@@ -32,10 +33,10 @@ class FindREA extends Component
     use WithPagination;
 
     #[Validate('required', message: 'O perfil é obrigatório.')]
-    public string $profile;
+    public string $profile = '';
 
     #[Validate('required', message: 'O interesse é obrigatório.')]
-    public string $interest;
+    public string $interest = '';
 
     #[Validate('required_if:userType,==,colaborador', message: 'O nome é obrigatório.')]
     public string $name;
@@ -108,9 +109,78 @@ class FindREA extends Component
         $this->charCount = strlen($value);
     }
 
+    /**
+     * Etapas oferecidas na busca. Os valores são os que o MEC RED (mecRedEtapas) e o RuleClassifier esperam.
+     */
+    public const ETAPAS = ['Educação infantil', 'Ensino fundamental', 'Ensino médio', 'Ensino superior'];
+
+    /**
+     * Uma busca sem resposta de todos os repositórios depois deste tempo é dada como travada:
+     * se o worker cair, o job não é refeito e o poll esperaria para sempre.
+     */
+    public const MINUTOS_BUSCA_TRAVADA = 5;
+
     public function mount()
     {
-        //
+        // O menu do topo abre o cadastro de colaborador ou a sugestão pelo link (/?secao=…).
+        $this->userType = match (request()->query('secao')) {
+            'colaborar' => 'colaborador',
+            'sugestao' => 'feedback',
+            default => null,
+        };
+    }
+
+    /**
+     * Buscas mais feitas, para os atalhos da tela inicial.
+     *
+     * @return array<int, array{perfil: string, interesse: string, total: int}>
+     */
+    public function buscasFrequentes(int $limite = 5): array
+    {
+        $etapas = collect(self::ETAPAS)->keyBy(fn ($etapa) => $this->sanitizeSearch($etapa));
+        $interesses = collect($this->opcoesInteresse())->keyBy(fn ($opcao) => $this->sanitizeSearch($opcao));
+
+        return Searches::query()
+            ->select('profile', 'interest', DB::raw('count(*) as total'))
+            ->groupBy(['profile', 'interest'])
+            ->orderByDesc('total')
+            ->get()
+            // Só as que dá para refazer com um clique: etapa e tema conhecidos.
+            ->filter(fn ($b) => $etapas->has($b->profile) && $interesses->has($b->interest))
+            ->take($limite)
+            ->map(fn ($b) => [
+                'perfil' => $etapas[$b->profile],
+                'interesse' => $interesses[$b->interest],
+                'total' => (int) $b->total,
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * A busca passou do tempo sem que todos os repositórios respondessem.
+     */
+    public function buscaTravada(array $repositorios): bool
+    {
+        $aguardando = collect($repositorios)->contains(fn ($r) => $r['situacao'] === 'aguardando');
+
+        return $aguardando && $this->timestampSession
+            && now()->diffInMinutes(Carbon::parse($this->timestampSession), true) >= self::MINUTOS_BUSCA_TRAVADA;
+    }
+
+    /**
+     * Refaz a última busca com a mesma etapa e o mesmo tema (botão "Buscar de novo").
+     */
+    public function refazerBusca()
+    {
+        if (! $this->contexto) {
+            return;
+        }
+
+        $this->profile = $this->contexto['perfil'];
+        $this->interest = $this->contexto['interesse'];
+
+        $this->search();
     }
 
     public function selectUserType(?string $type = null)
