@@ -313,7 +313,7 @@
                                     </div>
                                     <div x-show="editando" style="display: none" class="mt-1 space-y-3 p-3 rounded-lg bg-white border border-slate-200 text-sm">
                                         <p class="text-slate-600">
-                                            Marque os tipos de recurso que você prefere. Os REAs do Aquarela e do Eduplay (todos vídeos) são
+                                            Marque os tipos de recurso que você prefere. Os REAs do Aquarela e do Eduplay são
                                             reclassificados com a sua escolha; o MEC RED não informa o tipo, então os REAs dele não mudam.
                                         </p>
                                         <fieldset class="grid gap-1.5 sm:grid-cols-2">
