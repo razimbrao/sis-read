@@ -39,7 +39,7 @@ Não são flags:
   enviados.
 - **Aviso de interesse não reconhecido** (`search()`): é validação da busca. Sem ele a busca falharia
   calada (problema #14), o que mudaria o comportamento e não só a explicação.
-- **Destaque amarelo do REA da faixa mais alta**: existia antes da transparência.
+- **Destaque (borda verde) do REA da faixa mais alta**: existia antes da transparência (era amarelo antes do redesign).
 - **Gravação de `explicacao` pelos jobs, `Ranking` e `RuleClassifier`**: iguais em todos os grupos.
 - **Preferência por conta**: não fica atrás de flag.
 

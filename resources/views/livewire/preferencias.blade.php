@@ -13,8 +13,7 @@
         <fieldset class="space-y-3">
             <legend class="text-lg font-bold">Tipos de recurso preferidos</legend>
             <p class="text-[15px] leading-relaxed text-slate-600">
-                Valem em todas as suas buscas. Um REA com um destes tipos sobe para a faixa “Nível e tipo”
-                quando o nível também bate com o seu perfil.
+                Valem em todas as suas buscas. Um REA com um destes tipos ganha 1 ponto no grau de recomendação.
                 @if (! auth()->user()->tipos_preferidos)
                     Hoje você não tem preferência salva: o SisREAd usa os tipos cadastrados pelos colaboradores.
                 @endif
