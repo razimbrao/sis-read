@@ -124,11 +124,13 @@ return [
     ],
 
     'aquarela' => [
-        'api' => env('AQUARELA_API_URL', 'https://aquarelaapi.dev.br/api/reas')
+        'api' => env('AQUARELA_API_URL', 'https://aquarelaapi.dev.br/api/reas'),
+        // Página pública de cada REA (o link da API devolve JSON).
+        'site' => env('AQUARELA_SITE_URL', 'https://aquarela.app.br'),
     ],
 
     'mecred' => [
-        'api' => env('MECRED_API_URL', 'https://api.portalmec.c3sl.ufpr.br/v1/search')
+        'api' => env('MECRED_API_URL', 'https://api.portalmec.c3sl.ufpr.br/v1/search'),
     ],
 
 ];

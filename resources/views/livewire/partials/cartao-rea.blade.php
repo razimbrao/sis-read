@@ -8,7 +8,7 @@
     // O destaque existia antes da transparência e não fica atrás de flag (docs/feature-flags.md).
     $destaque = auth()->user() ? $rea->recommended === 'meta_both' : $rea->recommended === 'both';
     $links = array_values(array_filter([
-        $rea->link ?? null,
+        ($rea->repositorio ?? null) === 'Aquarela' ? \App\Jobs\ProcessAquarela::linkPublico($rea->link ?? null) : ($rea->link ?? null),
         isset($rea->id) && ($rea->repositorio ?? null) === 'MECRED' ? 'https://plataformaintegrada.mec.gov.br/recurso/'.$rea->id : null,
     ]));
     // Só as características preenchidas: "Não especificado" em todo cartão vira ruído.
