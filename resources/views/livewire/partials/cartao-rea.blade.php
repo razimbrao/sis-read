@@ -9,7 +9,8 @@
     $destaque = auth()->user() ? $rea->recommended === 'meta_both' : $rea->recommended === 'both';
     $links = array_values(array_filter([
         ($rea->repositorio ?? null) === 'Aquarela' ? \App\Jobs\ProcessAquarela::linkPublico($rea->link ?? null) : ($rea->link ?? null),
-        isset($rea->id) && ($rea->repositorio ?? null) === 'MECRED' ? 'https://plataformaintegrada.mec.gov.br/recurso/'.$rea->id : null,
+        // MEC RED gravado antes do link: monta pelo id, se houver.
+        empty($rea->link) && ($rea->repositorio ?? null) === 'MECRED' ? \App\Jobs\ProcessMecRed::linkPublico($rea->id ?? null) : null,
     ]));
     // Só as características preenchidas: "Não especificado" em todo cartão vira ruído.
     $caracteristicas = collect([
@@ -86,9 +87,6 @@
                     <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 5h5v5M19 5l-9 9M17 14v5H5V7h5"/></svg>
                     <span class="sr-only">: {{ $rea->title }} (abre em nova aba)</span>
                 </a>
-                @if (isset($links[1]))
-                    <a href="{{ $links[1] }}" target="_blank" rel="noopener" class="text-center text-sm font-semibold text-emerald-800 hover:underline underline-offset-4">Ver no MEC RED</a>
-                @endif
             </div>
         @else
             {{-- Sem link (ex.: a busca do MEC RED não devolve o endereço, problema #22). --}}
