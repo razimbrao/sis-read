@@ -2,9 +2,11 @@
 
 namespace App\Providers;
 
+use App\Experimento\Experimento;
 use App\Recommendation\Llm\OllamaProvedor;
 use App\Recommendation\Llm\ProvedorLlm;
 use App\Recommendation\MetaClassifier;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\ServiceProvider;
 
@@ -34,6 +36,8 @@ class AppServiceProvider extends ServiceProvider
 
             return new MetaClassifier($app->make(ProvedorLlm::class), config('llm', []));
         });
+
+        $this->app->scoped(Experimento::class);
     }
 
     /**
@@ -41,6 +45,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // @explicabilidade('flag') ... @else ... @endexplicabilidade (docs/feature-flags.md)
+        Blade::if('explicabilidade', fn (string $flag) => Experimento::ativa($flag));
     }
 }

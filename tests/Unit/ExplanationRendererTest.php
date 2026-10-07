@@ -335,9 +335,13 @@ class ExplanationRendererTest extends TestCase
         $this->assertSame('Atende: tema. Não verificado: nível.', ExplanationRenderer::resumo($explicacao));
     }
 
-    public function test_faixa_com_meta_nao_conferida(): void
+    public function test_faixa_com_meta_nao_conferida_ou_diferente(): void
     {
-        $this->assertSame('Nível e tipo, meta não conferida', ExplanationRenderer::faixa('both', null, true)['titulo']);
+        // Sem o REA (painel), a faixa reúne os dois grupos abaixo dos compatíveis.
+        $this->assertSame('Nível e tipo, meta não conferida ou diferente da sua', ExplanationRenderer::faixa('both', null, true)['titulo']);
+        $diferente = UserCorrections::corrigirMeta($this->reaAquarela(), 'mpe');
+        $this->assertSame('Tipo ou só tema, meta diferente da sua', ExplanationRenderer::faixa('interest', $diferente['explicacao'])['titulo']);
+        $this->assertStringContainsString('no fim da lista', ExplanationRenderer::faixa('interest', $diferente['explicacao'])['descricao']);
         $this->assertSame('Nível e tipo', ExplanationRenderer::faixa('both')['titulo']);
         $this->assertSame('Só meta', ExplanationRenderer::faixa('meta', null, true)['titulo']);
         $this->assertSame('Tipo ou só tema, meta não conferida', ExplanationRenderer::faixa('interest', $this->reaAquarela()['explicacao'])['titulo']);

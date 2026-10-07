@@ -50,9 +50,9 @@
     raramente pontuam em nível e tipo. Caminhos para dar dados ao grau: usar o parâmetro `filters` (JSON com
     `nivel`) ou buscar a etapa de cada item em `/public/resource/{id}`.
 16. ~~Busca com meta e Ollama fora do ar: todos os REAs do Aquarela e do Eduplay ficam ocultos (meta não
-    avaliada).~~ **Corrigido** (2026-10-06): só fica oculto o REA com meta conferida como incompatível. Com a
-    meta não avaliada, o REA aparece com 0 ponto de meta, abaixo dos compatíveis, e o painel "Como ordenamos"
-    diz quantos estão nessa situação; cada critério explica por quê (IA indisponível, tempo esgotado, resposta
+    avaliada).~~ **Corrigido** (2026-10-06): a meta não esconde mais nenhum REA (ver #18). Com a meta não
+    avaliada, o REA aparece com 0 ponto de meta, abaixo dos compatíveis, e o painel "Como ordenamos" diz
+    quantos estão nessa situação; cada critério explica por quê (IA indisponível, tempo esgotado, resposta
     inválida). Também foi **mitigada** a falha em si: o modelo é aquecido antes da primeira chamada (a frio, o
     `gemma3:4b` levava ~30s e todas as primeiras chamadas estouravam o timeout), o job desiste após 3 falhas
     seguidas em vez de esperar o timeout de cada REA, e classificações anteriores vêm do cache. Ver
@@ -68,7 +68,10 @@
     Com a LLM nos três repositórios (2026-10-06), o viés aparece em todos: na busca "algoritmos" com meta
     `ma`, os 157 REAs (Aquarela, MEC RED e Eduplay) saíram "Aprendizagem". O cache guarda a classe por REA:
     ao trocar o prompt, incremente `MetaClassifier::VERSAO_PROMPT`; ao trocar o modelo, o cache já separa
-    por `OLLAMA_MODELO`.
+    por `OLLAMA_MODELO`. Efeito na lista: numa busca real com meta `mpa`, os 39 REAs saíram com meta
+    `falhou`, e como a meta incompatível ocultava o REA, a lista ficava **vazia**. **Mitigado** (2026-10-06):
+    a meta diferente não esconde mais o REA; ele vai para o fim da lista, marcado "meta diferente da sua",
+    abaixo dos de meta não conferida (`docs/recomendacao.md`). O viés em si continua aberto.
 19. Empate no EMAPRE é resolvido em silêncio: `array_keys($resultados, max(...))[0]` pega o primeiro fator.
     Existe ao menos um caso real no banco (usuário 3, ma=2 e mpa=2).
 20. Os 24 `collaborators` vieram de uma planilha de artigos (o "nome" é uma referência bibliográfica), e a
