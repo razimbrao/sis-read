@@ -18,5 +18,6 @@ class ExplanationEvent extends Model
         'repositorio',
         'titulo',
         'faixa',
+        'grupo',
     ];
 }
