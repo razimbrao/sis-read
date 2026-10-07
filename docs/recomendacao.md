@@ -10,14 +10,21 @@ Cada REA retornado recebe um rótulo `recommended`:
 | `meta_both` / `meta_one` / `meta` | equivalentes aos rótulos acima para usuários com meta de aprendizagem, quando o REA é compatível com a meta |
 
 ## Por repositório
+Se o usuário tem meta, **todo REA dos três repositórios** é classificado por LLM
+(`App\Recommendation\MetaClassifier`, por padrão Ollama `gemma3:4b`) em Aprendizagem, Performance
+Aproximação ou Performance Evitação, e comparado com a meta dominante. Sem classificação (IA fora do
+ar, resposta inválida, tempo esgotado), o critério de meta fica não avaliado e o REA não entra nas
+faixas `meta*`. Detalhes em [transparencia.md §5.4](transparencia.md#54-classificação-de-meta-por-ia-metaclassifier).
+
 - **Aquarela** (até 3 páginas): o nível é inferido por regex no título + descrição (infantil,
   fundamental, médio; se nada bater, superior). A interatividade vem do `dtype` (`T` = ativo,
-  `D` = expositivo). Se o usuário tem meta, cada REA é classificado por LLM (Ollama `gemma3:4b`) em
-  Aprendizagem, Performance Aproximação ou Performance Evitação.
+  `D` = expositivo). A LLM recebe título, descrição, tipo e `dtype`.
 - **MEC RED** (1 chamada, 10 itens): os filtros de nível e `object_type` já vão na URL
-  (`getMecRedURL`). Todo item vira `both` (ou `meta_both`, com meta).
-- **Eduplay** (até 9 páginas): tudo é vídeo. O rótulo é `meta_one` se a meta for `ma` ou `mpa`;
-  caso contrário, `interest`.
+  (`getMecRedURL`). Todo item vira `both` (ou `meta_both`, com meta), por política. A LLM só recebe
+  o título, porque a busca não devolve descrição nem tipo.
+- **Eduplay** (até 9 páginas): tudo é vídeo e não há etapa. O rótulo sai da regra comum: com meta,
+  `meta` se a LLM disser que o vídeo é compatível, senão `interest`; sem meta, `interest`. A LLM
+  recebe título e descrição.
 
 ## Ordenação (`FindREA::paginate`)
 - Com meta dominante: `meta_both` → `meta_one` → `meta` (os demais são descartados)
