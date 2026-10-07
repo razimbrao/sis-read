@@ -160,7 +160,7 @@ sequenceDiagram
         F->>DB: Data::create(searched_at = timestampSession)
         F->>Q: ProcessAquarela(termo, tipos, perfil, searched_at, meta)
         F->>Q: ProcessMecRed(termo, tipos, perfil, interesse, searched_at, meta)
-        F->>Q: ProcessEduplay(termo, perfil, searched_at, meta)
+        F->>Q: ProcessEduplay(termo, perfil, searched_at, meta, tipos)
         F->>F: reset(profile, interest)
         F-->>U: tela de resultados com wire:poll
     end
@@ -281,11 +281,11 @@ ser conferido fica `nao_avaliado` e vale 0 ponto no grau.
 ```mermaid
 flowchart LR
     subgraph MEC["ProcessMecRed"]
-        M1["URL com educational_stages<br/>e object_type da meta"] --> M2["tema: ok<br/>nível: regex em name + description<br/>tipo, meta: nao_avaliado<br/>evidência = o que foi pedido"]
+        M1["URL com educational_stages<br/>e object_type da meta"] --> M2["tema: ok<br/>nível: regex em name + description<br/>tipo: nao_avaliado<br/>meta: IA só pelo título<br/>evidência = o que foi pedido"]
         M2 --> M3["rotular + grau<br/>posição = ordem na resposta"]
     end
     subgraph EDU["ProcessEduplay"]
-        E1["Busca por termo<br/>tudo é vídeo"] --> E2["tema: ok<br/>nível: regex em name + metatagDescription<br/>tipo: vídeo × preferidos<br/>meta: nao_avaliado"]
+        E1["Busca por termo<br/>tudo é vídeo"] --> E2["tema: ok<br/>nível: regex em name + metatagDescription<br/>tipo: vídeo × preferidos<br/>meta: IA por título + descrição"]
         E2 --> E3["rotular + grau<br/>posição = ordem na resposta"]
     end
 ```
@@ -295,7 +295,7 @@ flowchart LR
 | tema | ✓ busca | ✓ busca | ✓ busca |
 | nível | ✓/✗/? regex | ✓/✗/? regex | ✓/✗/? regex |
 | tipo | ✓/✗ colaboradores | ? repositório não informa | ✓/✗ vídeo × preferidos |
-| meta | ✓/✗/? IA | ? pedido na URL, não conferido | ? repositório não informa |
+| meta | ✓/✗/? IA | ✓/✗/? IA (só título) | ✓/✗/? IA |
 | rótulo e grau | calculados | calculados | calculados |
 | `fonte_interatividade` | `dtype` ou `indisponivel` | `meta_usuario` ou `indisponivel` | `padrao_repositorio` |
 
@@ -740,8 +740,8 @@ flowchart LR
     F --> H["oculto: incompatível com a sua meta"]
 ```
 
-MEC RED e Eduplay ficam com a meta não conferida: aparecem abaixo dos REAs compatíveis, ordenados pelo
-grau de nível e tipo (0 a 3 de 7).
+MEC RED e Eduplay passam pela mesma classificação por IA (o MEC RED só pelo título) e entram na mesma
+ordenação pelo grau, intercalados com o Aquarela.
 
 ### 11.3 Usuário com meta e Ollama fora do ar
 
@@ -766,7 +766,7 @@ Se ela casar com a dele, o REA sobe para as faixas de meta ([Fluxo 9](#10-fluxo-
 |---|---|---|---|
 | Por que este REA está nesta faixa? | `RuleClassifier::rotular` / regra fixa do job | `recommended` + `explicacao` em `data.data` | selo + `explicacao-rea.blade.php` |
 | Como o nível foi descoberto? | `RuleClassifier::inferirNivel` | `criterios.nivel.evidencia`, `assumido` | `ExplanationRenderer::textoNivel` |
-| Quem classificou a meta? | `ProcessAquarela::classificarMetaComLLM` | `criterios.meta.modelo`, `duracao` | `textoMeta` + aviso |
+| Quem classificou a meta? | `MetaClassifier` (nos três jobs) | `criterios.meta.modelo`, `duracao` | `textoMeta` + aviso |
 | Por que a lista tem esta ordem? | `Ranking::ordem` | — (calculado do rótulo) | painel **Como ordenamos** |
 | O que ficou de fora e por quê? | `Ranking::motivo` | — | **Ver os REAs que não aparecem** |
 | Algum repositório falhou? | jobs (`timeouts_errors`) | `search_metrics` | progresso + **Repositórios consultados** |
@@ -784,7 +784,7 @@ Os pontos abaixo são **declarados** na tela, mas não resolvidos:
 
 | Ponto | O que a explicação faz | O que continua igual | Ref. |
 |---|---|---|---|
-| MEC RED ignora os filtros | marca tipo e meta como não verificados (0 ponto) e estima o nível pelo regex | sem etapa nem tipo da API, os itens costumam ter grau 0 | #15 |
+| MEC RED ignora os filtros | marca o tipo como não verificado (0 ponto), estima o nível pelo regex e a meta pela IA (só título) | sem etapa nem tipo da API, os itens raramente pontuam em nível e tipo | #15 |
 | Viés da IA para "Aprendizagem" | declara modelo, tempo e o viés no aviso | o critério de meta quase não filtra | #18 |
 | `finished` prematuro | contador "N de 3 responderam" | a lista cresce enquanto o usuário lê | #2 |
 | Tipos de qualquer colaborador contam | painel separa as duas origens | ambas contam igual no critério | #11, #12 |

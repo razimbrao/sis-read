@@ -318,6 +318,8 @@ class ExplanationRenderer
         }
 
         $modelo = empty($c['modelo']) ? '' : " Modelo: {$c['modelo']}".(isset($c['duracao']) ? ", em {$c['duracao']}s." : '.');
+        // Ex.: classificação reaproveitada do cache, ou feita só pelo título.
+        $modelo .= empty($c['evidencia']) ? '' : ' '.ucfirst($c['evidencia']).'.';
 
         return match ($status) {
             'ok' => "Classificado por IA como {$c['valor']}, compatível com a sua meta ({$esperado}).".$modelo,

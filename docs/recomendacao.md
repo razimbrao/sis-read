@@ -42,17 +42,21 @@ estão acoplados: mude os três juntos.
 
 ## Por repositório
 Todos usam `RuleClassifier::criterioTema`, `criterioNivel` (regex) e, quando há o dado, `criterioTipo`.
+Se o usuário tem meta, **todo REA dos três repositórios** é classificado por LLM
+(`App\Recommendation\MetaClassifier`, por padrão Ollama `gemma3:4b`) em Aprendizagem, Performance
+Aproximação ou Performance Evitação, e comparado com a meta dominante. Sem classificação (IA fora do
+ar, resposta inválida, tempo esgotado), o critério de meta fica não avaliado e vale 0 no grau. Detalhes em
+[transparencia.md §5.4](transparencia.md#54-classificação-de-meta-por-ia-metaclassifier).
+
 - **Aquarela** (até 3 páginas): o nível vem do regex no título e na descrição (infantil, fundamental,
   médio; se nada bater, superior *assumido*). O tipo vem de `tipoConteudo`. A interatividade vem do
-  `dtype` (`T` = ativo, `D` = expositivo). Se o usuário tem meta, cada REA é classificado por LLM
-  (Ollama `gemma3:4b`) em Aprendizagem, Performance Aproximação ou Performance Evitação.
+  `dtype` (`T` = ativo, `D` = expositivo). A LLM recebe título, descrição, tipo e `dtype`.
 - **MEC RED** (1 chamada, 10 itens): os filtros de nível e `object_type` vão na URL (`getMecRedURL`),
   mas a API não devolve a etapa nem o tipo de cada item e, em 2026-09-18, ignorava os filtros
-  (problema #15). O nível vem do regex sobre o título e a descrição. Tipo e meta ficam como
-  `nao_avaliado`, com o pedido feito como evidência.
+  (problema #15). O nível vem do regex sobre o título e a descrição, e o tipo fica `nao_avaliado`, com o
+  pedido feito como evidência. A LLM só recebe o título.
 - **Eduplay** (até 9 páginas): tudo é vídeo. O nível vem do regex sobre o título e a descrição, e o
-  tipo `video` é comparado com os tipos preferidos. A meta fica `nao_avaliado`, porque o repositório não
-  informa nada que permita conferi-la.
+  tipo `video` é comparado com os tipos preferidos. A LLM recebe título e descrição.
 
 ## Ordenação (`Ranking::ordenar`, chamada em `FindREA::paginate`)
 1. **Grau**, do maior para o menor.

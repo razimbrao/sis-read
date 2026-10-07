@@ -8,9 +8,10 @@ o caminho mais simples (não precisa de MySQL nem Redis).
   openssl, pdo_sqlite, sqlite3, zip, intl e sodium
 - Composer (o `composer.phar` fica na pasta do PHP, junto com um `composer.bat`)
 - Node 20+ / npm (só para `vite build`)
-- Opcional: [Ollama](https://ollama.com) com o modelo `gemma3:4b` em `127.0.0.1:11434`. Ele é usado
-  apenas para usuários que responderam ao questionário (classificação de meta no Aquarela). Sem ele,
-  as chamadas falham silenciosamente e os itens ficam "Não classificado".
+- Opcional: [Ollama](https://ollama.com) com o modelo `gemma3:4b` em `127.0.0.1:11434` (configurável em
+  `.env`: `OLLAMA_URL`, `OLLAMA_MODELO`). Ele é usado apenas para usuários que responderam ao
+  questionário (classificação de meta nos três repositórios). Sem ele, a meta de cada REA fica "não
+  avaliada", com o motivo na explicação. Ver [integracoes.md](integracoes.md#llm-classificação-de-meta).
 
 ## Instalação automática
 ```powershell
