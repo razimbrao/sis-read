@@ -183,13 +183,42 @@ class FindREATransparenciaTest extends TestCase
         $componente = Livewire::test(FindREA::class)
             ->set('userType', 'usuario')
             ->set('profile', 'Ensino médio')
-            ->set('interest', 'pensamento computacional')
+            ->set('interest', 'fotossíntese')
             ->call('search');
 
         $componente->assertHasErrors('interest');
         $this->assertStringContainsString('algoritmos', $componente->errors()->first('interest'));
         Queue::assertNothingPushed();
         $this->assertSame(0, Data::count());
+    }
+
+    public function test_temas_novos_de_pensamento_computacional_sao_aceitos(): void
+    {
+        Queue::fake();
+
+        Livewire::test(FindREA::class)
+            ->set('userType', 'usuario')
+            ->set('profile', 'Ensino médio')
+            ->set('interest', 'inteligência artificial')
+            ->call('search')
+            ->assertHasNoErrors()
+            ->assertSet('interestApiSearch', 'inteligência artificial');
+
+        Queue::assertPushed(\App\Jobs\ProcessEduplay::class);
+    }
+
+    public function test_dropdown_agrupa_temas_fixos_e_de_colaboradores(): void
+    {
+        $this->colaborador('jogos educativos', 'ensino médio', 'video');
+
+        $grupos = Livewire::test(FindREA::class)->instance()->temasAgrupados();
+
+        $this->assertArrayHasKey('scratch', $grupos['Outros temas']);
+        $this->assertSame(['jogos educativos' => 'Jogos educativos'], $grupos['Cadastrados por colaboradores']);
+        // Tema de colaborador igual a um fixo não se repete.
+        $this->colaborador('Algoritmos', 'ensino médio', 'video');
+        $grupos = Livewire::test(FindREA::class)->instance()->temasAgrupados();
+        $this->assertArrayNotHasKey('Algoritmos', $grupos['Cadastrados por colaboradores']);
     }
 
     public function test_interesse_de_colaborador_e_aceito(): void
