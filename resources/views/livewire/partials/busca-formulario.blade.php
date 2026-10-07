@@ -1,6 +1,6 @@
-{{-- Formulário de busca: etapa (4 opções fixas) e tema (atalhos + campo com sugestões). --}}
+{{-- Formulário de busca: etapa (4 opções fixas) e tema (dropdown agrupado). --}}
 @php
-    $temasFixos = ['algoritmos' => 'Algoritmos', 'decomposição' => 'Decomposição', 'reconhecimento de padrões' => 'Reconhecimento de padrões', 'abstração' => 'Abstração'];
+    $temas = $this->temasAgrupados();
     $frequentes = $this->buscasFrequentes();
     $pill = 'inline-flex items-center min-h-12 px-5 rounded-full border-2 text-base font-semibold cursor-pointer transition-colors';
 @endphp
@@ -36,26 +36,21 @@
                     <span class="inline-flex w-7 h-7 rounded-full bg-emerald-700 text-white text-sm items-center justify-center" aria-hidden="true">2</span>
                     Qual tema você quer trabalhar?
                 </legend>
-                <div class="flex flex-wrap gap-2.5">
-                    @foreach ($temasFixos as $valor => $rotulo)
-                        <button type="button"
-                            x-on:click="$wire.interest = @js($valor)"
-                            :aria-pressed="($wire.interest || '').toLowerCase() === @js($valor) ? 'true' : 'false'"
-                            :class="($wire.interest || '').toLowerCase() === @js($valor) ? 'bg-emerald-700 border-emerald-700 text-white' : 'bg-white border-slate-300 text-slate-900'"
-                            class="{{ $pill }}">{{ $rotulo }}</button>
-                    @endforeach
+                <label for="interest" class="sr-only">Tema</label>
+                <div class="relative max-w-md">
+                    <select id="interest" wire:model="interest"
+                        class="w-full appearance-none min-h-12 pl-4 pr-11 py-3 text-base bg-white border border-slate-300 rounded-xl cursor-pointer focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20">
+                        <option value="">Escolha um tema</option>
+                        @foreach ($temas as $grupo => $opcoes)
+                            <optgroup label="{{ $grupo }}">
+                                @foreach ($opcoes as $valor => $rotulo)
+                                    <option value="{{ $valor }}">{{ $rotulo }}</option>
+                                @endforeach
+                            </optgroup>
+                        @endforeach
+                    </select>
+                    <svg class="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
                 </div>
-                <label for="interest" class="block text-[15px] text-slate-600 pt-1">Ou digite outro tema cadastrado por colaboradores</label>
-                <div class="flex items-center gap-2 max-w-md border border-slate-300 rounded-xl px-3 bg-white focus-within:border-emerald-700">
-                    <svg class="w-5 h-5 text-slate-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-                    <input id="interest" type="text" list="temas-disponiveis" wire:model="interest" autocomplete="off"
-                        class="flex-1 min-w-0 py-3 text-base bg-transparent border-0 outline-none" placeholder="Comece a digitar…">
-                </div>
-                <datalist id="temas-disponiveis">
-                    @foreach ($this->opcoesInteresse() as $opcao)
-                        <option value="{{ $opcao }}"></option>
-                    @endforeach
-                </datalist>
                 @error('interest') <p class="text-[15px] font-medium text-red-700" role="alert">{{ $message }}</p> @enderror
             </fieldset>
 

@@ -75,11 +75,28 @@ class FindREA extends Component
 
     public ?string $userType = null;
 
-    private array $interestOptions = [
-        'algoritmos',
-        'decomposição',
-        'reconhecimento de padrões',
-        'abstração',
+    /**
+     * Temas de pensamento computacional oferecidos na busca (valor => rótulo), em grupos para o dropdown.
+     * Os outros temas foram escolhidos por terem material no Aquarela (testados em 2026-10-07).
+     */
+    public const TEMAS = [
+        'Pilares do pensamento computacional' => [
+            'algoritmos' => 'Algoritmos',
+            'decomposição' => 'Decomposição',
+            'reconhecimento de padrões' => 'Reconhecimento de padrões',
+            'abstração' => 'Abstração',
+        ],
+        'Outros temas' => [
+            'pensamento computacional' => 'Pensamento computacional',
+            'programação' => 'Programação',
+            'lógica de programação' => 'Lógica de programação',
+            'computação desplugada' => 'Computação desplugada',
+            'programação em blocos' => 'Programação em blocos',
+            'scratch' => 'Scratch',
+            'estruturas de repetição' => 'Estruturas de repetição',
+            'robótica educacional' => 'Robótica educacional',
+            'inteligência artificial' => 'Inteligência artificial',
+        ],
     ];
 
     public string $interestApiSearch = '';
@@ -761,12 +778,34 @@ class FindREA extends Component
      * Interesses que o SisREAd sabe buscar: os fixos mais os cadastrados por colaboradores.
      * É calculado a cada requisição porque propriedades privadas não sobrevivem entre elas no Livewire.
      */
+    /**
+     * Temas do dropdown agrupados: os fixos (TEMAS) e, num grupo próprio, os cadastrados por colaboradores.
+     *
+     * @return array<string, array<string, string>>
+     */
+    public function temasAgrupados(): array
+    {
+        $grupos = self::TEMAS;
+        $fixos = collect($grupos)->flatMap(fn ($temas) => array_keys($temas))->map(fn ($t) => RuleClassifier::normalizar($t))->all();
+
+        $colaboradores = collect($this->opcoesInteresse())
+            ->reject(fn ($opcao) => in_array(RuleClassifier::normalizar($opcao), $fixos, true))
+            ->mapWithKeys(fn ($opcao) => [$opcao => mb_strtoupper(mb_substr($opcao, 0, 1)).mb_substr($opcao, 1)])
+            ->all();
+
+        if ($colaboradores) {
+            $grupos['Cadastrados por colaboradores'] = $colaboradores;
+        }
+
+        return $grupos;
+    }
+
     public function opcoesInteresse(): array
     {
         $opcoes = [];
 
         // Os fixos vêm primeiro, então a grafia com acento prevalece sobre a versão sanitizada do banco.
-        foreach (array_merge($this->interestOptions, Collaborator::query()->pluck('interest')->filter()->all()) as $opcao) {
+        foreach (array_merge(array_keys(array_merge(...array_values(self::TEMAS))), Collaborator::query()->pluck('interest')->filter()->all()) as $opcao) {
             $chave = RuleClassifier::normalizar($opcao);
 
             if ($chave !== '' && ! isset($opcoes[$chave])) {

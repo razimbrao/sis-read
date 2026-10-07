@@ -73,7 +73,14 @@ class ProcessEduplay implements ShouldQueue
             try {
                 $response = Http::withOptions(['verify' => false])
                     ->timeout(15)
-                    ->get("https://eduplay.rnp.br/api/v1/search?term={$this->search}&page={$page}&quantity=10&type=0&order=0");
+                    // Parâmetros em array: o termo vai codificado (acentos e espaços; problema #7).
+                    ->get('https://eduplay.rnp.br/api/v1/search', [
+                        'term' => $this->search,
+                        'page' => $page,
+                        'quantity' => 10,
+                        'type' => 0,
+                        'order' => 0,
+                    ]);
 
                 $search = $response->json();
                 $metrics['api_time'] += (microtime(true) - $start_api);
