@@ -268,9 +268,9 @@ flowchart TD
 ```
 
 Repare que, com meta, um REA cuja meta **falhou** ou **não foi avaliada** cai no ramo da direita e
-recebe `both`, `profile` ou `interest`. Para quem tem meta, o REA com meta que **falhou** sai da lista.
-O REA com meta **não avaliada** aparece abaixo dos compatíveis, como "meta não conferida" (ver
-[Fluxo 5](#6-fluxo-5-exibição-e-ordenação)).
+recebe `both`, `profile` ou `interest`. Para quem tem meta, nenhum dos dois sai da lista: o de meta
+**não avaliada** aparece abaixo dos compatíveis ("meta não conferida"), e o de meta que **falhou**, no
+fim ("meta diferente da sua"). Ver [Fluxo 5](#6-fluxo-5-exibição-e-ordenação).
 
 ### 4.3 MEC RED e Eduplay: a mesma regra, com menos dados
 
@@ -422,8 +422,7 @@ sequenceDiagram
 flowchart LR
     subgraph COM["Com meta (grau 0 a 7)"]
         direction LR
-        a1["meta_both · 7"] --> a2["meta_one · 5-6"] --> a3["meta · 4"] --> a5["both · profile · interest<br/>meta não conferida · 0-3"]
-        a4["ocultos: meta conferida como incompatível"]:::oculto
+        a1["meta_both · 7"] --> a2["meta_one · 5-6"] --> a3["meta · 4"] --> a5["both · profile · interest<br/>meta não conferida · 0-3"] --> a6["both · profile · interest<br/>meta diferente da sua · 0-3"]
     end
     subgraph SEM["Sem meta (grau 0 a 3)"]
         direction LR
@@ -433,7 +432,8 @@ flowchart LR
     classDef oculto fill:#eee,stroke:#999,stroke-dasharray: 4 3,color:#666
 ```
 
-A lista vai do maior grau para o menor. Entre REAs de mesmo grau, vem primeiro o de menor posição no
+Com meta, a lista é dividida em três grupos, nesta ordem: compatíveis, meta não conferida e meta
+diferente da sua (`Ranking::grupoMeta`). Dentro de cada grupo, vai do maior grau para o menor. Entre REAs de mesmo grau, vem primeiro o de menor posição no
 próprio repositório (intercalando os repositórios), depois a ordem alfabética do repositório e a
 `chave`. A ordem de chegada dos jobs não influi: a mesma busca dá sempre a mesma lista.
 
@@ -538,8 +538,8 @@ que impediu a verificação, usando a `evidencia` gravada pelo job.
 
 ## 8. Fluxo 7: REAs que não aparecem
 
-Um REA não aparece quando `Ranking::visivel` é falso: o rótulo não está na ordem do contexto ou, com
-meta, a meta foi conferida como incompatível. `Ranking::motivo` explica por quê:
+Um REA não aparece quando `Ranking::visivel` é falso: o rótulo não está na ordem do contexto. A meta
+não esconde nenhum REA. `Ranking::motivo` explica por quê:
 
 ```mermaid
 flowchart TD
@@ -547,17 +547,17 @@ flowchart TD
     B -- não --> C{"rótulo é meta_*?"}
     C -- sim --> C1["sem_meta_usuario<br/>'que dependem de uma meta de aprendizagem'"]
     C -- não --> C2["outros<br/>'sem faixa definida'"]
-    B -- sim --> D{"criterios.meta.status"}
-    D -- falhou --> D1["meta_incompativel<br/>'incompatíveis com a sua meta'<br/>(meta_corrigida_incompativel se o usuário informou)"]
-    D -- outro --> D3["outros"]
+    B -- sim --> D3["outros<br/>(rótulo desconhecido)"]
 ```
 
 O painel mostra a contagem por motivo e, ao expandir **Ver os REAs que não aparecem**, até 20 itens
 com o resumo dos critérios. Assim o usuário vê o que foi descartado e por qual regra.
 
-Um REA com meta não avaliada (a IA não respondeu, ou o repositório não informa) **não** é ocultado:
-aparece no fim da lista, com 0 ponto de meta, e o painel conta quantos estão nessa situação
-(`meta_nao_conferida`). Antes ele saía da lista com o motivo `meta_nao_avaliada` (problema #16).
+Os REAs com meta não avaliada (a IA não respondeu, ou o repositório não informa) e com meta diferente
+da do usuário **não** são ocultados: aparecem abaixo dos compatíveis, com 0 ponto de meta, e o painel
+conta quantos estão em cada situação (`meta_nao_conferida`, `meta_incompativel`,
+`meta_corrigida_incompativel`). Antes eles saíam da lista (problemas #16 e #18). Por isso, com meta, a
+lista **Ver os REAs que não aparecem** quase nunca tem itens.
 
 ---
 
@@ -619,7 +619,7 @@ flowchart TD
     P -- não --> T{"critério"}
     T -- tema --> N1["não corrigível"]
     T -- "nivel (regex)" --> S1["Corrigir: escolhe entre as 4 etapas"]
-    T -- "meta (llm)" --> S2["Corrigir: escolhe entre as 3 metas<br/>também nos ocultos"]
+    T -- "meta (llm)" --> S2["Corrigir: escolhe entre as 3 metas"]
     T -- tipo --> S3["o tipo do REA não se corrige;<br/>edita-se a lista de tipos preferidos no painel"]
 ```
 
@@ -737,7 +737,7 @@ flowchart LR
     D -- sim --> E["meta ok → meta_both / meta_one / meta"]
     D -- não --> F["meta falhou → both / profile / interest"]
     E --> G["aparece na lista"]
-    F --> H["oculto: incompatível com a sua meta"]
+    F --> H["fim da lista: meta diferente da sua"]
 ```
 
 MEC RED e Eduplay passam pela mesma classificação por IA (o MEC RED só pelo título) e entram na mesma

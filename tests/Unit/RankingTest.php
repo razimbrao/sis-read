@@ -136,7 +136,7 @@ class RankingTest extends TestCase
         $this->assertSame(['a1', 'm1', 'a2'], $this->ids(Ranking::ordenar($reas, false)));
     }
 
-    public function test_com_meta_so_oculta_meta_conferida_como_incompativel(): void
+    public function test_com_meta_incompativel_vai_para_o_fim_sem_ser_ocultado(): void
     {
         $reas = [
             $this->rea('incompativel', 'Aquarela', 1, 'ok', 'ok', 'falhou'),
@@ -144,14 +144,35 @@ class RankingTest extends TestCase
             $this->rea('compativel', 'Aquarela', 2, 'falhou', 'falhou', 'ok'),
         ];
 
-        $this->assertSame(['compativel', 'nao_conferida'], $this->ids(Ranking::ordenar($reas, true)));
+        // A meta diferente fica abaixo da não conferida mesmo com grau maior (3 contra 0).
+        $this->assertSame(['compativel', 'nao_conferida', 'incompativel'], $this->ids(Ranking::ordenar($reas, true)));
+        $this->assertSame([0, 1, 2], array_map(fn ($r) => Ranking::grupoMeta($r, true), [$reas[2], $reas[1], $reas[0]]));
 
         $contagem = Ranking::contar($reas, true);
-        $this->assertSame(1, $contagem['ocultos']);
-        $this->assertSame(1, $contagem['motivos_ocultos']['meta_incompativel']);
+        $this->assertSame(0, $contagem['ocultos']);
+        $this->assertSame(1, $contagem['meta_incompativel']);
         $this->assertSame(1, $contagem['meta_nao_conferida']);
-        $this->assertSame(1, $contagem['faixas']['meta']);
-        $this->assertSame(1, $contagem['faixas']['interest']);
+        $this->assertSame(0, $contagem['meta_corrigida_incompativel']);
+        $this->assertSame(['meta_both' => 0, 'meta_one' => 0, 'meta' => 1, 'both' => 1, 'profile' => 0, 'interest' => 1], $contagem['faixas']);
+    }
+
+    public function test_dentro_do_grupo_de_meta_diferente_vale_o_grau(): void
+    {
+        $reas = [
+            $this->rea('so_tema', 'Aquarela', 1, 'falhou', 'falhou', 'falhou'),
+            $this->rea('nivel_tipo', 'Eduplay', 2, 'ok', 'ok', 'falhou'),
+            $this->rea('nivel', 'MECRED', 1, 'ok', 'nao_avaliado', 'falhou'),
+        ];
+
+        $this->assertSame(['nivel_tipo', 'nivel', 'so_tema'], $this->ids(Ranking::ordenar($reas, true)));
+    }
+
+    public function test_sem_meta_o_status_da_meta_nao_separa_grupos(): void
+    {
+        $reas = [$this->rea('a', 'Aquarela', 1, 'ok', 'falhou'), $this->rea('b', 'Aquarela', 2, 'ok', 'ok')];
+
+        $this->assertSame(0, Ranking::grupoMeta($reas[0], false));
+        $this->assertSame(['b', 'a'], $this->ids(Ranking::ordenar($reas, false)));
     }
 
     public function test_grau_de_vem_dos_criterios_e_rea_antigo_usa_a_faixa(): void
@@ -178,15 +199,16 @@ class RankingTest extends TestCase
         $this->assertSame(4, $comMeta['meta_nao_conferida']);
     }
 
-    public function test_ocultos_com_meta_so_por_incompatibilidade(): void
+    public function test_com_meta_nada_e_ocultado_pela_meta(): void
     {
         $item = fn ($status) => (object) ['recommended' => 'both', 'explicacao' => (object) ['criterios' => (object) ['meta' => (object) ['status' => $status]]]];
 
         $contagem = Ranking::contar([$item('nao_avaliado'), $item('nao_avaliado'), $item('falhou')], true);
 
-        $this->assertSame(1, $contagem['ocultos']);
-        $this->assertSame(1, $contagem['motivos_ocultos']['meta_incompativel']);
+        $this->assertSame(0, $contagem['ocultos']);
+        $this->assertSame(['sem_meta_usuario' => 0, 'outros' => 0], $contagem['motivos_ocultos']);
         $this->assertSame(2, $contagem['meta_nao_conferida']);
+        $this->assertSame(1, $contagem['meta_incompativel']);
     }
 
     public function test_lista_vazia(): void
@@ -207,14 +229,16 @@ class RankingTest extends TestCase
         return ['recommended' => $rotulo, 'explicacao' => RuleClassifier::explicacao($criterios, $rotulo, 1)];
     }
 
-    public function test_oculto_com_meta_corrigida_passa_a_aparecer(): void
+    public function test_meta_diferente_corrigida_sobe_para_os_compativeis(): void
     {
-        $oculto = $this->reaComMeta('Performance Evitação');
-        $this->assertSame([], Ranking::ordenar([$oculto], true));
+        $diferente = $this->reaComMeta('Performance Evitação');
+        $compativel = ['chave' => 'z'] + $this->reaComMeta('Aprendizagem');
+        $this->assertSame([$compativel, $diferente], Ranking::ordenar([$diferente, $compativel], true));
+        $this->assertSame(Ranking::GRUPO_META_INCOMPATIVEL, Ranking::grupoMeta($diferente, true));
 
-        $corrigido = UserCorrections::corrigirMeta($oculto, 'ma');
+        $corrigido = UserCorrections::corrigirMeta($diferente, 'ma');
 
-        $this->assertSame([$corrigido], Ranking::ordenar([$corrigido], true));
+        $this->assertSame([$corrigido, $compativel], Ranking::ordenar([$compativel, $corrigido], true));
         $this->assertSame(4, $corrigido['explicacao']['grau']['total']);
         $this->assertSame(1, $corrigido['explicacao']['grau']['posicao']);
     }
@@ -236,9 +260,11 @@ class RankingTest extends TestCase
     {
         $corrigido = UserCorrections::corrigirMeta($this->reaComMeta('Aprendizagem'), 'mpe');
 
-        $this->assertSame('meta_corrigida_incompativel', Ranking::motivo($corrigido, true));
-        $this->assertSame('meta_corrigida_incompativel', Ranking::motivo(json_decode(json_encode($corrigido)), true));
-        $this->assertSame(1, Ranking::contar([$corrigido], true)['motivos_ocultos']['meta_corrigida_incompativel']);
+        $this->assertSame([$corrigido], Ranking::ordenar([$corrigido], true));
+        $this->assertSame(Ranking::GRUPO_META_INCOMPATIVEL, Ranking::grupoMeta(json_decode(json_encode($corrigido)), true));
+        $contagem = Ranking::contar([$corrigido], true);
+        $this->assertSame(1, $contagem['meta_corrigida_incompativel']);
+        $this->assertSame(0, $contagem['meta_incompativel']);
     }
 
     public function test_contar_correcoes_e_mudancas_de_faixa(): void

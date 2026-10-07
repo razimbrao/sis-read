@@ -9,8 +9,9 @@ namespace App\Recommendation;
 class Ranking
 {
     /**
-     * Com meta, as três últimas faixas reúnem os REAs cuja meta não pôde ser conferida: aparecem
-     * abaixo dos compatíveis. Só a meta conferida como incompatível tira o REA da lista.
+     * Com meta, as três últimas faixas reúnem os REAs cuja meta não atende: aparecem abaixo dos
+     * compatíveis, primeiro os de meta não conferida e depois os de meta diferente da do usuário
+     * (ver grupoMeta()). Nenhum REA sai da lista por causa da meta.
      */
     public const ORDEM_COM_META = ['meta_both', 'meta_one', 'meta', 'both', 'profile', 'interest'];
 
@@ -27,9 +28,19 @@ class Ranking
     }
 
     /**
-     * Ordena os REAs visíveis por: (1) grau, decrescente; (2) posição no próprio repositório, crescente,
-     * o que intercala os repositórios; (3) nome do repositório; (4) chave. A ordem de chegada dos jobs
-     * não influi. Itens ocultos (ver visivel()) ficam de fora.
+     * Grupos da lista numa busca com meta, nesta ordem (ver grupoMeta()).
+     */
+    public const GRUPO_COMPATIVEL = 0;
+
+    public const GRUPO_META_NAO_CONFERIDA = 1;
+
+    public const GRUPO_META_INCOMPATIVEL = 2;
+
+    /**
+     * Ordena os REAs visíveis por: (1) grupo da meta (compatível, não conferida, diferente); (2) grau,
+     * decrescente; (3) posição no próprio repositório, crescente, o que intercala os repositórios;
+     * (4) nome do repositório; (5) chave. A ordem de chegada dos jobs não influi. Itens ocultos
+     * (ver visivel()) ficam de fora.
      */
     public static function ordenar(iterable $reas, bool $comMeta): array
     {
@@ -42,7 +53,7 @@ class Ranking
 
             $itens[] = [
                 'rea' => $rea,
-                'chave' => [-self::grauDe($dados), $posicao, (string) ($dados['repositorio'] ?? ''), (string) ($dados['chave'] ?? '')],
+                'chave' => [self::grupoMeta($dados, $comMeta), -self::grauDe($dados), $posicao, (string) ($dados['repositorio'] ?? ''), (string) ($dados['chave'] ?? '')],
             ];
         }
 
@@ -52,18 +63,29 @@ class Ranking
     }
 
     /**
-     * Um REA aparece quando a faixa dele está na ordem do contexto e, com meta, quando a meta dele não
-     * foi conferida como incompatível.
+     * Um REA aparece quando a faixa dele está na ordem do contexto. A meta não esconde ninguém: o
+     * classificador de meta tem viés (problema #18) e, escondendo, deixava a lista vazia para metas
+     * diferentes de Aprendizagem. Ela só define o grupo (grupoMeta()).
      */
     public static function visivel($rea, bool $comMeta): bool
     {
+        return in_array(self::paraArray($rea)['recommended'] ?? null, self::ordem($comMeta), true);
+    }
+
+    /**
+     * Grupo do REA numa busca com meta: compatível (faixas meta*), meta não conferida (a IA não
+     * classificou) ou meta diferente da do usuário (classificada como incompatível, pela IA ou pelo
+     * usuário). Sem meta, todos ficam no mesmo grupo.
+     */
+    public static function grupoMeta($rea, bool $comMeta): int
+    {
         $dados = self::paraArray($rea);
 
-        if (! in_array($dados['recommended'] ?? null, self::ordem($comMeta), true)) {
-            return false;
+        if (! $comMeta || in_array($dados['recommended'] ?? null, ['meta_both', 'meta_one', 'meta'], true)) {
+            return self::GRUPO_COMPATIVEL;
         }
 
-        return ! $comMeta || self::statusMeta($dados) !== 'falhou';
+        return self::statusMeta($dados) === 'falhou' ? self::GRUPO_META_INCOMPATIVEL : self::GRUPO_META_NAO_CONFERIDA;
     }
 
     /**
@@ -82,18 +104,19 @@ class Ranking
     }
 
     /**
-     * Motivos dos ocultos: meta_incompativel, meta_corrigida_incompativel (o usuário informou outra meta),
-     * sem_meta_usuario (item de meta numa busca sem meta) e outros. `meta_nao_conferida` conta os exibidos
-     * no fim da lista porque a meta não pôde ser conferida. `corrigidos` e `mudaram_faixa` contam as correções.
+     * Motivos dos ocultos: sem_meta_usuario (item de meta numa busca sem meta) e outros. Os exibidos abaixo
+     * dos compatíveis com a meta são contados em `meta_nao_conferida` (a meta não pôde ser conferida),
+     * `meta_incompativel` (a IA classificou como diferente) e `meta_corrigida_incompativel` (o usuário
+     * informou uma meta diferente). `corrigidos` e `mudaram_faixa` contam as correções.
      *
-     * @return array{faixas: array<string, int>, ocultos: int, motivos_ocultos: array<string, int>, meta_nao_conferida: int, corrigidos: int, mudaram_faixa: int}
+     * @return array{faixas: array<string, int>, ocultos: int, motivos_ocultos: array<string, int>, meta_nao_conferida: int, meta_incompativel: int, meta_corrigida_incompativel: int, corrigidos: int, mudaram_faixa: int}
      */
     public static function contar(iterable $reas, bool $comMeta): array
     {
         $faixas = array_fill_keys(self::ordem($comMeta), 0);
         $ocultos = 0;
-        $motivos = ['meta_incompativel' => 0, 'meta_corrigida_incompativel' => 0, 'sem_meta_usuario' => 0, 'outros' => 0];
-        $metaNaoConferida = 0;
+        $motivos = ['sem_meta_usuario' => 0, 'outros' => 0];
+        $abaixo = ['meta_nao_conferida' => 0, 'meta_incompativel' => 0, 'meta_corrigida_incompativel' => 0];
         $corrigidos = 0;
         $mudaramFaixa = 0;
 
@@ -109,7 +132,13 @@ class Ranking
 
             if (self::visivel($dados, $comMeta)) {
                 $faixas[$rotulo]++;
-                $metaNaoConferida += $comMeta && in_array($rotulo, self::ORDEM_SEM_META, true) ? 1 : 0;
+
+                $grupo = self::grupoMeta($dados, $comMeta);
+                if ($grupo === self::GRUPO_META_NAO_CONFERIDA) {
+                    $abaixo['meta_nao_conferida']++;
+                } elseif ($grupo === self::GRUPO_META_INCOMPATIVEL) {
+                    $abaixo[($dados['explicacao']['criterios']['meta']['fonte'] ?? null) === 'usuario' ? 'meta_corrigida_incompativel' : 'meta_incompativel']++;
+                }
 
                 continue;
             }
@@ -122,7 +151,7 @@ class Ranking
             'faixas' => $faixas,
             'ocultos' => $ocultos,
             'motivos_ocultos' => $motivos,
-            'meta_nao_conferida' => $metaNaoConferida,
+        ] + $abaixo + [
             'corrigidos' => $corrigidos,
             'mudaram_faixa' => $mudaramFaixa,
         ];
@@ -140,14 +169,8 @@ class Ranking
     {
         $rotulo = $dados['recommended'] ?? null;
 
-        if (! $comMeta) {
-            return in_array($rotulo, ['meta_both', 'meta_one', 'meta'], true) ? 'sem_meta_usuario' : 'outros';
-        }
-
-        if (self::statusMeta($dados) === 'falhou' && in_array($rotulo, self::ORDEM_COM_META, true)) {
-            return ($dados['explicacao']['criterios']['meta']['fonte'] ?? null) === 'usuario'
-                ? 'meta_corrigida_incompativel'
-                : 'meta_incompativel';
+        if (! $comMeta && in_array($rotulo, ['meta_both', 'meta_one', 'meta'], true)) {
+            return 'sem_meta_usuario';
         }
 
         return 'outros';
