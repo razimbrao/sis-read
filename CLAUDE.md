@@ -16,6 +16,7 @@ Documentação completa em `docs/` (comece por `docs/README.md` e `docs/arquitet
 - Questionário de metas (EMAPRE): `app/Livewire/Emapre.php`
 - URL do MEC RED: `app/Helpers/helpers.php`
 - Regras, ordenação e textos das explicações: `app/Recommendation/` (spec em `docs/transparencia.md`)
+- Feature flags de explicabilidade e grupos do experimento: `app/Experimento/Experimento.php` + `config/experimento.php`, diretiva `@explicabilidade` (`docs/feature-flags.md`)
 - Correções do usuário (escrutabilidade): `app/Recommendation/UserCorrections.php` + ações no `FindREA` (`docs/plano-escrutabilidade.md`)
 
 ## Convenções
@@ -25,4 +26,5 @@ Documentação completa em `docs/` (comece por `docs/README.md` e `docs/arquitet
 - Toda regra nova de recomendação deve gravar seu critério em `explicacao` (decisão e explicação vêm da mesma fonte).
 - Os jobs gravam `chave` em cada REA; sem ela o REA não aceita correção. Depois de mexer nos jobs, rode `php artisan queue:restart`.
 - `database/database.sqlite` **não** é versionado (tem dados reais). É criado por `scripts/setup.ps1`; não rode `migrate:fresh` num banco com dados sem pedir.
+- Funcionalidade nova de explicabilidade entra atrás de uma flag (`Experimento::FLAGS` + grupos em `config/experimento.php`), escondendo a UI **e** recusando a ação no servidor. Recomendação e ordenação não dependem do grupo.
 - Bugs conhecidos estão em `docs/problemas-conhecidos.md`. Atualize esse arquivo ao corrigir algum.
