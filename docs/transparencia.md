@@ -129,7 +129,7 @@ REAs gravados antes desta funcionalidade não têm `explicacao`. O renderer most
 | tema | Todo item é resultado da busca pelo termo | `busca` |
 | nível | Regex em título + descrição: infantil → fundamental → médio. Sem casamento, assume superior (`assumido = true`). Compara com o perfil normalizado | `regex` |
 | tipo | `tipoConteudo` normalizado ∈ tipos preferidos | `colaboradores` |
-| meta | Só se o usuário tem meta. O LLM (Ollama `gemma3:4b`) classifica e o resultado é comparado com a meta dominante. Se a resposta for inválida ou o serviço falhar, o critério fica `nao_avaliado` | `llm` |
+| meta | Só se o usuário tem meta. O `MetaClassifier` (LLM, por padrão Ollama `gemma3:4b`) classifica e o resultado é comparado com a meta dominante. Se a resposta for inválida, o serviço falhar ou o tempo reservado acabar, o critério fica `nao_avaliado`, com o motivo em `evidencia` (§5.4) | `llm` |
 
 Rótulo (`RuleClassifier::rotular`), idêntico à regra anterior:
 
@@ -152,25 +152,50 @@ critério além do tema é marcado como atendido. A evidência registra o que fo
 | tema | `ok` | termo da busca |
 | nível | `nao_avaliado` | "o SisREAd pediu ao MEC RED itens desta etapa (educational_stages=…), mas o repositório não informa a etapa de cada item para conferir". Se o perfil não corresponde a nenhuma etapa, "nenhum filtro de nível foi aplicado" |
 | tipo | `nao_avaliado` | o MEC RED não informa o tipo |
-| meta | com meta: `nao_avaliado` | pedido de `object_type=…` associado à meta |
+| meta | com meta: classificada por IA (§5.4), só pelo título | "classificado só pelo título, porque o MEC RED não informa descrição nem tipo; a busca já pediu tipos de objeto associados à sua meta (object_type=…)" |
 
-Rótulo fixo: `both` (ou `meta_both` com meta), como antes. `observacao`: "Por política do SisREAd,
-os itens do MEC RED ficam na faixa mais alta, mas nível, tipo e meta não puderam ser conferidos
-neste repositório." O status `filtro_api` (▽) continua disponível para um repositório que confirme
+Rótulo fixo: `both` (ou `meta_both` com meta), como antes; a regra da faixa é escopo da ordenação
+por grau. `observacao`: "Por política do SisREAd, os itens do MEC RED ficam na faixa mais alta, mesmo
+sem conferir nível e tipo e qualquer que seja a meta classificada por IA." O status `filtro_api` (▽) continua disponível para um repositório que confirme
 o filtro aplicado.
 `fonte_interatividade = meta_usuario` quando há meta (interatividade derivada da meta do usuário,
 e não do recurso). Sem meta, `indisponivel`.
 
-### 5.3 Eduplay (faixa fixa por política)
+### 5.3 Eduplay
 
 | Critério | Status |
 |---|---|
 | tema | `ok` |
 | nível | `nao_avaliado`: o Eduplay não informa etapa |
 | tipo | `nao_avaliado`: é sempre vídeo e não é comparado com os tipos preferidos |
-| meta | com meta: `ok` para `ma`/`mpa`, `falhou` para `mpe` (`padrao_repositorio`) |
+| meta | com meta: classificada por IA (§5.4) a partir do título e de `metatagDescription` |
 
-Rótulo fixo: `meta_one` para metas `ma`/`mpa`. Senão, `interest`. `fonte_interatividade = padrao_repositorio`.
+Rótulo pela regra comum (`RuleClassifier::rotular`), sem `observacao`: com nível e tipo não
+avaliados, a faixa é `meta` se a meta for atendida e `interest` (oculto) se não for ou não puder ser
+avaliada. Antes (até 2026-10-06) o rótulo era fixo: `meta_one` para `ma`/`mpa`, `interest` para `mpe`,
+sem olhar o recurso. `fonte_interatividade = padrao_repositorio`. A meta do Eduplay agora é corrigível
+pelo usuário (fonte `llm`).
+
+### 5.4 Classificação de meta por IA (`MetaClassifier`)
+
+Os três jobs usam a mesma classe, `App\Recommendation\MetaClassifier`, com o mesmo prompt e a mesma
+interpretação. Ela devolve o critério pronto (`RuleClassifier::criterioMeta`) com `modelo`, `duracao`
+(do lote de chamadas simultâneas) e `evidencia`. A resposta só vale se `{"meta": …}` casar com
+exatamente uma das três metas; senão, `nao_avaliado`. Nunca há meta "atendida" sem classificação.
+
+| Situação | `status` | `evidencia` |
+|---|---|---|
+| Classificado agora | `ok`/`falhou` | (MEC RED: "classificado só pelo título…") |
+| Reaproveitado do cache (mesma `chave`, modelo e versão do prompt) | `ok`/`falhou` | "classificação reaproveitada de uma busca anterior" (`duracao` nula) |
+| Erro HTTP, conexão recusada ou tempo esgotado | `nao_avaliado` | "a IA não respondeu (erro ou tempo esgotado)" |
+| JSON inválido ou ambíguo | `nao_avaliado` | "a IA respondeu fora do formato esperado" |
+| `falhas_seguidas_max` falhas seguidas (neste job ou em outro, nos últimos `pausa_apos_falha_segundos`) | `nao_avaliado` | "a IA está indisponível (falhou várias vezes seguidas) e não foi consultada para este recurso" |
+| Orçamento de tempo do job esgotado | `nao_avaliado` | "o tempo reservado à classificação por IA (240s por repositório) acabou antes deste recurso" |
+| `LLM_PROVEDOR=nenhum` | `nao_avaliado` | "a classificação por IA está desativada nesta instalação" |
+
+O texto (`ExplanationRenderer::textoMeta`) mostra a evidência: "Meta não verificada: …" ou, quando
+classificado, "Classificado por IA como …. Modelo: …. Classificação reaproveitada de uma busca
+anterior." Configuração e desempenho em [integracoes.md](integracoes.md#llm-classificação-de-meta).
 
 ## 6. Ordenação (`Ranking`)
 
@@ -278,7 +303,8 @@ Os testes rodam em SQLite em memória (`phpunit.xml`), sem tocar em `database/da
 | `tests/Unit/RuleClassifierTest.php` | normalização, tipos, inferência de nível com evidência, critérios, `casaMeta`, tabela de rótulos |
 | `tests/Unit/RankingTest.php` | ordem com e sem meta, estabilidade, ocultos, contagem |
 | `tests/Unit/ExplanationRendererTest.php` | texto por status, nunca ✓ para não avaliado, resumo, avisos, faixa, item legado sem explicação |
-| `tests/Feature/JobsExplicacaoTest.php` | os três jobs com `Http::fake`: todo item tem `explicacao` coerente com `recommended`, Ollama fora do ar → `nao_avaliado` |
+| `tests/Feature/JobsExplicacaoTest.php` | os três jobs com `Http::fake`: todo item tem `explicacao` coerente com `recommended`, meta por IA nos três, Ollama fora do ar → `nao_avaliado`, métricas da LLM em `search_metrics` |
+| `tests/Feature/MetaClassifierTest.php` | sucesso, JSON inválido/ambíguo, timeout, provedor que lança exceção, cache entre buscas (e o que não entra nele), parada após falhas, orçamento, lotes, aquecimento, `LLM_PROVEDOR=nenhum`, configuração por `config/llm.php` |
 | `tests/Feature/FindREATransparenciaTest.php` | `search()` monta `$contexto` e tipos normalizados, `paginate` e `resumoOrdenacao`, `registrarExplicacao` grava e rejeita ação inválida |
 | `tests/Unit/UserCorrectionsTest.php` | correção de nível, meta e tipos: critério, `original`, rótulo, desfazer, item de política, entradas inválidas |
 | `tests/Feature/EscrutabilidadeTest.php` | ações de correção do `FindREA`: gravam `data.data` e `corrections`, reordenam, bloqueiam durante a busca; tela de correção e painel de tipos |
@@ -295,8 +321,8 @@ Quatro pontos em que o sistema falhava calado ou omitia o que estava fazendo:
 2. **Progresso da busca**: enquanto algum repositório não respondeu, a tela mostra "Consultando
    repositórios… N de 3 responderam", em vez de só "Carregando". Isso cobre o efeito do `finished`
    prematuro (problema #2), em que a lista parecia pronta e continuava crescendo.
-3. **Classificação por IA**: o critério de meta guarda o modelo (`ProcessAquarela::MODELO_LLM`) e
-   quanto tempo levou, e o texto os declara ("Modelo: gemma3:4b, em 1.23s"). O aviso de estimativa
+3. **Classificação por IA**: o critério de meta guarda o modelo (`MetaClassifier::modelo()`, de
+   `config/llm.php`) e quanto tempo levou, e o texto os declara ("Modelo: gemma3:4b, em 1.23s"). O aviso de estimativa
    automática menciona que o modelo local tende a favorecer "Aprendizagem" (problema #18).
 4. **REAs excluídos**: o painel de ordenação ganhou "Ver os REAs que não aparecem", com título,
    repositório, motivo e resumo dos critérios (até 20). A ação vira o evento `abriu_ocultos`.

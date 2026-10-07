@@ -10,6 +10,7 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\DB;
 use App\Models\Data;
+use App\Recommendation\MetaClassifier;
 use App\Recommendation\RuleClassifier;
 
 class ProcessMecRed implements ShouldQueue
@@ -51,6 +52,7 @@ class ProcessMecRed implements ShouldQueue
         ];
 
         $model = Data::query()->where('searched_at', $this->time)->first();
+        $classificador = app(MetaClassifier::class);
 
         $start_api = microtime(true);
         try {
@@ -92,14 +94,25 @@ class ProcessMecRed implements ShouldQueue
             'estrategia'           => $strategy,
         ];
 
-        if (is_array($search)) {
-            foreach ($search as $rea) {
+        $search = is_array($search) ? array_values(array_filter($search, 'is_array')) : [];
+
+        // Com meta, todos os itens vão para a LLM de uma vez. O MEC RED só devolve o nome do recurso.
+        $metas = $this->meta ? $classificador->criterios($this->meta, array_map(fn ($rea) => [
+            'chave'     => $this->chave($rea),
+            'titulo'    => $rea['name'] ?? null,
+            'evidencia' => 'classificado só pelo título, porque o MEC RED não informa descrição nem tipo; a busca já pediu tipos de objeto associados à sua meta (object_type='
+                . implode(',', mecRedTiposObjeto($this->meta)) . ')',
+        ], $search)) : [];
+
+        if ($search) {
+            foreach ($search as $i => $rea) {
                 // MecRed devolve dados mais diretos baseados na API construída
                 $recommended = $this->meta ? 'meta_both' : 'both';
                 $explicacao = RuleClassifier::explicacao(
-                    $this->criterios(),
+                    $this->criterios($metas[$i] ?? null),
                     $recommended,
-                    'Por política do SisREAd, os itens do MEC RED ficam na faixa mais alta, mas nível, tipo e meta não puderam ser conferidos neste repositório.'
+                    'Por política do SisREAd, os itens do MEC RED ficam na faixa mais alta, mesmo sem conferir nível e tipo'
+                        . ($this->meta ? ' e qualquer que seja a meta classificada por IA' : '') . '.'
                 );
 
                 // 📊 1. Incrementa a radiografia
@@ -119,7 +132,7 @@ class ProcessMecRed implements ShouldQueue
                 }
 
                 $allData[] = array_merge([
-                    'chave'        => RuleClassifier::chave('MECRED', (string) ($rea['id'] ?? ''), $rea['name'] ?? null),
+                    'chave'        => $this->chave($rea),
                     'title'        => $rea['name'] ?? 'Sem título',
                     'link'         => '',
                     'type'         => '',
@@ -157,15 +170,21 @@ class ProcessMecRed implements ShouldQueue
             'breakdown'       => json_encode($metrics['breakdown']),
             'created_at'      => now(),
             'updated_at'      => now(),
-        ]);
+        ] + $classificador->metricas());
+    }
+
+    private function chave(array $rea): string
+    {
+        return RuleClassifier::chave('MECRED', (string) ($rea['id'] ?? ''), $rea['name'] ?? null);
     }
 
     /**
      * Critérios do MEC RED. Os filtros de etapa e tipo são enviados na URL, mas a API não devolve a etapa
      * nem o tipo de cada item (e, em 2026-09-18, ignorava os filtros): nada disso pode ser conferido,
-     * então os critérios ficam como não avaliados, com o pedido feito como evidência.
+     * então os critérios ficam como não avaliados, com o pedido feito como evidência. A meta é classificada
+     * por IA a partir do título (MetaClassifier), como nos outros repositórios.
      */
-    private function criterios(): array
+    private function criterios(?array $meta): array
     {
         $criterios = ['tema' => RuleClassifier::criterioTema($this->search, 'MEC RED')];
 
@@ -194,14 +213,8 @@ class ProcessMecRed implements ShouldQueue
             'evidencia' => 'o MEC RED não informa o tipo nesta busca',
         ];
 
-        if ($this->meta) {
-            $criterios['meta'] = [
-                'status'    => 'nao_avaliado',
-                'valor'     => null,
-                'esperado'  => $this->meta,
-                'fonte'     => 'filtro_api',
-                'evidencia' => 'o SisREAd pediu ao MEC RED tipos de objeto associados à sua meta (object_type=' . implode(',', mecRedTiposObjeto($this->meta)) . '), mas o repositório não informa o tipo de cada item para conferir',
-            ];
+        if ($this->meta && $meta !== null) {
+            $criterios['meta'] = $meta;
         }
 
         return $criterios;
