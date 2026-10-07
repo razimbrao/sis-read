@@ -422,7 +422,7 @@ flowchart TD
     U -- sim --> I{"incluir_tipos_colaboradores?"}
     I -- não --> S["tipos da conta<br/>fonte: usuario, inclui_colaboradores: false"]
     I -- sim --> UN["conta ∪ colaboradores<br/>fonte: usuario, inclui_colaboradores: true"]
-    C & S & UN --> J["ProcessAquarela → criterioTipo<br/>(rótulo pela mesma regra)"]
+    C & S & UN --> J["ProcessAquarela / ProcessEduplay → criterioTipo<br/>(grau e rótulo pela mesma regra)"]
     J --> B["busca: Editar tipos preferidos<br/>(esperado_original = lista inicial)"]
     B -- "Salvar também como minha preferência" --> CT[("users.tipos_preferidos")]
     CT -. próxima busca .-> U
@@ -458,7 +458,7 @@ simples, no estilo atual; o redesign da UI aplica o visual definitivo.
 | `app/Recommendation/TiposPreferidos.php` | **novo**: `resolver`, `daConta`, `salvar` |
 | `app/Recommendation/RuleClassifier.php` | `criterioTipo(..., $origem)`, `tipoComparavel` |
 | `app/Recommendation/ExplanationRenderer.php` | texto "tipos preferidos da sua conta" |
-| `app/Jobs/ProcessAquarela.php` | recebe `origemTipos` |
+| `app/Jobs/ProcessAquarela.php`, `app/Jobs/ProcessEduplay.php` | recebem `origemTipos` (o Eduplay compara `video` com os tipos preferidos desde a ordenação por grau) |
 | `app/Livewire/FindREA.php` | aplica a preferência em `findInApi`; `redefinirTipos($tipos, $salvarNaConta)` |
 | `app/Livewire/Preferencias.php` + view | **nova** tela |
 | `resources/views/livewire/partials/transparencia-paineis.blade.php` | "Da sua conta", link, caixa de salvar |

@@ -89,6 +89,7 @@
                                             : 'rea-'.$this->page.'-'.$loop->iteration;
                                         $explicacao = $rea->explicacao ?? null;
                                         $faixa = \App\Recommendation\ExplanationRenderer::faixa($rea->recommended ?? null, $explicacao);
+                                        $grau = \App\Recommendation\ExplanationRenderer::grau($explicacao);
                                         $criterioMeta = collect(\App\Recommendation\ExplanationRenderer::linhas($explicacao))->firstWhere('criterio', 'meta');
                                         $destaque = auth()->user() ? $rea->recommended === 'meta_both' : $rea->recommended === 'both';
                                         $links = array_values(array_filter([
@@ -175,8 +176,8 @@
                                                         <path stroke-linecap="round" d="M12 11v5M12 8h.01" />
                                                     </svg>
                                                     <span class="font-medium">Por que este REA?</span>
-                                                    <span class="px-2 py-0.5 rounded-full text-xs bg-white border border-blue-200 text-blue-700" title="{{ $faixa['descricao'] }}">
-                                                        {{ $faixa['titulo'] }}
+                                                    <span class="px-2 py-0.5 rounded-full text-xs bg-white border border-blue-200 text-blue-700" title="{{ $grau['conta'] ?? $faixa['descricao'] }}">
+                                                        {{ $grau ? $grau['selo'].' · ' : '' }}{{ $faixa['titulo'] }}
                                                     </span>
                                                 </span>
                                                 <span class="flex items-center gap-1 shrink-0 text-xs">

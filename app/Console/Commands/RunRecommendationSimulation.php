@@ -70,7 +70,7 @@ class RunRecommendationSimulation extends Command
                     // 📡 Dispara a tríade de Jobs para a fila do Laravel
                     ProcessAquarela::dispatch($interestApiSearch, $types, $profile, $timestampSession, $meta);
                     ProcessMecRed::dispatch($interestApiSearch, $types, $profile, $interest, $timestampSession, $meta);
-                    ProcessEduplay::dispatch($interestApiSearch, $profile, $timestampSession, $meta);
+                    ProcessEduplay::dispatch($interestApiSearch, $profile, $timestampSession, $meta, $types);
 
                     $metaNome = $meta ?? 'Sem Meta (Padrão)';
                     $this->line("   [✔] Enfileirado: Perfil: {$profile} | Interesse: {$interest} | Meta: {$metaNome}");

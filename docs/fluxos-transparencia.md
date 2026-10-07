@@ -160,7 +160,7 @@ sequenceDiagram
         F->>DB: Data::create(searched_at = timestampSession)
         F->>Q: ProcessAquarela(termo, tipos, perfil, searched_at, meta)
         F->>Q: ProcessMecRed(termo, tipos, perfil, interesse, searched_at, meta)
-        F->>Q: ProcessEduplay(termo, perfil, searched_at, meta)
+        F->>Q: ProcessEduplay(termo, perfil, searched_at, meta, tipos)
         F->>F: reset(profile, interest)
         F-->>U: tela de resultados com wire:poll
     end
@@ -247,8 +247,10 @@ como fato. O critério de meta guarda o modelo e o tempo da chamada.
 
 ### 4.2 Do critério ao rótulo (`RuleClassifier::rotular`)
 
-Um critério "atende" quando o status é `ok` ou `filtro_api`. `nao_avaliado` **nunca** conta como
-atendido.
+Um critério "atende" (`RuleClassifier::atende`) quando o status é `ok` e o valor não foi *assumido*.
+`nao_avaliado`, `filtro_api` e nível assumido **nunca** contam como atendidos. A mesma regra dá o
+grau de recomendação (meta 4, nível 2, tipo 1; ver [recomendacao.md](recomendacao.md)), e o rótulo é
+um intervalo do grau.
 
 ```mermaid
 flowchart TD
@@ -266,36 +268,35 @@ flowchart TD
 ```
 
 Repare que, com meta, um REA cuja meta **falhou** ou **não foi avaliada** cai no ramo da direita e
-recebe `both`, `profile` ou `interest`. Esses rótulos não são exibidos para quem tem meta (ver
-[Fluxo 5](#6-fluxo-5-exibição-e-ordenação)); é assim que um REA incompatível com a meta sai da lista.
+recebe `both`, `profile` ou `interest`. Para quem tem meta, o REA com meta que **falhou** sai da lista.
+O REA com meta **não avaliada** aparece abaixo dos compatíveis, como "meta não conferida" (ver
+[Fluxo 5](#6-fluxo-5-exibição-e-ordenação)).
 
-### 4.3 MEC RED e Eduplay: faixa fixa por política
+### 4.3 MEC RED e Eduplay: a mesma regra, com menos dados
 
-Nesses repositórios a API não devolve o que seria preciso para conferir nível, tipo ou meta. O rótulo
-é fixo por política e a explicação **declara que é política** (campo `observacao`).
+Até a versão 1 das regras, esses repositórios tinham rótulo fixo por política (campo `observacao`).
+Desde a versão 2, a regra é a mesma do Aquarela. O que muda é só o que cada API informa: o que não pode
+ser conferido fica `nao_avaliado` e vale 0 ponto no grau.
 
 ```mermaid
 flowchart LR
     subgraph MEC["ProcessMecRed"]
-        M1["URL com educational_stages<br/>e object_type da meta"] --> M2["tema: ok<br/>nível, tipo, meta: nao_avaliado<br/>evidência = o que foi pedido"]
-        M2 --> M3["recommended fixo<br/>both ou meta_both"]
-        M3 --> M4["observacao: política,<br/>nada pôde ser conferido"]
+        M1["URL com educational_stages<br/>e object_type da meta"] --> M2["tema: ok<br/>nível: regex em name + description<br/>tipo: nao_avaliado<br/>meta: IA só pelo título<br/>evidência = o que foi pedido"]
+        M2 --> M3["rotular + grau<br/>posição = ordem na resposta"]
     end
     subgraph EDU["ProcessEduplay"]
-        E1["Busca por termo<br/>tudo é vídeo"] --> E2["tema: ok<br/>nível, tipo: nao_avaliado<br/>meta: ok se ma/mpa, falhou se mpe"]
-        E2 --> E3["recommended fixo<br/>meta_one se ma/mpa,<br/>senão interest"]
-        E3 --> E4["observacao: posição<br/>definida pela meta"]
+        E1["Busca por termo<br/>tudo é vídeo"] --> E2["tema: ok<br/>nível: regex em name + metatagDescription<br/>tipo: vídeo × preferidos<br/>meta: IA por título + descrição"]
+        E2 --> E3["rotular + grau<br/>posição = ordem na resposta"]
     end
 ```
 
 | | Aquarela | MEC RED | Eduplay |
 |---|---|---|---|
 | tema | ✓ busca | ✓ busca | ✓ busca |
-| nível | ✓/✗ regex | ? pedido na URL, não conferido | ? repositório não informa |
-| tipo | ✓/✗ colaboradores | ? repositório não informa | ? sempre vídeo |
-| meta | ✓/✗/? IA | ? pedido na URL, não conferido | ✓/✗ padrão do repositório |
-| rótulo | calculado | fixo | fixo |
-| `observacao` | — | sim | sim |
+| nível | ✓/✗/? regex | ✓/✗/? regex | ✓/✗/? regex |
+| tipo | ✓/✗ colaboradores | ? repositório não informa | ✓/✗ vídeo × preferidos |
+| meta | ✓/✗/? IA | ✓/✗/? IA (só título) | ✓/✗/? IA |
+| rótulo e grau | calculados | calculados | calculados |
 | `fonte_interatividade` | `dtype` ou `indisponivel` | `meta_usuario` ou `indisponivel` | `padrao_repositorio` |
 
 `fonte_interatividade` diz de onde vêm as colunas de interatividade da tabela. No MEC RED, por
@@ -406,35 +407,35 @@ sequenceDiagram
         F->>RK: ocultos → motivo de cada REA fora da ordem
         F->>RK: paginate → ordenar(REAs, temMeta), 10 por página
         loop cada REA da página
-            F->>ER: faixa(recommended, explicacao)
+            F->>ER: faixa(recommended, explicacao) + grau(explicacao)
             F->>ER: linhas(explicacao) → coluna Meta
         end
         F-->>B: HTML: painéis + tabela + progresso
     end
 ```
 
-### 6.1 Ordem das faixas (`Ranking`)
+### 6.1 Ordenação pelo grau (`Ranking`)
 
 `temMeta()` é verdadeiro quando o usuário logado tem `questionnaire.dominant`.
 
 ```mermaid
 flowchart LR
-    subgraph COM["Com meta"]
+    subgraph COM["Com meta (grau 0 a 7)"]
         direction LR
-        a1["meta_both"] --> a2["meta_one"] --> a3["meta"]
-        a4["ocultas: both · profile · interest"]:::oculto
+        a1["meta_both · 7"] --> a2["meta_one · 5-6"] --> a3["meta · 4"] --> a5["both · profile · interest<br/>meta não conferida · 0-3"]
+        a4["ocultos: meta conferida como incompatível"]:::oculto
     end
-    subgraph SEM["Sem meta"]
+    subgraph SEM["Sem meta (grau 0 a 3)"]
         direction LR
-        b1["both"] --> b2["profile"] --> b3["interest"]
+        b1["both · 3"] --> b2["profile · 2"] --> b3["interest · 0-1"]
         b4["ocultas: meta_both · meta_one · meta"]:::oculto
     end
     classDef oculto fill:#eee,stroke:#999,stroke-dasharray: 4 3,color:#666
 ```
 
-Em cinza, as faixas ocultas naquele contexto. Dentro de cada faixa a ordem é a de chegada dos
-repositórios (ordenação estável). Como os jobs terminam em tempos diferentes, essa ordem varia de
-uma busca para outra, e o painel avisa isso.
+A lista vai do maior grau para o menor. Entre REAs de mesmo grau, vem primeiro o de menor posição no
+próprio repositório (intercalando os repositórios), depois a ordem alfabética do repositório e a
+`chave`. A ordem de chegada dos jobs não influi: a mesma busca dá sempre a mesma lista.
 
 ### 6.2 Progresso da busca
 
@@ -500,7 +501,7 @@ flowchart TD
     V -- sim --> LI["linhas()"]
     V -- sim --> AV["avisos()"]
 
-    F --> F1{"tem observacao?"}
+    F --> F1{"tem observacao?<br/>(REA da versão 1)"}
     F1 -- sim --> F2["título + ' (política)'<br/>'posição definida por política do<br/>repositório, não pelos critérios conferidos'"]
     F1 -- não --> F3["título e descrição de FAIXAS"]
 
@@ -537,8 +538,8 @@ que impediu a verificação, usando a `evidencia` gravada pelo job.
 
 ## 8. Fluxo 7: REAs que não aparecem
 
-Um REA não aparece quando o rótulo dele não está na ordem do contexto atual. `Ranking::motivo`
-explica por quê:
+Um REA não aparece quando `Ranking::visivel` é falso: o rótulo não está na ordem do contexto ou, com
+meta, a meta foi conferida como incompatível. `Ranking::motivo` explica por quê:
 
 ```mermaid
 flowchart TD
@@ -547,17 +548,16 @@ flowchart TD
     C -- sim --> C1["sem_meta_usuario<br/>'que dependem de uma meta de aprendizagem'"]
     C -- não --> C2["outros<br/>'sem faixa definida'"]
     B -- sim --> D{"criterios.meta.status"}
-    D -- falhou --> D1["meta_incompativel<br/>'incompatíveis com a sua meta'"]
-    D -- nao_avaliado --> D2["meta_nao_avaliada<br/>'sem classificação de meta<br/>(a IA não conseguiu classificar)'"]
+    D -- falhou --> D1["meta_incompativel<br/>'incompatíveis com a sua meta'<br/>(meta_corrigida_incompativel se o usuário informou)"]
     D -- outro --> D3["outros"]
 ```
 
 O painel mostra a contagem por motivo e, ao expandir **Ver os REAs que não aparecem**, até 20 itens
 com o resumo dos critérios. Assim o usuário vê o que foi descartado e por qual regra.
 
-O motivo `meta_nao_avaliada` separa duas situações que, sem ele, seriam iguais na tela: "este REA
-não serve para a sua meta" e "a IA não respondeu". Com o Ollama fora do ar, todos os REAs do
-Aquarela caem no segundo caso (problema #16), e o painel diz isso.
+Um REA com meta não avaliada (a IA não respondeu, ou o repositório não informa) **não** é ocultado:
+aparece no fim da lista, com 0 ponto de meta, e o painel conta quantos estão nessa situação
+(`meta_nao_conferida`). Antes ele saía da lista com o motivo `meta_nao_avaliada` (problema #16).
 
 ---
 
@@ -614,7 +614,7 @@ que `data.data` é escrito fora dos jobs. Decisões e alternativas estão em
 
 ```mermaid
 flowchart TD
-    C["Critério de um REA"] --> P{"item de política?<br/>(observacao preenchida)"}
+    C["Critério de um REA"] --> P{"item de política?<br/>(observacao preenchida, versão 1)"}
     P -- sim --> N0["não corrigível<br/>'posição definida por política do repositório'"]
     P -- não --> T{"critério"}
     T -- tema --> N1["não corrigível"]
@@ -723,9 +723,9 @@ flowchart LR
     F --> G["Atende: tema, nível, tipo.<br/>+ aviso de estimativa (regex)"]
 ```
 
-No mesmo cenário, um item do MEC RED também fica em `both`, mas com o selo **Nível e tipo
-(política)** e o resumo "Atende: tema. Não verificado: nível, tipo." seguido da observação de
-política. Um vídeo do Eduplay fica em `interest` (**Só tema (política)**).
+No mesmo cenário, um item do MEC RED sem etapa no título fica em `interest` com **Grau 0 de 3** e o
+resumo "Atende: tema. Não verificado: nível, tipo.". Um vídeo do Eduplay cujo título menciona o
+ensino fundamental fica em `both` (**Grau 3 de 3**), intercalado com os do Aquarela de mesmo grau.
 
 ### 11.2 Usuário com meta *Aprendizagem* e Ollama no ar
 
@@ -740,8 +740,8 @@ flowchart LR
     F --> H["oculto: incompatível com a sua meta"]
 ```
 
-Eduplay entra em `meta_one` (vídeos considerados adequados a `ma`/`mpa`); MEC RED em `meta_both`
-por política.
+MEC RED e Eduplay passam pela mesma classificação por IA (o MEC RED só pelo título) e entram na mesma
+ordenação pelo grau, intercalados com o Aquarela.
 
 ### 11.3 Usuário com meta e Ollama fora do ar
 
@@ -749,14 +749,14 @@ por política.
 flowchart LR
     A["Aquarela: chamada ao LLM falha"] --> B["meta: nao_avaliado"]
     B --> C["rotular: meta não atende → ramo sem meta"]
-    C --> D["rótulo both / profile / interest"]
-    D --> E["oculto, motivo meta_nao_avaliada"]
-    E --> F["painel: 'N sem classificação de meta<br/>(a IA não conseguiu classificar)'"]
+    C --> D["rótulo both / profile / interest<br/>meta vale 0 no grau"]
+    D --> E["aparece no fim, 'meta não conferida'"]
+    E --> F["painel: 'N REAs aparecem abaixo dos<br/>compatíveis com a sua meta'"]
 ```
 
-A lista mostra só MEC RED e Eduplay, e o painel explica a ausência do Aquarela pelo motivo certo.
-Com a escrutabilidade, o usuário pode abrir **Ver os REAs que não aparecem** e informar a meta de um
-REA do Aquarela. Se ela casar com a dele, o REA volta para a lista ([Fluxo 9](#10-fluxo-9-escrutabilidade)).
+Todos os REAs aparecem, ordenados pelo grau de nível e tipo e intercalados entre os repositórios.
+Com a escrutabilidade, o usuário pode informar a meta de um REA do Aquarela em **Por que este REA?**.
+Se ela casar com a dele, o REA sobe para as faixas de meta ([Fluxo 9](#10-fluxo-9-escrutabilidade)).
 
 ---
 
@@ -766,7 +766,7 @@ REA do Aquarela. Se ela casar com a dele, o REA volta para a lista ([Fluxo 9](#1
 |---|---|---|---|
 | Por que este REA está nesta faixa? | `RuleClassifier::rotular` / regra fixa do job | `recommended` + `explicacao` em `data.data` | selo + `explicacao-rea.blade.php` |
 | Como o nível foi descoberto? | `RuleClassifier::inferirNivel` | `criterios.nivel.evidencia`, `assumido` | `ExplanationRenderer::textoNivel` |
-| Quem classificou a meta? | `ProcessAquarela::classificarMetaComLLM` | `criterios.meta.modelo`, `duracao` | `textoMeta` + aviso |
+| Quem classificou a meta? | `MetaClassifier` (nos três jobs) | `criterios.meta.modelo`, `duracao` | `textoMeta` + aviso |
 | Por que a lista tem esta ordem? | `Ranking::ordem` | — (calculado do rótulo) | painel **Como ordenamos** |
 | O que ficou de fora e por quê? | `Ranking::motivo` | — | **Ver os REAs que não aparecem** |
 | Algum repositório falhou? | jobs (`timeouts_errors`) | `search_metrics` | progresso + **Repositórios consultados** |
@@ -784,7 +784,7 @@ Os pontos abaixo são **declarados** na tela, mas não resolvidos:
 
 | Ponto | O que a explicação faz | O que continua igual | Ref. |
 |---|---|---|---|
-| MEC RED ignora os filtros | marca nível, tipo e meta como não verificados e diz que é política | os itens seguem na faixa mais alta | #15 |
+| MEC RED ignora os filtros | marca o tipo como não verificado (0 ponto), estima o nível pelo regex e a meta pela IA (só título) | sem etapa nem tipo da API, os itens raramente pontuam em nível e tipo | #15 |
 | Viés da IA para "Aprendizagem" | declara modelo, tempo e o viés no aviso | o critério de meta quase não filtra | #18 |
 | `finished` prematuro | contador "N de 3 responderam" | a lista cresce enquanto o usuário lê | #2 |
 | Tipos de qualquer colaborador contam | painel separa as duas origens | ambas contam igual no critério | #11, #12 |

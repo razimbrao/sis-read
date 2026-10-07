@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Jobs\ProcessAquarela;
+use App\Jobs\ProcessEduplay;
 use App\Livewire\FindREA;
 use App\Livewire\Preferencias;
 use App\Models\Collaborator;
@@ -158,6 +159,7 @@ class PreferenciasPorContaTest extends TestCase
         $contexto = $this->buscar($this->usuario(['Jogo']))->get('contexto');
 
         Queue::assertPushed(ProcessAquarela::class, fn ($job) => $job->types === ['jogo'] && $job->origemTipos === TiposPreferidos::CONTA);
+        Queue::assertPushed(ProcessEduplay::class, fn ($job) => $job->types === ['jogo'] && $job->origemTipos === TiposPreferidos::CONTA);
         $this->assertSame(['jogo'], $contexto['tipos_conta']);
         $this->assertSame(TiposPreferidos::CONTA, $contexto['origem_tipos']);
         $this->assertSame(['video'], $contexto['tipos_busca']);

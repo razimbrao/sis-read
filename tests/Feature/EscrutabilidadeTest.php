@@ -70,7 +70,7 @@ class EscrutabilidadeTest extends TestCase
             'link' => '',
             'repositorio' => 'MECRED',
             'recommended' => 'both',
-            'explicacao' => RuleClassifier::explicacao($criterios, 'both', 'Política.'),
+            'explicacao' => ['observacao' => 'Política.'] + RuleClassifier::explicacao($criterios, 'both'),
         ] + self::COLUNAS;
     }
 
@@ -142,7 +142,7 @@ class EscrutabilidadeTest extends TestCase
 
     public function test_corrigir_meta_traz_de_volta_um_rea_oculto(): void
     {
-        $oculto = $this->aquarela('Grafos', 'Vídeo', 'ma', null);
+        $oculto = $this->aquarela('Grafos', 'Vídeo', 'ma', 'Performance Evitação');
         $this->busca([$oculto]);
         $user = $this->usuarioComMeta('ma');
         $componente = $this->componente($user);
@@ -321,7 +321,8 @@ class EscrutabilidadeTest extends TestCase
         $this->componente()->set('userType', 'usuario')->set('interestApiSearch', 'algoritmos')
             ->call('corrigirNivel', $grafos['chave'], 'ensino fundamental')
             ->assertSee('informado por você (o sistema tinha assumido ensino superior)')
-            ->assertSee('Faixa alterada pela sua correção: antes Só tema, agora Nível.')
+            ->assertSee('Faixa alterada pela sua correção: antes Tipo ou só tema, agora Nível.')
+            ->assertSee('Grau 2 de 3: nível +2, tipo 0 (não atende).')
             ->assertSee('1 REA mudou de faixa por correções suas.')
             ->assertSee('desfazerCorrecao', false)
             ->assertSee('Corrigir de novo');
@@ -329,7 +330,7 @@ class EscrutabilidadeTest extends TestCase
 
     public function test_tela_oferece_corrigir_a_meta_dos_ocultos(): void
     {
-        $oculto = $this->aquarela('Grafos', 'Vídeo', 'ma', null);
+        $oculto = $this->aquarela('Grafos', 'Vídeo', 'ma', 'Performance Evitação');
         $this->busca([$oculto]);
 
         $this->componente($this->usuarioComMeta('ma'))->set('userType', 'usuario')->set('interestApiSearch', 'algoritmos')

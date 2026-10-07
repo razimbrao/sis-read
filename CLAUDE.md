@@ -16,12 +16,13 @@ Documentação completa em `docs/` (comece por `docs/README.md` e `docs/arquitet
 - Questionário de metas (EMAPRE): `app/Livewire/Emapre.php`
 - URL do MEC RED: `app/Helpers/helpers.php`
 - Regras, ordenação e textos das explicações: `app/Recommendation/` (spec em `docs/transparencia.md`)
+- Classificação de meta por LLM (os três jobs): `app/Recommendation/MetaClassifier.php` + `app/Recommendation/Llm/`, configuração em `config/llm.php` (`docs/integracoes.md`)
 - Correções do usuário (escrutabilidade): `app/Recommendation/UserCorrections.php` + ações no `FindREA` (`docs/plano-escrutabilidade.md`)
 
 ## Convenções
 - Textos de UI, comentários e mensagens de validação em português.
 - Os jobs se ligam à busca por `Data.searched_at`; mantenha essa chave ao mexer no fluxo.
-- Rótulos de recomendação (`both`, `profile`, `interest`, `meta_*`) estão acoplados a `Ranking` e `ExplanationRenderer::FAIXAS`. Mude juntos.
+- Rótulos de recomendação (`both`, `profile`, `interest`, `meta_*`) são faixas do grau (`RuleClassifier::PESOS`) e estão acoplados a `Ranking` e `ExplanationRenderer::FAIXAS`. Mude juntos. Nenhum repositório tem rótulo fixo.
 - Toda regra nova de recomendação deve gravar seu critério em `explicacao` (decisão e explicação vêm da mesma fonte).
 - Os jobs gravam `chave` em cada REA; sem ela o REA não aceita correção. Depois de mexer nos jobs, rode `php artisan queue:restart`.
 - `database/database.sqlite` **não** é versionado (tem dados reais). É criado por `scripts/setup.ps1`; não rode `migrate:fresh` num banco com dados sem pedir.

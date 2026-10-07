@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\Data;
+use App\Recommendation\MetaClassifier;
 use App\Recommendation\RuleClassifier;
 use App\Recommendation\TiposPreferidos;
 use Illuminate\Bus\Queueable;
@@ -15,8 +16,6 @@ use Illuminate\Support\Facades\Http;
 
 class ProcessAquarela implements ShouldQueue
 {
-    public const MODELO_LLM = 'gemma3:4b';
-
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public string $search;
@@ -38,12 +37,9 @@ class ProcessAquarela implements ShouldQueue
     private array $metrics = [
         'api_time' => 0,
         'api_calls' => 0,
-        'ollama_time' => 0,
-        'ollama_calls' => 0,
         'items_returned' => 0,
         'items_filtered' => 0,
         'timeouts_errors' => 0,
-        'ollama_errors' => 0,
         'breakdown' => [
             'meta_both' => 0, 'meta_one' => 0, 'meta' => 0,
             'both' => 0, 'profile' => 0, 'interest' => 0,
@@ -65,8 +61,10 @@ class ProcessAquarela implements ShouldQueue
         $start_total_time = microtime(true);
         $page = 0;
         $allData = [];
+        $posicao = 0; // ordem do REA no Aquarela, usada no desempate do grau
 
         $model = Data::query()->where('searched_at', $this->time)->first();
+        $classificador = app(MetaClassifier::class);
 
         while ($page < 3) {
             $this->metrics['api_calls']++;
@@ -95,11 +93,21 @@ class ProcessAquarela implements ShouldQueue
                 break;
             }
 
-            foreach ($search as $rea) {
+            // Com meta, a página inteira vai para a LLM de uma vez (cache e chamadas simultâneas).
+            $metas = $this->meta ? $classificador->criterios($this->meta, array_map(fn ($rea) => [
+                'chave' => $this->chave($rea),
+                'titulo' => $rea['titulo'] ?? null,
+                'descricao' => $rea['descricao'] ?? null,
+                'tipo' => $rea['tipoConteudo'] ?? null,
+                'dtype' => $rea['dtype'] ?? null,
+            ], $search)) : [];
+
+            foreach ($search as $i => $rea) {
                 $interactivityData = $this->definirInteratividade($rea['dtype'] ?? '');
 
-                $criterios = $this->avaliarCriterios($rea);
+                $criterios = $this->avaliarCriterios($rea, $metas[$i] ?? null);
                 $recommended = RuleClassifier::rotular($criterios, (bool) $this->meta);
+                $posicao++;
 
                 // 📊 1. Incrementa a radiografia exata
                 if (isset($this->metrics['breakdown'][$recommended])) {
@@ -118,13 +126,13 @@ class ProcessAquarela implements ShouldQueue
                 }
 
                 $allData[] = array_merge([
-                    'chave' => RuleClassifier::chave('Aquarela', $rea['links'][0]['href'] ?? null, $rea['titulo']),
+                    'chave' => $this->chave($rea),
                     'title' => $rea['titulo'],
                     'link' => $rea['links'][0]['href'] ?? null,
                     'type' => $rea['tipoConteudo'],
                     'repositorio' => 'Aquarela',
                     'recommended' => $recommended,
-                    'explicacao' => RuleClassifier::explicacao($criterios, $recommended),
+                    'explicacao' => RuleClassifier::explicacao($criterios, $recommended, $posicao),
                     'titulo' => $rea['titulo'],
                     'descricao' => $rea['descricao'],
                     'tipoConteudo' => $rea['tipoConteudo'],
@@ -153,16 +161,13 @@ class ProcessAquarela implements ShouldQueue
             'total_time' => $total_time,
             'api_time' => $this->metrics['api_time'],
             'api_calls' => $this->metrics['api_calls'],
-            'ollama_time' => $this->metrics['ollama_time'],
-            'ollama_calls' => $this->metrics['ollama_calls'],
             'items_returned' => $this->metrics['items_returned'],
             'items_filtered' => $this->metrics['items_filtered'],
             'timeouts_errors' => $this->metrics['timeouts_errors'],
-            'ollama_errors' => $this->metrics['ollama_errors'],
             'breakdown' => json_encode($this->metrics['breakdown']),
             'created_at' => now(),
             'updated_at' => now(),
-        ]);
+        ] + $classificador->metricas());
     }
 
     private function definirInteratividade(string $dtype): array
@@ -195,10 +200,16 @@ class ProcessAquarela implements ShouldQueue
         ];
     }
 
+    private function chave(array $rea): string
+    {
+        return RuleClassifier::chave('Aquarela', $rea['links'][0]['href'] ?? null, $rea['titulo']);
+    }
+
     /**
      * Avalia tema, nível, tipo e (com meta) meta; o rótulo é derivado destes critérios.
+     * O critério de meta vem pronto do MetaClassifier.
      */
-    private function avaliarCriterios(array $rea): array
+    private function avaliarCriterios(array $rea, ?array $meta): array
     {
         $criterios = [
             'tema' => RuleClassifier::criterioTema($this->search, 'Aquarela'),
@@ -213,75 +224,10 @@ class ProcessAquarela implements ShouldQueue
             ),
         ];
 
-        // Só aciona o Ollama se o cenário atual exigir meta.
-        if ($this->meta) {
-            $inicio = microtime(true);
-            $classificacao = $this->classificarMetaComLLM($rea);
-            $criterios['meta'] = RuleClassifier::criterioMeta(
-                $this->meta,
-                $classificacao,
-                self::MODELO_LLM,
-                microtime(true) - $inicio
-            );
+        if ($this->meta && $meta !== null) {
+            $criterios['meta'] = $meta;
         }
 
         return $criterios;
-    }
-
-    private function classificarMetaComLLM(array $rea): string
-    {
-        $prompt = <<<PROMPT
-        Classifique o REA em APENAS uma das metas abaixo.
-
-        Título: {$rea['titulo']}
-        Descrição: {$rea['descricao']}
-        Tipo: {$rea['tipoConteudo']}
-        DType: {$rea['dtype']}
-
-        Critérios:
-
-        - Aprendizagem: prioriza compreensão profunda, construção de conhecimento, investigação, criação de projetos, resolução de problemas, desenvolvimento de habilidades e autonomia.
-        - Performance Aproximação: prioriza demonstrar desempenho, alcançar resultados, competir, testar conhecimentos, desafios, jogos, avaliações ou obtenção de reconhecimento.
-        - Performance Evitação: prioriza reduzir dificuldades, facilitar a entrada no tema, apresentar conceitos introdutórios, básicos ou simplificados, minimizando erros e insegurança.
-
-        Escolha a meta predominante considerando principalmente o objetivo pedagógico do recurso, não apenas palavras isoladas do título.
-
-        Responda SOMENTE com um JSON no formato {"meta": "<opção>"}, em que <opção> é uma de:
-        Aprendizagem
-        Performance Aproximação
-        Performance Evitação
-        PROMPT;
-
-        $this->metrics['ollama_calls']++;
-        $start_ollama = microtime(true);
-
-        try {
-            $response = Http::timeout(10)
-                ->post('http://127.0.0.1:11434/api/generate', [
-                    'model' => self::MODELO_LLM,
-                    'prompt' => $prompt,
-                    'format' => 'json',
-                    'stream' => false,
-                ]);
-
-            $this->metrics['ollama_time'] += (microtime(true) - $start_ollama);
-
-            if ($response->successful()) {
-                $result = json_decode((string) $response->json('response'), true);
-                $meta = is_array($result) ? ($result['meta'] ?? null) : null;
-
-                return is_string($meta) && $meta !== '' ? $meta : 'Não classificado';
-            }
-
-            $this->metrics['ollama_errors']++;
-
-            return 'Não classificado';
-
-        } catch (\Exception $e) {
-            $this->metrics['ollama_time'] += (microtime(true) - $start_ollama);
-            $this->metrics['ollama_errors']++;
-
-            return 'Não classificado';
-        }
     }
 }
