@@ -1,0 +1,27 @@
+# Alternativa em VPS (Hetzner, Oracle Cloud etc.), com a MESMA imagem do Fly.io.
+# Uso (no servidor):  DOMINIO=sisread.exemplo.br docker compose -f docker-compose.prod.yml up -d --build
+# O FrankenPHP (Caddy) emite o certificado HTTPS sozinho; o DNS do domínio precisa apontar
+# para o IP do servidor e as portas 80 e 443 precisam estar abertas.
+services:
+  app:
+    build: .
+    image: sisread:latest
+    restart: unless-stopped
+    stop_grace_period: 11m # o worker pode estar no meio de um job de até 600s
+    env_file: .env.production # APP_KEY, APP_URL, chave da LLM... (fora do git)
+    environment:
+      SERVER_NAME: ${DOMINIO:?defina DOMINIO}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - sisread-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS --resolve $${SERVER_NAME}:443:127.0.0.1 https://$${SERVER_NAME}/up || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+
+volumes:
+  sisread-data:

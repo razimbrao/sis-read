@@ -16,6 +16,14 @@ return [
     'default' => env('QUEUE_CONNECTION', 'database'),
 
     /*
+    | Quando true, o worker roda sob um supervisor (supervisord no Docker, ver docs/deploy.md)
+    | e o agendamento de queue:work em routes/console.php é desligado, para não subir um
+    | segundo worker (dois workers causam a condição de corrida de docs/problemas-conhecidos.md).
+    */
+
+    'worker_supervisionado' => (bool) env('QUEUE_WORKER_SUPERVISIONADO', false),
+
+    /*
     |--------------------------------------------------------------------------
     | Queue Connections
     |--------------------------------------------------------------------------
