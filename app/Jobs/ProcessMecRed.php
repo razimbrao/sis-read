@@ -135,7 +135,8 @@ class ProcessMecRed implements ShouldQueue
                 $allData[] = array_merge([
                     'chave' => $this->chave($rea),
                     'title' => $rea['name'] ?? 'Sem título',
-                    'link' => '',
+                    'id' => $rea['id'] ?? null,
+                    'link' => self::linkPublico($rea['id'] ?? null),
                     'type' => '',
                     'repositorio' => 'MECRED',
                     'recommended' => $recommended,
@@ -172,6 +173,18 @@ class ProcessMecRed implements ShouldQueue
             'created_at' => now(),
             'updated_at' => now(),
         ] + $classificador->metricas());
+    }
+
+    /**
+     * Página pública do recurso no MEC RED; null sem id (a busca não devolve outro link).
+     */
+    public static function linkPublico($id): ?string
+    {
+        if ($id === null || $id === '') {
+            return null;
+        }
+
+        return rtrim((string) config('app.mecred.site'), '/').'/recurso/'.$id;
     }
 
     private function chave(array $rea): string
