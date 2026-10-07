@@ -26,6 +26,7 @@ class Correction extends Model
         'faixa_anterior',
         'faixa_nova',
         'itens_afetados',
+        'grupo',
     ];
 
     protected $casts = [

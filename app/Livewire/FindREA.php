@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Experimento\Experimento;
 use App\Jobs\ProcessAquarela;
 use App\Jobs\ProcessEduplay;
 use App\Jobs\ProcessMecRed;
@@ -10,6 +11,7 @@ use App\Models\Correction;
 use App\Models\Data;
 use App\Models\ExplanationEvent;
 use App\Models\Feedback;
+use App\Models\FeedbackReason;
 use App\Models\Searches;
 use App\Recommendation\ExplanationRenderer;
 use App\Recommendation\Ranking;
@@ -168,6 +170,8 @@ class FindREA extends Component
 
         Feedback::create([
             'feedback' => $this->message,
+            'grupo' => $this->experimento()->grupo(),
+            'participante' => $this->experimento()->participante(),
         ]);
 
         $this->reset('message');
@@ -191,14 +195,45 @@ class FindREA extends Component
         }
 
         $dadosParaSalvar = [];
+        $permitidos = $this->motivosFeedback()->modelKeys();
+        $grupo = $this->experimento()->grupo();
 
         foreach ($this->selectedReasons as $reason) {
-            $dadosParaSalvar[$reason] = ['feedback' => $this->comment];
+            // Motivo escondido para este grupo (ex.: sobre explicações no controle) não é aceito.
+            if (! in_array((int) $reason, $permitidos, true)) {
+                continue;
+            }
+
+            $dadosParaSalvar[$reason] = ['feedback' => $this->comment, 'grupo' => $grupo];
         }
 
         $this->data->feedbackReasons()->sync($dadosParaSalvar);
 
         $this->feedbackSent = true;
+    }
+
+    /**
+     * Motivos de avaliação exibidos: os sobre explicações só para quem viu alguma explicação.
+     */
+    public function motivosFeedback()
+    {
+        return FeedbackReason::query()
+            ->when(! $this->experimento()->mostraExplicacoes(), fn ($q) => $q->whereNotIn('phrase', FeedbackReason::FRASES_EXPLICACAO))
+            ->orderBy('id')
+            ->get();
+    }
+
+    private function experimento(): Experimento
+    {
+        return app(Experimento::class);
+    }
+
+    /**
+     * Escrutabilidade desligada (docs/feature-flags.md): as ações de correção não fazem nada.
+     */
+    private function escrutabilidadeAtiva(): bool
+    {
+        return $this->experimento()->ativo('escrutabilidade');
     }
 
     public function insert()
@@ -341,6 +376,11 @@ class FindREA extends Component
             return;
         }
 
+        // Funcionalidade desligada para este grupo: a ação não pode ter vindo da tela.
+        if (! $this->experimento()->ativo(Experimento::FLAG_DA_ACAO[$acao] ?? '')) {
+            return;
+        }
+
         ExplanationEvent::create([
             'searched_at' => $this->timestampSession,
             'user_id' => auth()->id(),
@@ -348,6 +388,7 @@ class FindREA extends Component
             'repositorio' => $repositorio ? mb_substr($repositorio, 0, 50) : null,
             'titulo' => $titulo ? mb_substr($titulo, 0, 255) : null,
             'faixa' => $faixa ? mb_substr($faixa, 0, 20) : null,
+            'grupo' => $this->experimento()->grupo(),
         ]);
     }
 
@@ -438,6 +479,10 @@ class FindREA extends Component
 
     public function redefinirTipos(array $tipos): void
     {
+        if (! $this->escrutabilidadeAtiva()) {
+            return;
+        }
+
         $this->resetErrorBag('correcao');
         $data = $this->dadosDaBusca();
 
@@ -481,6 +526,10 @@ class FindREA extends Component
      */
     public function desfazerTodas(): void
     {
+        if (! $this->escrutabilidadeAtiva()) {
+            return;
+        }
+
         $this->resetErrorBag('correcao');
         $data = $this->dadosDaBusca();
 
@@ -509,6 +558,10 @@ class FindREA extends Component
      */
     private function corrigirItem(string $alvo, string $chave, callable $correcao, string $acao = 'corrigir'): void
     {
+        if (! $this->escrutabilidadeAtiva()) {
+            return;
+        }
+
         $this->resetErrorBag('correcao');
         $data = $this->dadosDaBusca();
 
@@ -592,6 +645,7 @@ class FindREA extends Component
         Correction::create($campos + [
             'searched_at' => $this->timestampSession,
             'user_id' => auth()->id(),
+            'grupo' => $this->experimento()->grupo(),
         ]);
     }
 
@@ -704,7 +758,13 @@ class FindREA extends Component
             ] : null,
         ];
 
-        $this->data = Data::create(['searched_at' => $this->timestampSession]);
+        // O grupo e as flags da busca permitem comparar as métricas por grupo (docs/feature-flags.md).
+        $this->data = Data::create([
+            'searched_at' => $this->timestampSession,
+            'grupo' => $this->experimento()->grupo(),
+            'flags' => $this->experimento()->flagsAtivas(),
+            'participante' => $this->experimento()->participante(),
+        ]);
 
         ProcessAquarela::dispatch($this->interestApiSearch, $types, $this->profile, $this->timestampSession, auth()->user()?->questionnaire?->dominant);
 
