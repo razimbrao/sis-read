@@ -2,7 +2,7 @@
 
 | Serviço | Endpoint | Onde |
 |---|---|---|
-| Aquarela | `AQUARELA_API_URL` (padrão `https://aquarelaapi.dev.br/api/reas`, params `string`, `page`) | `ProcessAquarela` |
+| Aquarela | `AQUARELA_API_URL` (padrão `https://aquarelaapi.dev.br/api/reas`, params `string`, `page`); o botão "Abrir recurso" usa a página pública `AQUARELA_SITE_URL`/rea/{id} (padrão `https://aquarela.app.br`), porque o link da API devolve JSON | `ProcessAquarela` |
 | MEC RED | `https://api.mecred.c3sl.ufpr.br/public/elastic/search?...` | `helpers.php`, `ProcessMecRed` |
 | Eduplay (RNP) | `https://eduplay.rnp.br/api/v1/search?term=&page=&quantity=10` | `ProcessEduplay` |
 | Ollama | `OLLAMA_URL` (padrão `http://127.0.0.1:11434`) + `/api/generate`, modelo `OLLAMA_MODELO` (padrão `gemma3:4b`) | `MetaClassifier` + `Llm\OllamaProvedor`, nos três jobs |
