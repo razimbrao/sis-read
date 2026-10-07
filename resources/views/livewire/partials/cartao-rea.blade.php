@@ -109,7 +109,7 @@
                         </button>
                     </span>
                     <span id="{{ $semLinkId }}" role="tooltip"
-                          class="pointer-events-none absolute z-20 bottom-full left-1/2 -translate-x-1/2 mb-2 sm:bottom-auto sm:left-auto sm:right-full sm:top-1/2 sm:-translate-y-1/2 sm:translate-x-0 sm:mb-0 sm:mr-3 w-max max-w-[15rem] rounded-lg bg-slate-900 px-3 py-2 text-center text-sm font-medium text-white shadow-lg opacity-0 invisible transition-opacity duration-150 group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible">
+                          class="pointer-events-none absolute z-20 bottom-full left-1/2 -translate-x-1/2 mb-1.5 sm:bottom-auto sm:left-auto sm:right-full sm:top-1/2 sm:-translate-y-1/2 sm:translate-x-0 sm:mb-0 sm:mr-2 w-max max-w-[13rem] rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-center text-xs text-slate-600 shadow-sm opacity-0 invisible transition-opacity duration-150 group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible">
                         O repositório não informou o link deste recurso.
                     </span>
                 </div>
