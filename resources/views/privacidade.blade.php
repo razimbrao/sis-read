@@ -33,10 +33,5 @@
             <h2 class="text-xl font-bold">Cookies</h2>
             <p class="text-[15px] leading-relaxed text-slate-700">Usamos só os cookies necessários para manter a sua sessão e proteger os formulários. Não há cookies de rastreamento nem de publicidade.</p>
         </section>
-
-        <section class="bg-white border border-slate-200 rounded-2xl p-6 space-y-3">
-            <h2 class="text-xl font-bold">Contato</h2>
-            <p class="text-[15px] leading-relaxed text-slate-700">Para pedir acesso, correção ou exclusão dos seus dados, escreva para [e-mail da equipe do projeto].</p>
-        </section>
     </div>
 </x-site>
