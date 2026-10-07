@@ -19,8 +19,12 @@ app/Recommendation/*      regras (RuleClassifier), ordem (Ranking), textos (Expl
                           e correções do usuário (UserCorrections)
 app/Helpers/helpers.php   getMecRedURL(): monta a URL da API MEC RED com filtros
 app/Console/Commands/RunRecommendationSimulation.php  simulation:run-all
-resources/views/welcome.blade.php              layout da home (sidebar "pesquisas mais acessadas")
-resources/views/livewire/find-r-e-a.blade.php  toda a UI de busca/resultados/feedback
+resources/views/components/site.blade.php      layout comum (cabeçalho, rodapé); layouts/app.blade.php o usa
+resources/views/welcome.blade.php              home: só monta o FindREA dentro do layout
+resources/views/livewire/find-r-e-a.blade.php  busca e resultados; partes em livewire/partials/
+                                               (busca-formulario, cartao-rea, progresso-busca,
+                                               transparencia-paineis, explicacao-rea, colaborar…)
+resources/views/errors/, privacidade.blade.php páginas de erro e de privacidade
 start-queue.php           loop infinito de queue:work (alternativa ao cron em produção)
 ```
 
