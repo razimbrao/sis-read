@@ -2,26 +2,31 @@
 
 namespace App\Jobs;
 
+use App\Models\Data;
+use App\Recommendation\MetaClassifier;
+use App\Recommendation\RuleClassifier;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\DB;
-use App\Models\Data;
-use App\Recommendation\MetaClassifier;
-use App\Recommendation\RuleClassifier;
+use Illuminate\Support\Facades\Http;
 
 class ProcessMecRed implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public string $search;
+
     public $time;
+
     public array $types;
+
     public string $profile;
+
     public string $interest;
+
     public ?string $meta;
 
     public function __construct($search, $types, $profile, $interest, $time, $meta)
@@ -36,19 +41,19 @@ class ProcessMecRed implements ShouldQueue
 
     public function handle()
     {
-        $start_total_time = microtime(true); 
+        $start_total_time = microtime(true);
         $offset = 0;
         $allData = [];
 
         $metrics = [
-            'api_time'        => 0,
-            'items_returned'  => 0,
-            'items_filtered'  => 0,
+            'api_time' => 0,
+            'items_returned' => 0,
+            'items_filtered' => 0,
             'timeouts_errors' => 0,
-            'breakdown'       => [
+            'breakdown' => [
                 'meta_both' => 0, 'meta_one' => 0, 'meta' => 0,
                 'both' => 0, 'profile' => 0, 'interest' => 0,
-            ]
+            ],
         ];
 
         $model = Data::query()->where('searched_at', $this->time)->first();
@@ -58,9 +63,9 @@ class ProcessMecRed implements ShouldQueue
         try {
             $search = Http::withOptions(['verify' => false])
                 ->timeout(15)
-                ->get(getMecRedURL(str_replace(" ", "+", $this->search), $offset, $this->profile, $this->meta))
+                ->get(getMecRedURL(str_replace(' ', '+', $this->search), $offset, $this->profile, $this->meta))
                 ->json();
-            
+
             $metrics['api_time'] = microtime(true) - $start_api;
             $metrics['items_returned'] = is_array($search) ? count($search) : 0;
         } catch (\Exception $e) {
@@ -88,20 +93,20 @@ class ProcessMecRed implements ShouldQueue
 
         $interactivityData = [
             'fonte_interatividade' => $this->meta ? 'meta_usuario' : 'indisponivel',
-            'interatividade'       => $interactivity,
+            'interatividade' => $interactivity,
             'nivel_interatividade' => $interactivity_level,
-            'estilo_aprendizagem'  => $learning_style,
-            'estrategia'           => $strategy,
+            'estilo_aprendizagem' => $learning_style,
+            'estrategia' => $strategy,
         ];
 
         $search = is_array($search) ? array_values(array_filter($search, 'is_array')) : [];
 
         // Com meta, todos os itens vão para a LLM de uma vez. O MEC RED só devolve o nome do recurso.
         $metas = $this->meta ? $classificador->criterios($this->meta, array_map(fn ($rea) => [
-            'chave'     => $this->chave($rea),
-            'titulo'    => $rea['name'] ?? null,
+            'chave' => $this->chave($rea),
+            'titulo' => $rea['name'] ?? null,
             'evidencia' => 'classificado só pelo título, porque o MEC RED não informa descrição nem tipo; a busca já pediu tipos de objeto associados à sua meta (object_type='
-                . implode(',', mecRedTiposObjeto($this->meta)) . ')',
+                .implode(',', mecRedTiposObjeto($this->meta)).')',
         ], $search)) : [];
 
         if ($search) {
@@ -128,22 +133,22 @@ class ProcessMecRed implements ShouldQueue
                 }
 
                 $allData[] = array_merge([
-                    'chave'        => $this->chave($rea),
-                    'title'        => $rea['name'] ?? 'Sem título',
-                    'link'         => '',
-                    'type'         => '',
-                    'repositorio'  => 'MECRED',
-                    'recommended'  => $recommended,
-                    'explicacao'   => $explicacao,
-                    'titulo'       => $rea['name'] ?? '',
-                    'descricao'    => $rea['description'] ?? '',
+                    'chave' => $this->chave($rea),
+                    'title' => $rea['name'] ?? 'Sem título',
+                    'link' => '',
+                    'type' => '',
+                    'repositorio' => 'MECRED',
+                    'recommended' => $recommended,
+                    'explicacao' => $explicacao,
+                    'titulo' => $rea['name'] ?? '',
+                    'descricao' => $rea['description'] ?? '',
                     'tipoConteudo' => '',
-                    'dtype'        => '',
+                    'dtype' => '',
                 ], $interactivityData);
             }
         }
 
-        if (!empty($allData)) {
+        if (! empty($allData)) {
             $existingData = $model->data ? json_decode($model->data, true) : [];
             $model->update(['data' => json_encode(array_merge($existingData, $allData))]);
         }
@@ -152,20 +157,20 @@ class ProcessMecRed implements ShouldQueue
         $model->update(['finished' => true, 'time' => $model->time + $total_time]);
 
         DB::table('search_metrics')->insert([
-            'searched_at'     => $this->time,
-            'repository'      => 'MecRed',
-            'profile'         => $this->profile,
-            'interest'        => $this->interest,
-            'meta'            => $this->meta,
-            'total_time'      => $total_time,
-            'api_time'        => $metrics['api_time'],
-            'api_calls'       => 1, // Considerando que faz apenas uma chamada na API aqui
-            'items_returned'  => $metrics['items_returned'],
-            'items_filtered'  => $metrics['items_filtered'],
+            'searched_at' => $this->time,
+            'repository' => 'MecRed',
+            'profile' => $this->profile,
+            'interest' => $this->interest,
+            'meta' => $this->meta,
+            'total_time' => $total_time,
+            'api_time' => $metrics['api_time'],
+            'api_calls' => 1, // Considerando que faz apenas uma chamada na API aqui
+            'items_returned' => $metrics['items_returned'],
+            'items_filtered' => $metrics['items_filtered'],
             'timeouts_errors' => $metrics['timeouts_errors'],
-            'breakdown'       => json_encode($metrics['breakdown']),
-            'created_at'      => now(),
-            'updated_at'      => now(),
+            'breakdown' => json_encode($metrics['breakdown']),
+            'created_at' => now(),
+            'updated_at' => now(),
         ] + $classificador->metricas());
     }
 
@@ -190,10 +195,10 @@ class ProcessMecRed implements ShouldQueue
         );
 
         $criterios['tipo'] = [
-            'status'    => 'nao_avaliado',
-            'valor'     => null,
-            'esperado'  => RuleClassifier::normalizarTipos($this->types),
-            'fonte'     => 'filtro_api',
+            'status' => 'nao_avaliado',
+            'valor' => null,
+            'esperado' => RuleClassifier::normalizarTipos($this->types),
+            'fonte' => 'filtro_api',
             'evidencia' => 'o MEC RED não informa o tipo nesta busca',
         ];
 

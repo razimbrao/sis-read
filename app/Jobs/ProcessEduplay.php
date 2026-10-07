@@ -2,25 +2,29 @@
 
 namespace App\Jobs;
 
+use App\Models\Data;
+use App\Recommendation\MetaClassifier;
+use App\Recommendation\RuleClassifier;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\DB;
-use App\Models\Data;
-use App\Recommendation\MetaClassifier;
-use App\Recommendation\RuleClassifier;
+use Illuminate\Support\Facades\Http;
 
 class ProcessEduplay implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public string $search; 
+    public string $search;
+
     public string $profile;
+
     public $time;
+
     public ?string $meta;
+
     public array $types;
 
     public function __construct($search, $profile, $time, $meta, array $types = [])
@@ -34,19 +38,19 @@ class ProcessEduplay implements ShouldQueue
 
     public function handle(): void
     {
-        $start_total_time = microtime(true); 
+        $start_total_time = microtime(true);
         $page = 1;
-        
+
         $metrics = [
-            'api_time'        => 0,
-            'api_calls'       => 0,
-            'items_returned'  => 0,
-            'items_filtered'  => 0,
+            'api_time' => 0,
+            'api_calls' => 0,
+            'items_returned' => 0,
+            'items_filtered' => 0,
             'timeouts_errors' => 0,
-            'breakdown'       => [
+            'breakdown' => [
                 'meta_both' => 0, 'meta_one' => 0, 'meta' => 0,
                 'both' => 0, 'profile' => 0, 'interest' => 0,
-            ]
+            ],
         ];
 
         $allData = [];
@@ -62,11 +66,11 @@ class ProcessEduplay implements ShouldQueue
                 $response = Http::withOptions(['verify' => false])
                     ->timeout(15)
                     ->get("https://eduplay.rnp.br/api/v1/search?term={$this->search}&page={$page}&quantity=10&type=0&order=0");
-                
+
                 $search = $response->json();
                 $metrics['api_time'] += (microtime(true) - $start_api);
 
-                if (empty($search) || !isset($search['contents'])) {
+                if (empty($search) || ! isset($search['contents'])) {
                     break;
                 }
 
@@ -82,20 +86,20 @@ class ProcessEduplay implements ShouldQueue
 
             $interactivityData = [
                 'fonte_interatividade' => 'padrao_repositorio',
-                'interatividade'       => 'Ativo',
+                'interatividade' => 'Ativo',
                 'nivel_interatividade' => 'Alto / Muito alto',
-                'estilo_aprendizagem'  => 'Intuitivo / Ativo / Auditivo/Visual',
-                'estrategia'           => 'Ativa / Abstrata / Visual/Verbal',
+                'estilo_aprendizagem' => 'Intuitivo / Ativo / Auditivo/Visual',
+                'estrategia' => 'Ativa / Abstrata / Visual/Verbal',
             ];
 
             $conteudos = array_values(array_filter($search['contents'], 'is_array'));
 
             // Com meta, a página inteira vai para a LLM de uma vez (cache e chamadas simultâneas).
             $metas = $this->meta ? $classificador->criterios($this->meta, array_map(fn ($rea) => [
-                'chave'     => $this->chave($rea),
-                'titulo'    => $rea['name'] ?? null,
+                'chave' => $this->chave($rea),
+                'titulo' => $rea['name'] ?? null,
                 'descricao' => $rea['metatagDescription'] ?? null,
-                'tipo'      => 'Vídeo',
+                'tipo' => 'Vídeo',
             ], $conteudos)) : [];
 
             foreach ($conteudos as $i => $rea) {
@@ -121,22 +125,22 @@ class ProcessEduplay implements ShouldQueue
                 }
 
                 $allData[] = array_merge([
-                    'chave'        => $this->chave($rea),
-                    'title'        => $rea['name'],
-                    'link'         => $rea['contentUrl'],
-                    'type'         => 'Vídeo',
-                    'repositorio'  => 'Eduplay',
-                    'recommended'  => $recommended,
-                    'explicacao'   => $explicacao,
-                    'titulo'       => $rea['name'],
-                    'descricao'    => $rea['metatagDescription'] ?? '',
+                    'chave' => $this->chave($rea),
+                    'title' => $rea['name'],
+                    'link' => $rea['contentUrl'],
+                    'type' => 'Vídeo',
+                    'repositorio' => 'Eduplay',
+                    'recommended' => $recommended,
+                    'explicacao' => $explicacao,
+                    'titulo' => $rea['name'],
+                    'descricao' => $rea['metatagDescription'] ?? '',
                     'tipoConteudo' => 'Vídeo',
-                    'dtype'        => 'T',
+                    'dtype' => 'T',
                 ], $interactivityData);
             }
         }
 
-        if (!empty($allData)) {
+        if (! empty($allData)) {
             $existingData = $model->data ? json_decode($model->data, true) : [];
             $model->update(['data' => json_encode(array_merge($existingData, $allData))]);
         }
@@ -145,20 +149,20 @@ class ProcessEduplay implements ShouldQueue
         $model->update(['finished' => true, 'time' => $model->time + $total_time]);
 
         DB::table('search_metrics')->insert([
-            'searched_at'     => $this->time,
-            'repository'      => 'Eduplay',
-            'profile'         => $this->profile,
-            'interest'        => $this->search,
-            'meta'            => $this->meta,
-            'total_time'      => $total_time,
-            'api_time'        => $metrics['api_time'],
-            'api_calls'       => $metrics['api_calls'],
-            'items_returned'  => $metrics['items_returned'],
-            'items_filtered'  => $metrics['items_filtered'],
+            'searched_at' => $this->time,
+            'repository' => 'Eduplay',
+            'profile' => $this->profile,
+            'interest' => $this->search,
+            'meta' => $this->meta,
+            'total_time' => $total_time,
+            'api_time' => $metrics['api_time'],
+            'api_calls' => $metrics['api_calls'],
+            'items_returned' => $metrics['items_returned'],
+            'items_filtered' => $metrics['items_filtered'],
             'timeouts_errors' => $metrics['timeouts_errors'],
-            'breakdown'       => json_encode($metrics['breakdown']),
-            'created_at'      => now(),
-            'updated_at'      => now(),
+            'breakdown' => json_encode($metrics['breakdown']),
+            'created_at' => now(),
+            'updated_at' => now(),
         ] + $classificador->metricas());
     }
 
@@ -174,12 +178,12 @@ class ProcessEduplay implements ShouldQueue
     private function criterios(array $rea, ?array $meta): array
     {
         $criterios = [
-            'tema'  => RuleClassifier::criterioTema($this->search, 'Eduplay'),
+            'tema' => RuleClassifier::criterioTema($this->search, 'Eduplay'),
             'nivel' => RuleClassifier::criterioNivel(
                 $this->profile,
                 RuleClassifier::inferirNivel($rea['name'] ?? '', $rea['metatagDescription'] ?? '')
             ),
-            'tipo'  => RuleClassifier::criterioTipo('Vídeo', RuleClassifier::normalizarTipos($this->types)),
+            'tipo' => RuleClassifier::criterioTipo('Vídeo', RuleClassifier::normalizarTipos($this->types)),
         ];
 
         if ($this->meta && $meta !== null) {
