@@ -128,7 +128,7 @@ class ProcessAquarela implements ShouldQueue
                 $allData[] = array_merge([
                     'chave' => $this->chave($rea),
                     'title' => $rea['titulo'],
-                    'link' => $rea['links'][0]['href'] ?? null,
+                    'link' => self::linkPublico($rea['links'][0]['href'] ?? null, $rea['id'] ?? null),
                     'type' => $rea['tipoConteudo'],
                     'repositorio' => 'Aquarela',
                     'recommended' => $recommended,
@@ -198,6 +198,24 @@ class ProcessAquarela implements ShouldQueue
             'estilo_aprendizagem' => 'Não especificado',
             'estrategia' => 'Não especificado',
         ];
+    }
+
+    /**
+     * Página pública do REA no Aquarela. A API devolve o link da própria API (JSON); a chave do REA
+     * continua usando esse link, para não invalidar correções e o cache da LLM.
+     * Também converte links gravados antes desta correção (buscas antigas).
+     */
+    public static function linkPublico(?string $href, $id = null): ?string
+    {
+        if ($id === null && $href !== null && preg_match('#aquarelaapi\.dev\.br/api/reas/(\d+)/?$#', $href, $m)) {
+            $id = $m[1];
+        }
+
+        if ($id === null || $id === '') {
+            return $href;
+        }
+
+        return rtrim((string) config('app.aquarela.site'), '/').'/rea/'.$id;
     }
 
     private function chave(array $rea): string
