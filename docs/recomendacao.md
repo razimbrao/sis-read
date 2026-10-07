@@ -91,6 +91,16 @@ melhorar, o grupo de meta diferente encolhe sozinho. Se ela errar, o REA continu
 
 Cada REA grava a `explicacao` da decisão, com o grau e a conta; veja [transparencia.md](transparencia.md).
 
+## Tipos preferidos
+A lista com que o tipo do REA é comparado vem, por padrão, dos colaboradores: os tipos cadastrados
+com o mesmo interesse e perfil, mais os de todos os outros colaboradores. O usuário logado pode
+salvar os seus tipos preferidos na conta (tela **Minhas preferências**, `/conta/preferencias`). Com
+preferência salva, ela **substitui** os tipos dos colaboradores em todas as buscas; com a opção
+"incluir também os tipos sugeridos pelos colaboradores", as duas listas são unidas. O critério de
+tipo (Aquarela e Eduplay) grava a fonte `usuario` nesse caso (`App\Recommendation\TiposPreferidos`,
+[plano-escrutabilidade.md §15](plano-escrutabilidade.md#15-tipos-preferidos-salvos-na-conta)).
+Visitantes continuam com os tipos dos colaboradores.
+
 O usuário pode corrigir o nível e a meta estimados de um REA e os tipos preferidos da busca. O rótulo
 e o grau são recalculados pela mesma regra, só para a busca atual; veja
 [transparencia.md §13](transparencia.md#13-escrutabilidade).

@@ -378,7 +378,8 @@ diagramas: [plano-escrutabilidade.md](plano-escrutabilidade.md). Fluxo:
 |---|---|---|
 | Nível do REA (fonte `regex`) | **Por que este REA?** → Corrigir | status recalculado contra o perfil |
 | Meta do REA (fonte `llm`) | **Por que este REA?** | status recalculado contra a meta do usuário; o REA muda de grupo (sobe para os compatíveis ou desce para meta diferente) |
-| Tipos preferidos | **O que usamos sobre você** → Editar tipos preferidos | critério de tipo recalculado em todos os REAs comparáveis |
+| Tipos preferidos | **O que usamos sobre você** → Editar tipos preferidos | critério de tipo recalculado em todos os REAs comparáveis; logado, pode também salvar na conta |
+| Tipos preferidos da conta | **Minhas preferências** (`/conta/preferencias`) | vale em todas as buscas seguintes do usuário |
 
 Regras:
 
@@ -390,7 +391,8 @@ Regras:
    regras não são, e a tela diz por quê.
 3. O critério do job fica em `original`, e a faixa do job em `faixa_original`. Toda correção pode
    ser desfeita, uma a uma ou todas. Corrigir para o valor estimado equivale a desfazer.
-4. A correção vale só para a busca atual (fica em `data.data`).
+4. A correção vale só para a busca atual (fica em `data.data`). A exceção são os tipos preferidos
+   do usuário logado, que podem ser salvos na conta (ver abaixo).
 5. Correções só ficam disponíveis depois que os três repositórios responderam
    (`FindREA::podeCorrigir`), porque os jobs regravam `data.data` sem lock (problema #3).
 
@@ -405,6 +407,8 @@ Textos novos (`ExplanationRenderer`):
 | meta corrigida | Meta Aprendizagem, informada por você (a IA não tinha conseguido classificar). Compatível com a sua meta (Aprendizagem). |
 | tipos editados | Tipo jogo, entre os tipos preferidos que você definiu (jogo, video). |
 | faixa mudou | ✎ Faixa alterada pela sua correção: antes Tipo ou só tema, agora Nível. |
+| tipos da conta | Tipo jogo, entre os tipos preferidos da sua conta (jogo, video). |
+| tipos da conta + colaboradores | Tipo jogo, entre os tipos preferidos da sua conta e dos colaboradores (jogo, video). |
 | resumo | Atende: tema, nível (corrigido por você). Não atende: tipo. |
 
 O aviso de estimativa automática some para o critério corrigido. O painel **Como ordenamos** mostra
@@ -414,3 +418,21 @@ marcou como diferente da dele vai para o fim da lista e é contado em `meta_corr
 Registro: cada correção e cada desfazer viram uma linha em `corrections` (ver [dados.md](dados.md)),
 e abrir um formulário de correção grava o evento `abriu_correcao` em `explanation_events`. No painel
 de tipos o evento vai sem repositório e título.
+
+### 13.1 Tipos preferidos salvos na conta
+
+Detalhes em [plano-escrutabilidade.md §15](plano-escrutabilidade.md#15-tipos-preferidos-salvos-na-conta).
+
+- Com preferência salva, os jobs do Aquarela e do Eduplay gravam o critério de tipo com `fonte: usuario` e
+  `inclui_colaboradores` (`RuleClassifier::criterioTipo`, origem `conta` ou `conta+colaboradores`).
+  Sem preferência, a fonte continua `colaboradores`. As duas fontes são comparáveis e editáveis na
+  busca (`RuleClassifier::tipoComparavel`). O grau soma o ponto do tipo pela mesma regra
+  (`RuleClassifier::atende`), qualquer que seja a fonte.
+- **O que usamos sobre você** mostra "Da sua conta: …", se substituem ou se unem aos tipos dos
+  colaboradores, e o link **Editar os tipos da sua conta**. Sem preferência, o link é **Salvar tipos
+  preferidos na sua conta**. Visitantes não veem o link.
+- Editar os tipos na busca oferece **Salvar também como minha preferência** (marcada por padrão para
+  quem está logado). Desfazer na busca volta à lista com que a busca começou (a da conta, se havia)
+  e não muda a conta.
+- A tela **Minhas preferências** e a aplicação da preferência nas buscas não dependem dos painéis de
+  transparência: funcionam com eles desligados.

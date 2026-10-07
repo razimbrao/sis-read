@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Models\Data;
 use App\Recommendation\MetaClassifier;
 use App\Recommendation\RuleClassifier;
+use App\Recommendation\TiposPreferidos;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -27,13 +28,20 @@ class ProcessEduplay implements ShouldQueue
 
     public array $types;
 
-    public function __construct($search, $profile, $time, $meta, array $types = [])
+    /**
+     * De onde veio a lista de tipos preferidos (TiposPreferidos::ORIGENS). Jobs enfileirados antes
+     * desta propriedade existir ficam com o padrão, os colaboradores.
+     */
+    public string $origemTipos = TiposPreferidos::COLABORADORES;
+
+    public function __construct($search, $profile, $time, $meta, array $types = [], string $origemTipos = TiposPreferidos::COLABORADORES)
     {
         $this->search = $search;
         $this->profile = $profile;
         $this->time = $time;
         $this->meta = $meta;
         $this->types = $types;
+        $this->origemTipos = $origemTipos;
     }
 
     public function handle(): void
@@ -183,7 +191,7 @@ class ProcessEduplay implements ShouldQueue
                 $this->profile,
                 RuleClassifier::inferirNivel($rea['name'] ?? '', $rea['metatagDescription'] ?? '')
             ),
-            'tipo' => RuleClassifier::criterioTipo('Vídeo', RuleClassifier::normalizarTipos($this->types)),
+            'tipo' => RuleClassifier::criterioTipo('Vídeo', RuleClassifier::normalizarTipos($this->types), $this->origemTipos),
         ];
 
         if ($this->meta && $meta !== null) {
