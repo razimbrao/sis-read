@@ -137,8 +137,9 @@ class RuleClassifier
 
     /**
      * Critério de meta a partir da classificação do LLM ("Não classificado" = não avaliado).
+     * `evidencia`: motivo de não ter sido avaliado, ou observação sobre a classificação (ex.: cache).
      */
-    public static function criterioMeta(string $metaUsuario, ?string $classificacao, ?string $modelo = null, ?float $segundos = null): array
+    public static function criterioMeta(string $metaUsuario, ?string $classificacao, ?string $modelo = null, ?float $segundos = null, ?string $evidencia = null): array
     {
         $base = [
             'esperado' => $metaUsuario,
@@ -146,6 +147,10 @@ class RuleClassifier
             'modelo' => $modelo,
             'duracao' => $segundos === null ? null : round($segundos, 2),
         ];
+
+        if ($evidencia !== null) {
+            $base['evidencia'] = $evidencia;
+        }
 
         if ($classificacao === null || $classificacao === '' || $classificacao === 'Não classificado') {
             return $base + ['status' => 'nao_avaliado', 'valor' => null];
