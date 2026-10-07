@@ -5,6 +5,7 @@
 > A escrutabilidade (o usuário corrige o que o sistema estimou) está em §13 e no
 > [plano-escrutabilidade.md](plano-escrutabilidade.md). Explicações contrafactuais ficam para a próxima fase.
 > O caminho dos dados, com diagramas, está em [fluxos-transparencia.md](fluxos-transparencia.md).
+> Cada funcionalidade descrita aqui fica atrás de uma flag do experimento ([feature-flags.md](feature-flags.md)).
 
 ## 1. Objetivo e princípios
 
