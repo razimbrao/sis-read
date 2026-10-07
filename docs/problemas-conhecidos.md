@@ -76,7 +76,9 @@
 19. Empate no EMAPRE é resolvido em silêncio: `array_keys($resultados, max(...))[0]` pega o primeiro fator.
     Existe ao menos um caso real no banco (usuário 3, ma=2 e mpa=2).
 20. Os 24 `collaborators` vieram de uma planilha de artigos (o "nome" é uma referência bibliográfica), e a
-    primeira linha é o **cabeçalho da planilha**, o que criou o interesse "Interesse" e o tipo "Item".
+    ~~primeira linha é o **cabeçalho da planilha**, o que criou o interesse "Interesse" e o tipo "Item".~~
+    **Corrigido no banco local** (2026-10-07): a linha (id 2) foi apagada, com backup antes. O banco não é
+    versionado: outras cópias dele ainda têm essa linha.
 21. 61 `failed_jobs` acumulados, nunca revisados.
 22. Os REAs do MEC RED não têm link: `ProcessMecRed` grava `'link' => ''` e não grava o `id`, que a tela
     usava para montar `plataformaintegrada.mec.gov.br/recurso/{id}`. Desde 2026-10-07 o cartão mostra o botão
