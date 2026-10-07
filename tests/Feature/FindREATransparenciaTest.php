@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Jobs\ProcessAquarela;
+use App\Jobs\ProcessEduplay;
 use App\Jobs\ProcessMecRed;
 use App\Livewire\FindREA;
 use App\Models\Collaborator;
@@ -10,6 +11,7 @@ use App\Models\Data;
 use App\Models\ExplanationEvent;
 use App\Models\Questionnaire;
 use App\Models\User;
+use App\Recommendation\RuleClassifier;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
@@ -49,6 +51,7 @@ class FindREATransparenciaTest extends TestCase
 
         Queue::assertPushed(ProcessAquarela::class, fn ($job) => $job->types === ['video', 'e-book', 'livro digital']);
         Queue::assertPushed(ProcessMecRed::class);
+        Queue::assertPushed(ProcessEduplay::class, fn ($job) => $job->types === ['video', 'e-book', 'livro digital']);
     }
 
     public function test_contexto_inclui_medias_emapre(): void
@@ -90,6 +93,69 @@ class FindREATransparenciaTest extends TestCase
         $this->assertSame(['both' => 1, 'profile' => 1, 'interest' => 1], $resumo['faixas']);
         $this->assertSame(1, $resumo['ocultos']);
         $this->assertFalse($resumo['com_meta']);
+    }
+
+    /**
+     * REA como os jobs gravam, com os status de nível, tipo e meta dados.
+     */
+    private function reaComGrau(string $titulo, string $repositorio, int $posicao, string $nivel, string $tipo, ?string $meta): array
+    {
+        $criterios = [
+            'tema' => ['status' => 'ok', 'valor' => 'algoritmos', 'fonte' => 'busca', 'repositorio' => $repositorio],
+            'nivel' => ['status' => $nivel, 'valor' => 'ensino fundamental', 'esperado' => 'ensino fundamental', 'fonte' => 'regex', 'evidencia' => '6º', 'assumido' => false],
+            'tipo' => ['status' => $tipo, 'valor' => 'video', 'esperado' => ['video'], 'fonte' => 'colaboradores'],
+        ];
+        if ($meta !== null) {
+            $criterios['meta'] = ['status' => $meta, 'valor' => $meta === 'ok' ? 'Aprendizagem' : null, 'esperado' => 'ma', 'fonte' => 'llm'];
+        }
+        $rotulo = RuleClassifier::rotular($criterios, $meta !== null);
+
+        return [
+            'chave' => RuleClassifier::chave($repositorio, null, $titulo), 'title' => $titulo, 'type' => 'Vídeo', 'link' => 'http://'.$titulo,
+            'repositorio' => $repositorio, 'recommended' => $rotulo, 'explicacao' => RuleClassifier::explicacao($criterios, $rotulo, $posicao),
+            'fonte_interatividade' => 'indisponivel', 'interatividade' => '', 'nivel_interatividade' => '', 'estilo_aprendizagem' => '', 'estrategia' => '',
+        ];
+    }
+
+    public function test_lista_com_meta_ordena_pelo_grau_e_mistura_os_repositorios(): void
+    {
+        $user = User::factory()->create();
+        $questionnaire = new Questionnaire(['ma' => 4, 'mpa' => 3, 'mpe' => 2, 'dominant' => 'ma']);
+        $questionnaire->user_id = $user->id;
+        $questionnaire->save();
+
+        // Ordem de chegada: MEC RED primeiro, como quando ele responde antes dos outros.
+        $data = Data::create(['searched_at' => '2026-10-06 12:00:00', 'finished' => true, 'data' => json_encode([
+            $this->reaComGrau('mec', 'MECRED', 1, 'nao_avaliado', 'nao_avaliado', 'nao_avaliado'),
+            $this->reaComGrau('edu', 'Eduplay', 1, 'ok', 'ok', 'nao_avaliado'),
+            $this->reaComGrau('aqu-tipo', 'Aquarela', 1, 'falhou', 'ok', 'ok'),
+            $this->reaComGrau('aqu-tudo', 'Aquarela', 2, 'ok', 'ok', 'ok'),
+            $this->reaComGrau('aqu-incompativel', 'Aquarela', 3, 'ok', 'ok', 'falhou'),
+        ])]);
+
+        $componente = Livewire::actingAs($user)->test(FindREA::class);
+        $instancia = $componente->instance();
+
+        $titulos = collect($instancia->paginate($data)->items())->pluck('title')->all();
+        // Compatíveis, depois meta não conferida, e no fim a meta diferente (mesmo com grau 3).
+        $this->assertSame(['aqu-tudo', 'aqu-tipo', 'edu', 'mec', 'aqu-incompativel'], $titulos);
+
+        $resumo = $instancia->resumoOrdenacao($data);
+        $this->assertSame(0, $resumo['ocultos']);
+        $this->assertSame(1, $resumo['meta_incompativel']);
+        $this->assertSame(2, $resumo['meta_nao_conferida']);
+        $this->assertSame([], $instancia->ocultos($data));
+
+        $componente->set('timestampSession', '2026-10-06 12:00:00')->set('userType', 'usuario')->set('interestApiSearch', 'algoritmos')
+            ->assertSee('grau de recomendação')
+            ->assertSee('meta +4, nível +2, tipo +1, de 0 a 7')
+            ->assertSee('Grau 7 de 7 · Meta, nível e tipo')
+            ->assertSee('Grau 3 de 7 · Nível e tipo, meta não conferida')
+            ->assertSee('Grau 3 de 7 · Nível e tipo, meta diferente da sua')
+            ->assertSee('2 REAs estão com a meta não conferida.')
+            ->assertSee('1 REA está com a meta diferente da sua.')
+            ->assertSee('este é o 2º resultado do Aquarela')
+            ->assertDontSee('Por política do SisREAd');
     }
 
     public function test_status_dos_repositorios_mostra_falhas(): void

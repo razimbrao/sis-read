@@ -44,7 +44,7 @@ class UserCorrectionsTest extends TestCase
 
         return [
             'recommended' => 'both',
-            'explicacao' => RuleClassifier::explicacao($criterios, 'both', 'Por política do SisREAd...'),
+            'explicacao' => ['observacao' => 'Por política do SisREAd...'] + RuleClassifier::explicacao($criterios, 'both'),
         ];
     }
 

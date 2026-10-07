@@ -33,22 +33,21 @@
         <div class="px-4 pb-4 space-y-5 border-t border-gray-100 pt-4">
             <section class="space-y-3">
                 <p>
-                    @if ($resumo['com_meta'])
-                        Como você respondeu o questionário de metas, mostramos só REAs compatíveis com a sua meta, nesta ordem:
-                    @else
-                        Os REAs são agrupados em faixas e mostrados nesta ordem:
-                    @endif
+                    Cada REA recebe um <strong>grau de recomendação</strong>: a soma dos pontos dos critérios que foram
+                    conferidos e atendidos ({{ $resumo['com_meta'] ? 'meta +4, nível +2, tipo +1, de 0 a 7' : 'nível +2, tipo +1, de 0 a 3' }}).
+                    Critério que não pôde ser conferido vale 0, e a regra é a mesma para todos os repositórios.
+                    A lista vai do maior grau para o menor, nestas faixas:
                 </p>
                 <ol class="space-y-2">
                     @foreach ($resumo['ordem'] as $rotulo)
                         @php
-                            $faixa = ExplanationRenderer::faixa($rotulo);
+                            $faixa = ExplanationRenderer::faixa($rotulo, null, $resumo['com_meta']);
                             $quantidade = $resumo['faixas'][$rotulo];
                         @endphp
                         <li class="flex items-start gap-3 p-3 rounded-lg bg-gray-50">
                             <span class="flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-semibold shrink-0">{{ $loop->iteration }}</span>
                             <span class="flex-1 min-w-0">
-                                <span class="block font-medium text-gray-900">{{ $faixa['titulo'] }}</span>
+                                <span class="block font-medium text-gray-900">{{ $faixa['titulo'] }} <span class="font-normal text-gray-500">· grau {{ $faixa['graus'] }}</span></span>
                                 <span class="block text-xs text-gray-600">{{ $faixa['descricao'] }}</span>
                             </span>
                             <span @class([
@@ -59,6 +58,26 @@
                         </li>
                     @endforeach
                 </ol>
+                @if ($resumo['com_meta'])
+                    @php
+                        $incompativeis = $resumo['meta_incompativel'] + $resumo['meta_corrigida_incompativel'];
+                    @endphp
+                    <div class="text-xs text-gray-600 space-y-1">
+                        <p>
+                            Abaixo dos compatíveis com a sua meta vêm primeiro os REAs cuja meta não pôde ser conferida e, no fim,
+                            os de meta diferente da sua. Em cada grupo, a ordem é a mesma: do maior grau para o menor.
+                            A meta não tira nenhum REA da lista, porque a classificação por IA pode errar.
+                        </p>
+                        @if ($resumo['meta_nao_conferida'] > 0)
+                            <p>{{ $resumo['meta_nao_conferida'] }} {{ $resumo['meta_nao_conferida'] === 1 ? 'REA está' : 'REAs estão' }} com a meta não conferida.</p>
+                        @endif
+                        @if ($incompativeis > 0)
+                            <p>
+                                {{ $incompativeis }} {{ $incompativeis === 1 ? 'REA está' : 'REAs estão' }} com a meta diferente da sua{{ $resumo['meta_corrigida_incompativel'] > 0 ? ' ('.$resumo['meta_corrigida_incompativel'].' por correção sua)' : '' }}.
+                            </p>
+                        @endif
+                    </div>
+                @endif
             </section>
 
             @if ($resumo['corrigidos'] > 0 && $podeCorrigir)
@@ -80,9 +99,6 @@
             @if ($resumo['ocultos'] > 0)
                 @php
                     $textosMotivos = [
-                        'meta_incompativel' => 'incompatíveis com a sua meta',
-                        'meta_corrigida_incompativel' => 'incompatíveis com a sua meta (corrigido por você)',
-                        'meta_nao_avaliada' => 'sem classificação de meta (a IA não conseguiu classificar)',
                         'sem_meta_usuario' => 'que dependem de uma meta de aprendizagem',
                         'outros' => 'sem faixa definida',
                     ];
@@ -169,9 +185,9 @@
             </section>
 
             <p class="text-xs text-gray-500 pt-3 border-t border-gray-100">
-                Dentro de cada faixa, a ordem é a de chegada dos repositórios. Exceções por política: os itens do MEC RED
-                ficam na faixa mais alta (o SisREAd pede ao repositório itens do seu nível, mas não consegue conferir), e os do Eduplay
-                são posicionados pela sua meta.
+                Entre REAs de mesmo grau, vem primeiro o que está mais acima no próprio repositório (o 1º resultado de cada
+                repositório, depois o 2º, e assim por diante), o que intercala os repositórios. Persistindo o empate, vale a ordem
+                alfabética do repositório. Nenhum repositório tem posição reservada, e a ordem não depende de qual respondeu primeiro.
             </p>
         </div>
     </details>

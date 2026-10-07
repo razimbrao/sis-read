@@ -53,6 +53,7 @@ class ProcessAquarela implements ShouldQueue
         $start_total_time = microtime(true);
         $page = 0;
         $allData = [];
+        $posicao = 0; // ordem do REA no Aquarela, usada no desempate do grau
 
         $model = Data::query()->where('searched_at', $this->time)->first();
         $classificador = app(MetaClassifier::class);
@@ -98,6 +99,7 @@ class ProcessAquarela implements ShouldQueue
 
                 $criterios = $this->avaliarCriterios($rea, $metas[$i] ?? null);
                 $recommended = RuleClassifier::rotular($criterios, (bool) $this->meta);
+                $posicao++;
 
                 // 📊 1. Incrementa a radiografia exata
                 if (isset($this->metrics['breakdown'][$recommended])) {
@@ -122,7 +124,7 @@ class ProcessAquarela implements ShouldQueue
                     'type' => $rea['tipoConteudo'],
                     'repositorio' => 'Aquarela',
                     'recommended' => $recommended,
-                    'explicacao' => RuleClassifier::explicacao($criterios, $recommended),
+                    'explicacao' => RuleClassifier::explicacao($criterios, $recommended, $posicao),
                     'titulo' => $rea['titulo'],
                     'descricao' => $rea['descricao'],
                     'tipoConteudo' => $rea['tipoConteudo'],
