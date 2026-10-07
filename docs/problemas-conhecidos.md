@@ -16,7 +16,8 @@
    `{"meta": ...}` e `RuleClassifier::casaMeta` normaliza acento, espaço e hífen.
 5. ~~**Typo `obkect_type`** em `getMecRedURL` (meta mpe).~~ **Corrigido** (2026-09-18): IDs em `mecRedTiposObjeto()`.
 6. **`searched_at` usado como chave**: duas buscas no mesmo segundo colidem.
-7. `ProcessEduplay` interpola o termo de busca na URL sem encoding.
+7. ~~`ProcessEduplay` interpola o termo de busca na URL sem encoding.~~ **Corrigido** (2026-10-07): os
+   parâmetros vão em array para o `Http::get`, que os codifica.
 8. ~~O `database.sqlite` versionado contém dados de usuários (e-mails e hashes de senha).~~
    **Parcialmente corrigido** (2026-09-30): o arquivo saiu do versionamento (`.gitignore` + `git rm --cached`)
    e o `setup.ps1` passa a criá-lo com migrations e seeders. **O histórico antigo ainda contém o banco com
