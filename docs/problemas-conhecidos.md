@@ -80,7 +80,8 @@
     **Corrigido no banco local** (2026-10-07): a linha (id 2) foi apagada, com backup antes. O banco não é
     versionado: outras cópias dele ainda têm essa linha.
 21. 61 `failed_jobs` acumulados, nunca revisados.
-22. Os REAs do MEC RED não têm link: `ProcessMecRed` grava `'link' => ''` e não grava o `id`, que a tela
-    usava para montar `plataformaintegrada.mec.gov.br/recurso/{id}`. Desde 2026-10-07 o cartão mostra o botão
-    "Abrir recurso" desabilitado, com o tooltip "O repositório não informou o link deste recurso." (antes o
-    botão sumia). A causa, no job, continua aberta.
+22. ~~Os REAs do MEC RED não têm link: `ProcessMecRed` grava `'link' => ''` e não grava o `id`.~~
+    **Corrigido** (2026-10-07): o job grava o `id` e o link `https://mecred.mec.gov.br/recurso/{id}`
+    (`MECRED_SITE_URL`; o antigo `plataformaintegrada.mec.gov.br/recurso/{id}` redireciona para lá). Buscas
+    gravadas antes disso não têm o `id` e continuam sem link: o cartão mostra "Abrir recurso" desabilitado,
+    com tooltip.

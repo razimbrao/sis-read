@@ -131,6 +131,8 @@ return [
 
     'mecred' => [
         'api' => env('MECRED_API_URL', 'https://api.portalmec.c3sl.ufpr.br/v1/search'),
+        // Página pública de cada recurso (o antigo plataformaintegrada.mec.gov.br redireciona para cá).
+        'site' => env('MECRED_SITE_URL', 'https://mecred.mec.gov.br'),
     ],
 
 ];
