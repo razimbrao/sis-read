@@ -292,6 +292,8 @@ class FindREATransparenciaTest extends TestCase
             ->assertSee('identificado pelo trecho “sexto ano”', false)
             ->assertSee('Explicação indisponível para esta busca.')
             ->assertSee('Repositórios consultados')
+            // "Item antigo" não tem link: o botão aparece desabilitado, com a explicação no tooltip.
+            ->assertSee('title="O repositório não informou o link deste recurso."', false)
             ->assertDontSee('Derivado do tipo de interatividade (dtype) informado pelo repositório.');
     }
 
