@@ -41,14 +41,19 @@
     (`both`/`meta_both`), e a ordenação favorecia esses itens.~~ **Corrigida a ordenação** (2026-10-06): não
     há mais prioridade fixa por repositório. A lista é ordenada pelo grau de recomendação, calculado só dos
     critérios conferidos (meta 4, nível 2, tipo 1; o que não foi conferido vale 0), com desempate pela posição
-    no repositório (`docs/recomendacao.md`). O nível do MEC RED passou a vir do regex sobre título e descrição.
+    no repositório (`docs/recomendacao.md`). O nível do MEC RED passou a vir do regex sobre título e descrição,
+    e a meta, da IA pelo título.
     **Continua aberto**: a API ignora os filtros e não informa etapa nem tipo, então os itens do MEC RED
-    costumam ficar com grau 0. Caminhos para dar dados ao grau: usar o parâmetro `filters` (JSON com `nivel`)
-    ou buscar a etapa de cada item em `/public/resource/{id}`.
-16. ~~Busca com meta e Ollama fora do ar: todos os REAs do Aquarela ficam ocultos (meta não avaliada).~~
-    **Corrigido** (2026-10-06): só fica oculto o REA com meta conferida como incompatível. Com a meta não
-    avaliada, o REA aparece com 0 ponto de meta, abaixo dos compatíveis, e o painel "Como ordenamos" diz
-    quantos estão nessa situação.
+    raramente pontuam em nível e tipo. Caminhos para dar dados ao grau: usar o parâmetro `filters` (JSON com
+    `nivel`) ou buscar a etapa de cada item em `/public/resource/{id}`.
+16. ~~Busca com meta e Ollama fora do ar: todos os REAs do Aquarela e do Eduplay ficam ocultos (meta não
+    avaliada).~~ **Corrigido** (2026-10-06): só fica oculto o REA com meta conferida como incompatível. Com a
+    meta não avaliada, o REA aparece com 0 ponto de meta, abaixo dos compatíveis, e o painel "Como ordenamos"
+    diz quantos estão nessa situação; cada critério explica por quê (IA indisponível, tempo esgotado, resposta
+    inválida). Também foi **mitigada** a falha em si: o modelo é aquecido antes da primeira chamada (a frio, o
+    `gemma3:4b` levava ~30s e todas as primeiras chamadas estouravam o timeout), o job desiste após 3 falhas
+    seguidas em vez de esperar o timeout de cada REA, e classificações anteriores vêm do cache. Ver
+    [integracoes.md](integracoes.md#llm-classificação-de-meta).
 17. ~~**Interesses cadastrados por colaboradores nunca funcionavam na busca**: `interestOptions` é uma
     propriedade privada, que o Livewire não persiste entre requisições. O `mount()` carregava a lista, mas
     no request do `search()` ela já tinha voltado só aos 4 termos fixos.~~ **Corrigido** (2026-09-30):
@@ -57,6 +62,10 @@
     "Performance Aproximação" mas classificou como "Aprendizagem" um recurso claramente de
     "Performance Evitação". Numa busca real com meta `ma`, **nenhum** dos 157 REAs foi excluído, ou seja, o
     critério quase não filtra. A explicação declara o modelo usado, mas vale testar prompt ou modelo maior.
+    Com a LLM nos três repositórios (2026-10-06), o viés aparece em todos: na busca "algoritmos" com meta
+    `ma`, os 157 REAs (Aquarela, MEC RED e Eduplay) saíram "Aprendizagem". O cache guarda a classe por REA:
+    ao trocar o prompt, incremente `MetaClassifier::VERSAO_PROMPT`; ao trocar o modelo, o cache já separa
+    por `OLLAMA_MODELO`.
 19. Empate no EMAPRE é resolvido em silêncio: `array_keys($resultados, max(...))[0]` pega o primeiro fator.
     Existe ao menos um caso real no banco (usuário 3, ma=2 e mpa=2).
 20. Os 24 `collaborators` vieram de uma planilha de artigos (o "nome" é uma referência bibliográfica), e a

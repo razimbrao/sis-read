@@ -10,6 +10,7 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\DB;
 use App\Models\Data;
+use App\Recommendation\MetaClassifier;
 use App\Recommendation\RuleClassifier;
 
 class ProcessEduplay implements ShouldQueue
@@ -51,6 +52,7 @@ class ProcessEduplay implements ShouldQueue
         $allData = [];
         $posicao = 0;
         $model = Data::query()->where('searched_at', $this->time)->first();
+        $classificador = app(MetaClassifier::class);
 
         while ($page < 10) {
             $metrics['api_calls']++;
@@ -86,9 +88,19 @@ class ProcessEduplay implements ShouldQueue
                 'estrategia'           => 'Ativa / Abstrata / Visual/Verbal',
             ];
 
-            foreach ($search['contents'] as $rea) {
+            $conteudos = array_values(array_filter($search['contents'], 'is_array'));
+
+            // Com meta, a página inteira vai para a LLM de uma vez (cache e chamadas simultâneas).
+            $metas = $this->meta ? $classificador->criterios($this->meta, array_map(fn ($rea) => [
+                'chave'     => $this->chave($rea),
+                'titulo'    => $rea['name'] ?? null,
+                'descricao' => $rea['metatagDescription'] ?? null,
+                'tipo'      => 'Vídeo',
+            ], $conteudos)) : [];
+
+            foreach ($conteudos as $i => $rea) {
                 // Mesma regra dos outros repositórios: rótulo e grau vêm só dos critérios conferidos.
-                $criterios = $this->criterios($rea);
+                $criterios = $this->criterios($rea, $metas[$i] ?? null);
                 $recommended = RuleClassifier::rotular($criterios, (bool) $this->meta);
                 $explicacao = RuleClassifier::explicacao($criterios, $recommended, ++$posicao);
 
@@ -109,7 +121,7 @@ class ProcessEduplay implements ShouldQueue
                 }
 
                 $allData[] = array_merge([
-                    'chave'        => RuleClassifier::chave('Eduplay', $rea['contentUrl'] ?? null, $rea['name'] ?? null),
+                    'chave'        => $this->chave($rea),
                     'title'        => $rea['name'],
                     'link'         => $rea['contentUrl'],
                     'type'         => 'Vídeo',
@@ -147,15 +159,19 @@ class ProcessEduplay implements ShouldQueue
             'breakdown'       => json_encode($metrics['breakdown']),
             'created_at'      => now(),
             'updated_at'      => now(),
-        ]);
+        ] + $classificador->metricas());
+    }
+
+    private function chave(array $rea): string
+    {
+        return RuleClassifier::chave('Eduplay', $rea['contentUrl'] ?? null, $rea['name'] ?? null);
     }
 
     /**
      * Critérios do Eduplay, pela mesma regra dos outros repositórios: nível pelo regex sobre título e
-     * descrição, e tipo (sempre vídeo) comparado com os preferidos. O Eduplay não informa nada que permita
-     * conferir a meta, então ela fica não avaliada e não pontua.
+     * descrição, tipo (sempre vídeo) comparado com os preferidos e meta classificada por IA (MetaClassifier).
      */
-    private function criterios(array $rea): array
+    private function criterios(array $rea, ?array $meta): array
     {
         $criterios = [
             'tema'  => RuleClassifier::criterioTema($this->search, 'Eduplay'),
@@ -166,14 +182,8 @@ class ProcessEduplay implements ShouldQueue
             'tipo'  => RuleClassifier::criterioTipo('Vídeo', RuleClassifier::normalizarTipos($this->types)),
         ];
 
-        if ($this->meta) {
-            $criterios['meta'] = [
-                'status'    => 'nao_avaliado',
-                'valor'     => null,
-                'esperado'  => $this->meta,
-                'fonte'     => 'padrao_repositorio',
-                'evidencia' => 'o Eduplay não informa dados para conferir a meta do recurso',
-            ];
+        if ($this->meta && $meta !== null) {
+            $criterios['meta'] = $meta;
         }
 
         return $criterios;
