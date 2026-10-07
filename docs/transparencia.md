@@ -26,21 +26,23 @@ Classificação da abordagem no vocabulário do MSL:
 Princípios:
 
 1. **Decisão e explicação vêm da mesma fonte.** `RuleClassifier` devolve os critérios avaliados, e
-   o rótulo (`recommended`) é calculado a partir deles. Não há como a explicação dizer uma coisa e a
-   ordenação fazer outra.
+   o rótulo (`recommended`) e o grau de recomendação são calculados a partir deles. O `Ranking` ordena
+   pelo grau recalculado dos mesmos critérios. Não há como a explicação dizer uma coisa e a ordenação
+   fazer outra.
 2. **Só se afirma o que foi verificado.** Um critério que não foi avaliado aparece como
-   *não avaliado* (`?`), nunca como atendido.
+   *não avaliado* (`?`), nunca como atendido, e vale 0 ponto no grau. O nível *assumido* (o texto não
+   menciona etapa) também aparece como `?` e vale 0.
 3. **A fonte de cada informação é declarada**: regex, IA, filtro do repositório, colaboradores,
    meta do usuário ou padrão do repositório. Estimativas automáticas vêm com aviso de que podem errar.
-4. **Exceções de política são explicadas como exceções.** O MEC RED e o Eduplay têm faixas fixas
-   por repositório. A explicação diz isso, e não finge uma checagem que não houve.
+4. **Nenhum repositório tem posição reservada.** Até a versão 1 das regras, o MEC RED e o Eduplay
+   tinham faixas fixas por política. Desde a versão 2, a regra é a mesma para todos (§5 e §6).
 
 ## 2. Três níveis de explicação
 
 | Nível | Pergunta do usuário | Onde aparece |
 |---|---|---|
-| Item | "Por que este REA está aqui?" | Selo de faixa + botão **Por que este REA?** em cada linha |
-| Lista | "Como esta lista foi ordenada?" | Painel **Como ordenamos** (contagem por faixa, itens ocultos) |
+| Item | "Por que este REA está aqui?" | Selo com grau e faixa ("Grau 5 de 7 · Meta e nível ou tipo"; abaixo dos compatíveis, ", meta não conferida" ou ", meta diferente da sua") + botão **Por que este REA?** com a conta do grau e o desempate |
+| Lista | "Como esta lista foi ordenada?" | Painel **Como ordenamos** (fórmula do grau, contagem por faixa, desempate, itens ocultos) |
 | Usuário | "O que o sistema usou sobre mim?" | Painel **O que usamos sobre você** (perfil, termo, tipos preferidos com origem, meta EMAPRE com médias) |
 
 ## 3. Arquitetura
@@ -53,12 +55,13 @@ FindREA::search()
         │
 Process{Aquarela,MecRed,Eduplay}
   ├─ RuleClassifier::criterio*()   → critérios {status, valor, esperado, fonte, evidencia}
-  ├─ RuleClassifier::rotular()     → recommended (Aquarela)  | faixa fixa + observação (MEC RED, Eduplay)
+  ├─ RuleClassifier::rotular()     → recommended (mesma regra nos três repositórios)
+  ├─ RuleClassifier::explicacao()  → critérios + grau (pontos e posição no repositório)
   └─ grava no item: recommended, explicacao, fonte_interatividade
         │
-FindREA::paginate()  → Ranking::ordenar()   (ordem das faixas)
+FindREA::paginate()  → Ranking::ordenar()   (grau, posição no repositório, repositório, chave)
 FindREA::resumoOrdenacao() → Ranking::contar() (painel "Como ordenamos")
-Blade → ExplanationRenderer::resumo()/linhas()/faixa()  (texto por templates)
+Blade → ExplanationRenderer::resumo()/linhas()/faixa()/grau()  (texto por templates)
       → FindREA::registrarExplicacao()  (tabela explanation_events)
 ```
 
@@ -66,8 +69,8 @@ Arquivos:
 
 | Arquivo | Papel |
 |---|---|
-| `app/Recommendation/RuleClassifier.php` | Normalização, inferência de nível, critérios e rótulo |
-| `app/Recommendation/Ranking.php` | Ordem das faixas, ordenação e contagem (inclusive ocultos) |
+| `app/Recommendation/RuleClassifier.php` | Normalização, inferência de nível, critérios, pesos, grau e rótulo |
+| `app/Recommendation/Ranking.php` | Visibilidade, ordenação pelo grau com desempate e contagem (inclusive ocultos) |
 | `app/Recommendation/ExplanationRenderer.php` | Templates de texto em português |
 | `app/Models/ExplanationEvent.php` + migration | Registro de uso das explicações |
 | `app/Jobs/Process*.php` | Gravam `explicacao` em cada REA |
@@ -84,8 +87,9 @@ Não é preciso migration: fica dentro do JSON que já existe.
   "recommended": "profile",
   "fonte_interatividade": "dtype",
   "explicacao": {
-    "versao_regras": 1,
+    "versao_regras": 2,
     "faixa": "profile",
+    "grau": {"total": 2, "maximo": 7, "pontos": {"meta": 0, "nivel": 2, "tipo": 0}, "posicao": 3},
     "observacao": null,
     "criterios": {
       "tema":  {"status": "ok", "valor": "algoritmos", "fonte": "busca", "repositorio": "Aquarela"},
@@ -115,15 +119,24 @@ Não é preciso migration: fica dentro do JSON que já existe.
 Cada REA também tem `chave` (hash de repositório, link e título), usada para apontar correções, e a
 `explicacao` ganha `faixa_original` (faixa do job) enquanto houver correção.
 
+`grau` é calculado por `RuleClassifier::grau` a partir dos critérios: `pontos` traz os pontos de cada
+critério (`PESOS`: meta 4, nível 2, tipo 1), `maximo` soma os pesos dos critérios presentes, e
+`posicao` é a ordem do REA na resposta do repositório (1, 2, …), usada no desempate. As correções do
+usuário recalculam o grau e mantêm a posição.
+
 `versao_regras` (constante `RuleClassifier::VERSAO_REGRAS`) permite separar, na avaliação,
-explicações geradas por versões diferentes das regras.
+explicações geradas por versões diferentes das regras. A versão 2 trouxe o grau, a regra única para
+os três repositórios e o fim da `observacao` de política (que só aparece em REAs da versão 1).
 
 REAs gravados antes desta funcionalidade não têm `explicacao`. O renderer mostra
 "Explicação indisponível para esta busca" e não quebra.
 
 ## 5. Regras por repositório
 
-### 5.1 Aquarela (regra completa)
+Os três repositórios usam o mesmo `RuleClassifier::rotular` e o mesmo `RuleClassifier::grau`. O que muda
+é só o dado que cada um informa para conferir os critérios.
+
+### 5.1 Aquarela
 
 | Critério | Como é avaliado | Fonte |
 |---|---|---|
@@ -132,7 +145,8 @@ REAs gravados antes desta funcionalidade não têm `explicacao`. O renderer most
 | tipo | `tipoConteudo` normalizado ∈ tipos preferidos | `colaboradores` |
 | meta | Só se o usuário tem meta. O `MetaClassifier` (LLM, por padrão Ollama `gemma3:4b`) classifica e o resultado é comparado com a meta dominante. Se a resposta for inválida, o serviço falhar ou o tempo reservado acabar, o critério fica `nao_avaliado`, com o motivo em `evidencia` (§5.4) | `llm` |
 
-Rótulo (`RuleClassifier::rotular`), idêntico à regra anterior:
+Rótulo (`RuleClassifier::rotular`), em que "atendido" é `RuleClassifier::atende` (status `ok`, não
+assumido):
 
 ```
 com meta e meta atendida:  nível e tipo → meta_both | nível ou tipo → meta_one | nenhum → meta
@@ -141,24 +155,24 @@ caso contrário:            nível e tipo → both      | só nível → profile
 
 `fonte_interatividade = dtype` (`T` = ativo, `D` = expositivo); sem `dtype`, `indisponivel`.
 
-### 5.2 MEC RED (faixa fixa por política)
+### 5.2 MEC RED
 
 O SisREAd envia filtros de etapa (`educational_stages`) e de tipo por meta (`object_type`), mas a
 resposta não traz a etapa nem o tipo de cada item. No teste manual de 2026-09-18, a API devolveu
-**os mesmos 10 itens** com e sem filtros (ver `problemas-conhecidos.md` #15). Por isso nenhum
-critério além do tema é marcado como atendido. A evidência registra o que foi pedido:
+**os mesmos 10 itens** com e sem filtros (ver `problemas-conhecidos.md` #15). Por isso o filtro não
+conta como conferência:
 
 | Critério | Status | Evidência |
 |---|---|---|
 | tema | `ok` | termo da busca |
-| nível | `nao_avaliado` | "o SisREAd pediu ao MEC RED itens desta etapa (educational_stages=…), mas o repositório não informa a etapa de cada item para conferir". Se o perfil não corresponde a nenhuma etapa, "nenhum filtro de nível foi aplicado" |
+| nível | regex sobre `name` e `description`, como no Aquarela (fonte `regex`, corrigível). A busca não devolve `description` (conferido em 2026-10-06), então na prática só o título conta | trecho casado, ou *assumido* (0 ponto) |
 | tipo | `nao_avaliado` | o MEC RED não informa o tipo |
 | meta | com meta: classificada por IA (§5.4), só pelo título | "classificado só pelo título, porque o MEC RED não informa descrição nem tipo; a busca já pediu tipos de objeto associados à sua meta (object_type=…)" |
 
-Rótulo fixo: `both` (ou `meta_both` com meta), como antes; a regra da faixa é escopo da ordenação
-por grau. `observacao`: "Por política do SisREAd, os itens do MEC RED ficam na faixa mais alta, mesmo
-sem conferir nível e tipo e qualquer que seja a meta classificada por IA." O status `filtro_api` (▽) continua disponível para um repositório que confirme
-o filtro aplicado.
+O rótulo e o grau saem da regra comum. Na prática, um item do MEC RED sem etapa no título só pontua
+pela meta (classificada por IA) e fica abaixo dos que conferem nível ou tipo, intercalado com os de mesmo
+grau. O status `filtro_api` (▽) continua disponível para um repositório que confirme o filtro aplicado,
+mas não pontua.
 `fonte_interatividade = meta_usuario` quando há meta (interatividade derivada da meta do usuário,
 e não do recurso). Sem meta, `indisponivel`.
 
@@ -167,15 +181,14 @@ e não do recurso). Sem meta, `indisponivel`.
 | Critério | Status |
 |---|---|
 | tema | `ok` |
-| nível | `nao_avaliado`: o Eduplay não informa etapa |
-| tipo | `nao_avaliado`: é sempre vídeo e não é comparado com os tipos preferidos |
+| nível | regex sobre `name` e `metatagDescription` (fonte `regex`, corrigível) |
+| tipo | `video` comparado com os tipos preferidos (`criterioTipo`, fonte `colaboradores`). O job recebe os tipos da busca |
 | meta | com meta: classificada por IA (§5.4) a partir do título e de `metatagDescription` |
 
-Rótulo pela regra comum (`RuleClassifier::rotular`), sem `observacao`: com nível e tipo não
-avaliados, a faixa é `meta` se a meta for atendida e `interest` (oculto) se não for ou não puder ser
-avaliada. Antes (até 2026-10-06) o rótulo era fixo: `meta_one` para `ma`/`mpa`, `interest` para `mpe`,
-sem olhar o recurso. `fonte_interatividade = padrao_repositorio`. A meta do Eduplay agora é corrigível
-pelo usuário (fonte `llm`).
+Rótulo e grau pela regra comum, sem `observacao`. Até a versão 1 das regras, o rótulo era fixo:
+`meta_one` para `ma`/`mpa`, `interest` para `mpe`, sem olhar o recurso. Com a meta não avaliada, o REA
+aparece com 0 ponto de meta (não é ocultado). `fonte_interatividade = padrao_repositorio`. A meta do
+Eduplay é corrigível pelo usuário (fonte `llm`).
 
 ### 5.4 Classificação de meta por IA (`MetaClassifier`)
 
@@ -200,15 +213,31 @@ anterior." Configuração e desempenho em [integracoes.md](integracoes.md#llm-cl
 
 ## 6. Ordenação (`Ranking`)
 
-| Contexto | Ordem das faixas | Ocultos |
+A lista é ordenada pelo **grau de recomendação** (fórmula em [recomendacao.md](recomendacao.md)), com
+desempate estável e documentado:
+
+1. grau, decrescente (`Ranking::grauDe`, recalculado dos critérios);
+2. posição do REA no próprio repositório (`explicacao.grau.posicao`), crescente. Isso intercala os
+   repositórios;
+3. nome do repositório, em ordem alfabética;
+4. `chave`.
+
+A ordem de chegada dos jobs não influi (testado com a entrada embaralhada em `RankingTest`).
+
+| Contexto | Ordem | Ocultos |
 |---|---|---|
-| Usuário com meta dominante | `meta_both` → `meta_one` → `meta` | `both`, `profile`, `interest` (REAs incompatíveis com a meta) |
+| Usuário com meta dominante | compatíveis (`meta_both` → `meta_one` → `meta`) → meta não conferida (`both` → `profile` → `interest`) → meta diferente da sua (`both` → `profile` → `interest`) | nenhum por causa da meta |
 | Sem meta | `both` → `profile` → `interest` | `meta*` |
 
-Dentro de cada faixa a ordem de chegada é mantida (ordenação estável). `Ranking::contar` devolve
-a contagem por faixa, o total de ocultos e o **motivo** de cada oculto (`meta_incompativel`,
-`meta_nao_avaliada` quando a IA não classificou, `sem_meta_usuario`, `outros`). O painel **Como
-ordenamos** mostra tudo isso e também a situação de cada repositório (`FindREA::statusRepositorios`,
+O grupo vem de `Ranking::grupoMeta` e é o primeiro item da chave de ordenação, antes do grau. A
+justificativa de manter dois grupos abaixo dos compatíveis está em [recomendacao.md](recomendacao.md).
+`Ranking::visivel` decide o que aparece. `Ranking::contar` devolve a contagem por faixa, o total de
+ocultos, o **motivo** de cada oculto (`sem_meta_usuario`, `outros`) e quantos REAs estão abaixo dos
+compatíveis: `meta_nao_conferida`, `meta_incompativel` (a IA classificou diferente) e
+`meta_corrigida_incompativel` (o usuário informou uma meta diferente). Os motivos `meta_nao_avaliada`
+(problema #16) e, depois, `meta_incompativel` deixaram de ocultar REAs: a meta não esconde ninguém
+(problema #18). O painel **Como ordenamos** mostra a fórmula, as faixas com o
+intervalo de grau, o desempate e também a situação de cada repositório (`FindREA::statusRepositorios`,
 lida de `search_metrics`): itens retornados, falha (tempo esgotado ou erro) ou ainda consultando.
 Assim, uma lista sem itens do Aquarela é explicada ("não respondeu"), e não fica só a ausência.
 
@@ -232,7 +261,7 @@ Exemplos:
 |---|---|---|
 | tema | ok | Resultado da busca por “algoritmos” no Aquarela. |
 | nível | ok, regex | Nível ensino fundamental, igual ao seu perfil: identificado pelo trecho “6º” no título ou na descrição. |
-| nível | ok, assumido | Nível ensino superior, igual ao seu perfil, mas assumido: o texto não menciona nenhuma etapa. |
+| nível | ok, assumido (ícone `?`, 0 ponto) | Nível ensino superior, igual ao seu perfil, mas assumido: o texto não menciona nenhuma etapa. |
 | nível | falhou, regex | Nível estimado ensino medio (trecho “médio”), diferente do seu perfil (ensino fundamental). |
 | nível | falhou, assumido | O texto não menciona nenhuma etapa; o sistema assume ensino superior, diferente do seu perfil (…). |
 | nível | filtro_api | O MEC RED filtrou a busca pela etapa do seu perfil (ensino fundamental). |
@@ -241,9 +270,14 @@ Exemplos:
 | meta | ok, llm | Classificado por IA como Aprendizagem, compatível com a sua meta (Aprendizagem). |
 | meta | nao_avaliado | Não foi possível classificar a meta deste recurso (IA indisponível ou resposta inválida). |
 
-- `resumo()` gera uma linha: "Atende: tema, nível. Não atende: tipo. Não verificado: meta."
-- `faixa()` gera título e descrição do selo. Por exemplo, `profile` → "Nível": "o nível bate com o seu
-  perfil, mas o tipo não está entre os preferidos".
+- `resumo()` gera uma linha: "Atende: tema, nível. Não atende: tipo. Não verificado: meta." Usa
+  `RuleClassifier::atende`, então nível assumido e `filtro_api` ficam em "Não verificado".
+- `faixa()` gera título, descrição e intervalo de grau do selo. Por exemplo, `profile` → "Nível", grau 2:
+  "o nível bate com o seu perfil, mas o tipo não está entre os preferidos ou não foi conferido". Numa
+  busca com meta, `both`/`profile`/`interest` ganham ", meta não conferida".
+- `grau()` gera o selo ("Grau 5 de 7"), a conta ("Grau 5 de 7: meta +4, nível 0 (não atende),
+  tipo +1.") e o desempate ("Entre REAs de mesmo grau, vale a posição no repositório: este é o 3º
+  resultado do Aquarela."). O critério com 0 ponto diz por quê: não atende, não verificado ou assumido.
 - `avisos()` devolve "Estimativa automática (regex/IA): pode conter erros." quando algum critério
   atendido ou não atendido veio de `regex` ou `llm`.
 
@@ -292,7 +326,7 @@ Esses dados alimentam a Etapa 3 (avaliação com usuários).
 | D2 | Itens `profile` passam a aparecer sem meta |
 | D3 | Prompt do Ollama pede JSON `{"meta": ...}`, e a comparação normaliza acento, espaço e hífen (`performance aproximação` ≡ `performance_aproximacao`) |
 | D4 | Tipos preferidos achatados e normalizados |
-| D5–D7 | MEC RED e Eduplay explicam a política fixa, e a fonte da interatividade é declarada |
+| D5–D7 | MEC RED e Eduplay explicavam a política fixa, e a fonte da interatividade é declarada. A política fixa acabou na versão 2 das regras (§5) |
 | D8 | Typo `obkect_type` corrigido |
 
 ## 11. Testes
@@ -301,12 +335,12 @@ Os testes rodam em SQLite em memória (`phpunit.xml`), sem tocar em `database/da
 
 | Arquivo | Cobre |
 |---|---|
-| `tests/Unit/RuleClassifierTest.php` | normalização, tipos, inferência de nível com evidência, critérios, `casaMeta`, tabela de rótulos |
-| `tests/Unit/RankingTest.php` | ordem com e sem meta, estabilidade, ocultos, contagem |
+| `tests/Unit/RuleClassifierTest.php` | normalização, tipos, inferência de nível com evidência, critérios, `casaMeta`, tabela de rótulos, tabela de graus, grau e rótulo concordam, nível assumido não conta |
+| `tests/Unit/RankingTest.php` | ordem por grau com e sem meta, desempate por posição e repositório, ordem de chegada não influi, grupos de meta (compatível → não conferida → diferente), a meta não oculta, contagem |
 | `tests/Unit/ExplanationRendererTest.php` | texto por status, nunca ✓ para não avaliado, resumo, avisos, faixa, item legado sem explicação |
-| `tests/Feature/JobsExplicacaoTest.php` | os três jobs com `Http::fake`: todo item tem `explicacao` coerente com `recommended`, meta por IA nos três, Ollama fora do ar → `nao_avaliado`, métricas da LLM em `search_metrics` |
+| `tests/Feature/JobsExplicacaoTest.php` | os três jobs com `Http::fake`: todo item tem `explicacao` e grau coerentes com `recommended`, posição gravada, MEC RED e Eduplay sem prioridade fixa, meta por IA nos três, Ollama fora do ar → `nao_avaliado`, métricas da LLM em `search_metrics` |
 | `tests/Feature/MetaClassifierTest.php` | sucesso, JSON inválido/ambíguo, timeout, provedor que lança exceção, cache entre buscas (e o que não entra nele), parada após falhas, orçamento, lotes, aquecimento, `LLM_PROVEDOR=nenhum`, configuração por `config/llm.php` |
-| `tests/Feature/FindREATransparenciaTest.php` | `search()` monta `$contexto` e tipos normalizados, `paginate` e `resumoOrdenacao`, `registrarExplicacao` grava e rejeita ação inválida |
+| `tests/Feature/FindREATransparenciaTest.php` | `search()` monta `$contexto` e tipos normalizados (também para o Eduplay), `paginate` mistura os repositórios pelo grau, `resumoOrdenacao`, selo e painel com o grau, `registrarExplicacao` grava e rejeita ação inválida |
 | `tests/Unit/UserCorrectionsTest.php` | correção de nível, meta e tipos: critério, `original`, rótulo, desfazer, item de política, entradas inválidas |
 | `tests/Feature/EscrutabilidadeTest.php` | ações de correção do `FindREA`: gravam `data.data` e `corrections`, reordenam, bloqueiam durante a busca; tela de correção e painel de tipos |
 
@@ -330,8 +364,8 @@ Quatro pontos em que o sistema falhava calado ou omitia o que estava fazendo:
 
 ## 12. Próxima fase (diferenciais)
 
-- **Contrafactual**: derivado dos critérios `falhou`. Exemplo: "se o tipo fosse vídeo, este REA
-  subiria para a faixa Nível e tipo".
+- **Contrafactual**: derivado dos critérios `falhou` e dos pesos do grau. Exemplo: "se o tipo fosse
+  vídeo, este REA subiria do grau 2 para o 3 (faixa Nível e tipo)".
 - **Escrutabilidade**: implementada, ver §13. Ficou de fora a edição da meta EMAPRE do usuário.
 
 ## 13. Escrutabilidade
@@ -343,15 +377,17 @@ diagramas: [plano-escrutabilidade.md](plano-escrutabilidade.md). Fluxo:
 | O que se corrige | Onde | Efeito |
 |---|---|---|
 | Nível do REA (fonte `regex`) | **Por que este REA?** → Corrigir | status recalculado contra o perfil |
-| Meta do REA (fonte `llm`) | **Por que este REA?** e **Ver os REAs que não aparecem** | status recalculado contra a meta do usuário; um oculto pode voltar |
+| Meta do REA (fonte `llm`) | **Por que este REA?** | status recalculado contra a meta do usuário; o REA muda de grupo (sobe para os compatíveis ou desce para meta diferente) |
 | Tipos preferidos | **O que usamos sobre você** → Editar tipos preferidos | critério de tipo recalculado em todos os REAs comparáveis |
 
 Regras:
 
 1. O usuário informa **o que o REA é**, e não se ele atende. O status vem da mesma comparação do
-   job, e o rótulo de `RuleClassifier::rotular`. Decisão e explicação continuam com a mesma fonte.
-2. Só é corrigível critério com fonte `regex` ou `llm` (`RuleClassifier::corrigivel`). Itens de
-   política (MEC RED, Eduplay) e o tema não são, e a tela diz por quê.
+   job, o rótulo de `RuleClassifier::rotular` e o grau de `RuleClassifier::grau` (a posição no
+   repositório é mantida). Decisão e explicação continuam com a mesma fonte.
+2. Só é corrigível critério com fonte `regex` ou `llm` (`RuleClassifier::corrigivel`). Isso inclui o
+   nível de MEC RED e Eduplay, que agora vem do regex. O tema e os itens de política da versão 1 das
+   regras não são, e a tela diz por quê.
 3. O critério do job fica em `original`, e a faixa do job em `faixa_original`. Toda correção pode
    ser desfeita, uma a uma ou todas. Corrigir para o valor estimado equivale a desfazer.
 4. A correção vale só para a busca atual (fica em `data.data`).
@@ -368,12 +404,12 @@ Textos novos (`ExplanationRenderer`):
 | nível corrigido | Nível ensino fundamental, informado por você (o sistema tinha estimado ensino médio). Igual ao seu perfil. |
 | meta corrigida | Meta Aprendizagem, informada por você (a IA não tinha conseguido classificar). Compatível com a sua meta (Aprendizagem). |
 | tipos editados | Tipo jogo, entre os tipos preferidos que você definiu (jogo, video). |
-| faixa mudou | ✎ Faixa alterada pela sua correção: antes Só tema, agora Nível. |
+| faixa mudou | ✎ Faixa alterada pela sua correção: antes Tipo ou só tema, agora Nível. |
 | resumo | Atende: tema, nível (corrigido por você). Não atende: tipo. |
 
 O aviso de estimativa automática some para o critério corrigido. O painel **Como ordenamos** mostra
-"N REAs mudaram de faixa por correções suas" e **Desfazer todas**. Um oculto cuja meta o usuário
-marcou como diferente da dele aparece com o motivo `meta_corrigida_incompativel`.
+"N REAs mudaram de faixa por correções suas" e **Desfazer todas**. Um REA cuja meta o usuário
+marcou como diferente da dele vai para o fim da lista e é contado em `meta_corrigida_incompativel`.
 
 Registro: cada correção e cada desfazer viram uma linha em `corrections` (ver [dados.md](dados.md)),
 e abrir um formulário de correção grava o evento `abriu_correcao` em `explanation_events`. No painel

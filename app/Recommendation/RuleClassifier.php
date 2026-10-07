@@ -11,7 +11,14 @@ use Illuminate\Support\Str;
  */
 class RuleClassifier
 {
-    public const VERSAO_REGRAS = 1;
+    public const VERSAO_REGRAS = 2;
+
+    /**
+     * Pontos que cada critério atendido soma ao grau de recomendação (docs/recomendacao.md).
+     * Potências de 2: meta pesa mais que nível e tipo juntos, e nível mais que tipo. O tema não pontua,
+     * pois todo REA listado é resultado da busca.
+     */
+    public const PESOS = ['meta' => 4, 'nivel' => 2, 'tipo' => 1];
 
     public const METAS = [
         'ma' => 'Aprendizagem',
@@ -177,9 +184,40 @@ class RuleClassifier
         };
     }
 
+    /**
+     * Um critério só é atendido quando foi conferido e bateu. Não avaliado, filtro de API sem retorno e
+     * nível assumido (o texto não menciona etapa) não contam: nunca se afirma o que não foi verificado.
+     */
     public static function atende(array $criterios, string $nome): bool
     {
-        return in_array($criterios[$nome]['status'] ?? null, ['ok', 'filtro_api'], true);
+        $criterio = $criterios[$nome] ?? null;
+
+        return ($criterio['status'] ?? null) === 'ok' && ! ($criterio['assumido'] ?? false);
+    }
+
+    /**
+     * Grau de recomendação: soma dos PESOS dos critérios atendidos. `maximo` considera só os critérios
+     * presentes (a meta só existe quando o usuário tem meta). `posicao` é a ordem do REA no próprio
+     * repositório, usada no desempate (Ranking::ordenar).
+     *
+     * @return array{total: int, maximo: int, pontos: array<string, int>, posicao: ?int}
+     */
+    public static function grau(array $criterios, ?int $posicao = null): array
+    {
+        $pontos = [];
+
+        foreach (self::PESOS as $nome => $peso) {
+            if (isset($criterios[$nome])) {
+                $pontos[$nome] = self::atende($criterios, $nome) ? $peso : 0;
+            }
+        }
+
+        return [
+            'total' => array_sum($pontos),
+            'maximo' => array_sum(array_intersect_key(self::PESOS, $pontos)),
+            'pontos' => $pontos,
+            'posicao' => $posicao,
+        ];
     }
 
     public static function rotular(array $criterios, bool $comMeta): string
@@ -208,12 +246,16 @@ class RuleClassifier
         return 'interest';
     }
 
-    public static function explicacao(array $criterios, string $faixa, ?string $observacao = null): array
+    /**
+     * O rótulo e o grau saem dos mesmos critérios; `posicao` é a ordem do REA no repositório (1, 2, ...).
+     */
+    public static function explicacao(array $criterios, string $faixa, ?int $posicao = null): array
     {
         return [
             'versao_regras' => self::VERSAO_REGRAS,
             'faixa' => $faixa,
-            'observacao' => $observacao,
+            'grau' => self::grau($criterios, $posicao),
+            'observacao' => null,
             'criterios' => $criterios,
         ];
     }

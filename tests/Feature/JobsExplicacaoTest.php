@@ -137,31 +137,70 @@ class JobsExplicacaoTest extends TestCase
         $this->assertSame('nao_avaliado', $this->reas()[0]['explicacao']['criterios']['meta']['status']);
     }
 
-    public function test_mec_red_explica_os_filtros_enviados_e_classifica_a_meta_por_ia(): void
+    /**
+     * Mesma checagem para os três repositórios: rótulo, faixa e grau vêm dos critérios gravados.
+     */
+    private function assertGrauCoerente(array $reas, bool $comMeta): void
+    {
+        foreach ($reas as $i => $rea) {
+            $criterios = $rea['explicacao']['criterios'];
+            $this->assertSame(RuleClassifier::VERSAO_REGRAS, $rea['explicacao']['versao_regras']);
+            $this->assertNull($rea['explicacao']['observacao']);
+            $this->assertSame($rea['recommended'], $rea['explicacao']['faixa']);
+            $this->assertSame($rea['recommended'], RuleClassifier::rotular($criterios, $comMeta));
+            $this->assertSame(RuleClassifier::grau($criterios, $i + 1), $rea['explicacao']['grau']);
+        }
+    }
+
+    private function graus(array $reas): array
+    {
+        return array_map(fn ($r) => $r['explicacao']['grau']['total'], $reas);
+    }
+
+    public function test_aquarela_grava_grau_e_posicao(): void
+    {
+        $this->fakeAquarela('{"meta": "Aprendizagem"}');
+
+        (new ProcessAquarela('algoritmos', ['Vídeo'], 'Ensino fundamental', $this->searchedAt, 'ma'))->handle();
+
+        $reas = $this->reas();
+        $this->assertGrauCoerente($reas, true);
+        $this->assertSame([7, 5, 4], $this->graus($reas));
+        $this->assertSame([1, 2, 3], array_map(fn ($r) => $r['explicacao']['grau']['posicao'], $reas));
+    }
+
+    public function test_mec_red_sem_prioridade_fixa_e_meta_por_ia(): void
     {
         Http::fake([
             '127.0.0.1:11434/*' => $this->ollama('{"meta": "Performance Evitação"}'),
-            '*' => Http::response([['id' => 1, 'name' => 'Recurso 1'], ['id' => 2, 'name' => 'Recurso 2']]),
+            '*' => Http::response([
+                ['id' => 1, 'name' => 'Recurso 1'],
+                ['id' => 2, 'name' => 'Algoritmos para o ensino fundamental', 'description' => 'Atividade do 6º ano'],
+            ]),
         ]);
 
         (new ProcessMecRed('algoritmos', ['Vídeo'], 'Ensino fundamental', 'Algoritmos', $this->searchedAt, 'mpe'))->handle();
 
         $reas = $this->reas();
         $this->assertCount(2, $reas);
-        $explicacao = $reas[0]['explicacao'];
-        // A faixa do MEC RED continua definida por política (sessão de ordenação por grau).
-        $this->assertSame('meta_both', $reas[0]['recommended']);
-        // A API não devolve etapa/tipo dos itens: nível e tipo não são marcados como atendidos.
-        foreach (['nivel', 'tipo'] as $criterio) {
-            $this->assertSame('nao_avaliado', $explicacao['criterios'][$criterio]['status']);
-        }
-        $this->assertStringContainsString('educational_stages=2,3', $explicacao['criterios']['nivel']['evidencia']);
+        $this->assertGrauCoerente($reas, true);
 
-        $meta = $explicacao['criterios']['meta'];
+        // Sem política: rótulo e grau saem dos critérios. Tipo não é conferido e não pontua.
+        $this->assertSame(['meta', 'meta_one'], array_column($reas, 'recommended'));
+        $this->assertSame([4, 6], $this->graus($reas));
+        $this->assertTrue($reas[0]['explicacao']['criterios']['nivel']['assumido']);
+        $this->assertSame('nao_avaliado', $reas[0]['explicacao']['criterios']['tipo']['status']);
+
+        $meta = $reas[0]['explicacao']['criterios']['meta'];
         $this->assertSame(['ok', 'Performance Evitação', 'llm', 'gemma3:4b'], [$meta['status'], $meta['valor'], $meta['fonte'], $meta['modelo']]);
         $this->assertStringContainsString('só pelo título', $meta['evidencia']);
         $this->assertStringContainsString('object_type=17,22,6,18,13', $meta['evidencia']);
-        $this->assertNotNull($explicacao['observacao']);
+
+        // O nível é estimado pelo mesmo regex dos outros repositórios, e pode ser corrigido.
+        $nivel = $reas[1]['explicacao']['criterios']['nivel'];
+        $this->assertSame(['ok', 'fundamental', 'regex'], [$nivel['status'], $nivel['evidencia'], $nivel['fonte']]);
+        $this->assertTrue(RuleClassifier::corrigivel($nivel));
+        $this->assertSame('Atividade do 6º ano', $reas[1]['descricao']);
         $this->assertSame('meta_usuario', $reas[0]['fonte_interatividade']);
 
         // D8: o typo obkect_type não existe mais na URL.
@@ -172,29 +211,50 @@ class JobsExplicacaoTest extends TestCase
         $this->assertSame([2, 0, 0], [(int) $metricas->ollama_calls, (int) $metricas->ollama_errors, (int) $metricas->llm_nao_avaliados]);
     }
 
-    public function test_mec_red_perfil_sem_etapa_nao_finge_filtro_de_nivel(): void
+    public function test_mec_red_sem_meta(): void
     {
         Http::fake(['*' => Http::response([['name' => 'Recurso 1']])]);
 
         (new ProcessMecRed('algoritmos', [], 'Professor', 'Algoritmos', $this->searchedAt, null))->handle();
 
         $rea = $this->reas()[0];
-        $this->assertSame('both', $rea['recommended']);
-        $this->assertSame('nao_avaliado', $rea['explicacao']['criterios']['nivel']['status']);
+        $this->assertGrauCoerente([$rea], false);
+        $this->assertSame('interest', $rea['recommended']);
+        $this->assertSame(3, $rea['explicacao']['grau']['maximo']);
         $this->assertArrayNotHasKey('meta', $rea['explicacao']['criterios']);
         $this->assertSame('indisponivel', $rea['fonte_interatividade']);
         Http::assertSent(fn (Request $r) => ! str_contains($r->url(), 'educational_stages'));
     }
 
-    private function fakeEduplay(?string $respostaOllama): void
+    private function fakeEduplay(?string $respostaOllama, array $conteudos = [['name' => 'Vídeo 1', 'contentUrl' => 'http://v1', 'metatagDescription' => 'Aula']]): void
     {
         Http::fake([
             '127.0.0.1:11434/*' => $this->ollama($respostaOllama),
             // O fake avalia todos os padrões a cada requisição: a sequência casa só com o Eduplay.
             'eduplay.rnp.br/*' => Http::sequence()
-                ->push(['contents' => [['name' => 'Vídeo 1', 'contentUrl' => 'http://v1', 'metatagDescription' => 'Aula']]])
+                ->push(['contents' => $conteudos])
                 ->push(['contents' => []]),
         ]);
+    }
+
+    public function test_eduplay_usa_a_mesma_regra(): void
+    {
+        $this->fakeEduplay(null, [
+            ['name' => 'Vídeo 1', 'contentUrl' => 'http://v1'],
+            ['name' => 'Aula de ensino médio', 'contentUrl' => 'http://v2', 'metatagDescription' => 'Revisão'],
+        ]);
+
+        (new ProcessEduplay('algoritmos', 'Ensino medio', $this->searchedAt, null, [['Vídeo'], 'Jogo']))->handle();
+
+        $reas = $this->reas();
+        $this->assertGrauCoerente($reas, false);
+
+        // Nível pelo regex e tipo vídeo comparado com os preferidos, como nos outros repositórios.
+        $tipo = $reas[0]['explicacao']['criterios']['tipo'];
+        $this->assertSame(['ok', 'video', 'colaboradores'], [$tipo['status'], $tipo['valor'], $tipo['fonte']]);
+        $this->assertSame(['interest', 'both'], array_column($reas, 'recommended'));
+        $this->assertSame([1, 3], $this->graus($reas));
+        $this->assertSame('padrao_repositorio', $reas[0]['fonte_interatividade']);
     }
 
     public function test_eduplay_classifica_a_meta_por_ia_e_rotula_pela_regra_comum(): void
@@ -205,12 +265,12 @@ class JobsExplicacaoTest extends TestCase
 
         $rea = $this->reas()[0];
         $criterios = $rea['explicacao']['criterios'];
-        // Nível e tipo não são conferidos: com a meta atendida, a faixa é `meta`.
+        $this->assertGrauCoerente([$rea], true);
+        // Nível assumido e nenhum tipo preferido: com a meta atendida, a faixa é `meta` (grau 4).
         $this->assertSame('meta', $rea['recommended']);
-        $this->assertSame($rea['recommended'], RuleClassifier::rotular($criterios, true));
+        $this->assertSame(4, $rea['explicacao']['grau']['total']);
         $this->assertSame(['ok', 'llm'], [$criterios['meta']['status'], $criterios['meta']['fonte']]);
-        $this->assertNull($rea['explicacao']['observacao']);
-        $this->assertSame('nao_avaliado', $criterios['nivel']['status']);
+        $this->assertTrue($criterios['nivel']['assumido']);
         $this->assertSame('padrao_repositorio', $rea['fonte_interatividade']);
         Http::assertSent(fn (Request $r) => str_contains($r->url(), '11434') && str_contains($r['prompt'] ?? '', 'Descrição: Aula'));
 
@@ -218,7 +278,7 @@ class JobsExplicacaoTest extends TestCase
         $this->assertSame(1, (int) $metricas->ollama_calls);
     }
 
-    public function test_eduplay_meta_incompativel_fica_em_interest(): void
+    public function test_eduplay_meta_incompativel_fica_fora_das_faixas_de_meta(): void
     {
         $this->fakeEduplay('{"meta": "Aprendizagem"}');
 
@@ -227,6 +287,7 @@ class JobsExplicacaoTest extends TestCase
         $rea = $this->reas()[0];
         $this->assertSame('interest', $rea['recommended']);
         $this->assertSame('falhou', $rea['explicacao']['criterios']['meta']['status']);
+        $this->assertSame(0, $rea['explicacao']['grau']['total']);
     }
 
     public function test_eduplay_com_ollama_fora_do_ar_nao_marca_meta_como_atendida(): void
@@ -238,6 +299,7 @@ class JobsExplicacaoTest extends TestCase
         $rea = $this->reas()[0];
         $this->assertSame('interest', $rea['recommended']);
         $this->assertSame('nao_avaliado', $rea['explicacao']['criterios']['meta']['status']);
+        $this->assertSame(0, $rea['explicacao']['grau']['pontos']['meta']);
         $this->assertNotEmpty($rea['explicacao']['criterios']['meta']['evidencia']);
 
         $metricas = DB::table('search_metrics')->where('repository', 'Eduplay')->first();
@@ -253,6 +315,8 @@ class JobsExplicacaoTest extends TestCase
         $rea = $this->reas()[0];
         $this->assertSame('interest', $rea['recommended']);
         $this->assertArrayNotHasKey('meta', $rea['explicacao']['criterios']);
+        $this->assertSame('falhou', $rea['explicacao']['criterios']['tipo']['status']);
+        $this->assertSame(0, $rea['explicacao']['grau']['total']);
         Http::assertNotSent(fn (Request $r) => str_contains($r->url(), '11434'));
     }
 }

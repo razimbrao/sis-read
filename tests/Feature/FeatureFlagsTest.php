@@ -68,12 +68,14 @@ class FeatureFlagsTest extends TestCase
     }
 
     /**
-     * Uma busca com um REA de nível corrigível, um oculto por meta e tipos comparáveis.
+     * Uma busca com um REA de nível corrigível, um oculto e tipos comparáveis. A meta não oculta mais
+     * nenhum REA (Ranking::visivel); o oculto aqui é um REA sem faixa conhecida (motivo `outros`).
      */
     private function buscaCompleta(array $repositorios = ['Aquarela', 'MecRed', 'Eduplay']): array
     {
         $grafos = $this->aquarela('Grafos', 'Jogo', 'ma', 'Aprendizagem');
-        $this->busca([$grafos, $this->aquarela('Árvores', 'Vídeo', 'ma', 'Performance-evitação')], $repositorios);
+        $oculto = ['recommended' => 'sem_faixa'] + $this->aquarela('Árvores', 'Vídeo', 'ma', 'Performance-evitação');
+        $this->busca([$grafos, $oculto], $repositorios);
 
         return $grafos;
     }
@@ -388,7 +390,8 @@ class FeatureFlagsTest extends TestCase
 
         $ordens = array_map(fn ($grupo) => $this->titulosExibidos($this->componente($grupo, $user)), Experimento::GRUPOS);
 
-        $this->assertSame(['Algoritmos no sexto ano', 'Grafos'], $ordens[0]);
+        // A meta diferente não esconde o REA: ele vai para o fim da lista.
+        $this->assertSame(['Algoritmos no sexto ano', 'Grafos', 'Árvores'], $ordens[0]);
         $this->assertSame([$ordens[0], $ordens[0], $ordens[0]], $ordens);
     }
 

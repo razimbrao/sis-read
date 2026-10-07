@@ -8,6 +8,7 @@
     ];
     $linhas = ExplanationRenderer::linhas($explicacao);
     $mudancaFaixa = ExplanationRenderer::mudancaFaixa($explicacao);
+    $grau = ExplanationRenderer::grau($explicacao);
     $chave = $rea->chave ?? null;
     $temCorrigivel = $chave && \App\Experimento\Experimento::ativa('escrutabilidade') && collect($linhas)->contains('corrigivel', true);
     $politica = ! empty(is_array($explicacao) ? ($explicacao['observacao'] ?? null) : ($explicacao->observacao ?? null));
@@ -18,6 +19,12 @@
         <p class="font-medium text-gray-900">
             {{ $faixa['titulo'] }} <span class="font-normal text-gray-600">— {{ $faixa['descricao'] }}</span>
         </p>
+        @if ($grau)
+            <p class="mt-1 text-gray-700">{{ $grau['conta'] }}</p>
+            @if ($grau['desempate'])
+                <p class="text-xs text-gray-500">{{ $grau['desempate'] }}</p>
+            @endif
+        @endif
         @if ($mudancaFaixa)
             <p class="mt-1 text-amber-700">{{ ExplanationRenderer::MARCA_CORRECAO }} {{ $mudancaFaixa }}</p>
         @endif

@@ -33,31 +33,89 @@ class ExplanationRenderer
         'ensino superior' => 'ensino superior',
     ];
 
+    /**
+     * Faixas do grau de recomendação (RuleClassifier::grau, pesos meta 4, nível 2, tipo 1). `graus` é o
+     * intervalo de grau de cada faixa; com ou sem meta, ele é o mesmo, pois a meta não atendida vale 0.
+     */
     public const FAIXAS = [
-        'meta_both' => ['titulo' => 'Meta + nível e tipo', 'descricao' => 'compatível com a sua meta, com nível do seu perfil e tipo preferido'],
-        'meta_one' => ['titulo' => 'Meta + nível ou tipo', 'descricao' => 'compatível com a sua meta e com o nível ou o tipo'],
-        'meta' => ['titulo' => 'Meta', 'descricao' => 'compatível com a sua meta, mas não com nível nem tipo'],
-        'both' => ['titulo' => 'Nível e tipo', 'descricao' => 'nível do seu perfil e tipo entre os preferidos'],
-        'profile' => ['titulo' => 'Nível', 'descricao' => 'o nível bate com o seu perfil, mas o tipo não está entre os preferidos'],
-        'interest' => ['titulo' => 'Só tema', 'descricao' => 'resultado da busca, sem compatibilidade de nível e tipo'],
+        'meta_both' => ['titulo' => 'Meta, nível e tipo', 'descricao' => 'compatível com a sua meta, com nível do seu perfil e tipo preferido', 'graus' => '7'],
+        'meta_one' => ['titulo' => 'Meta e nível ou tipo', 'descricao' => 'compatível com a sua meta e com o nível (grau 6) ou o tipo (grau 5)', 'graus' => '5 a 6'],
+        'meta' => ['titulo' => 'Só meta', 'descricao' => 'compatível com a sua meta, mas nível e tipo não batem ou não foram conferidos', 'graus' => '4'],
+        'both' => ['titulo' => 'Nível e tipo', 'descricao' => 'nível do seu perfil e tipo entre os preferidos', 'graus' => '3'],
+        'profile' => ['titulo' => 'Nível', 'descricao' => 'o nível bate com o seu perfil, mas o tipo não está entre os preferidos ou não foi conferido', 'graus' => '2'],
+        'interest' => ['titulo' => 'Tipo ou só tema', 'descricao' => 'o nível não bate ou não foi conferido; grau 1 se o tipo está entre os preferidos', 'graus' => '0 a 1'],
     ];
 
     /**
-     * Título e descrição da faixa. Quando a posição vem de política do repositório (há `observacao`),
-     * a descrição genérica da faixa não é afirmada, pois os critérios não foram conferidos.
+     * Título e descrição da faixa. Numa busca com meta, as faixas sem meta reúnem os REAs cuja meta não
+     * pôde ser conferida ou é diferente da do usuário (Ranking::grupoMeta). `observacao` só existe em REAs gravados antes do grau (versao_regras 1), quando
+     * MEC RED e Eduplay tinham faixa fixa por política.
      */
-    public static function faixa(?string $rotulo, $explicacao = null): array
+    public static function faixa(?string $rotulo, $explicacao = null, bool $comMeta = false): array
     {
-        $faixa = self::FAIXAS[$rotulo] ?? ['titulo' => 'Sem faixa', 'descricao' => 'rótulo desconhecido'];
+        $faixa = self::FAIXAS[$rotulo] ?? ['titulo' => 'Sem faixa', 'descricao' => 'rótulo desconhecido', 'graus' => '?'];
+        $explicacao = self::paraArray($explicacao);
 
-        if (! empty(self::paraArray($explicacao)['observacao'])) {
+        if (! empty($explicacao['observacao'])) {
             return [
                 'titulo' => $faixa['titulo'].' (política)',
                 'descricao' => 'posição definida por política do repositório, não pelos critérios conferidos',
+                'graus' => $faixa['graus'],
+            ];
+        }
+
+        if (($comMeta || isset($explicacao['criterios']['meta'])) && in_array($rotulo, Ranking::ORDEM_SEM_META, true)) {
+            [$sufixo, $motivo] = match ($explicacao['criterios']['meta']['status'] ?? null) {
+                // Sem o REA (painel "Como ordenamos"), a faixa reúne os dois grupos.
+                null => [', meta não conferida ou diferente da sua', 'a meta do REA não pôde ser conferida ou é diferente da sua, por isso ele fica abaixo dos compatíveis com a sua meta'],
+                'falhou' => [', meta diferente da sua', 'a meta do REA é diferente da sua, por isso ele fica no fim da lista, abaixo dos compatíveis e dos de meta não conferida'],
+                default => [', meta não conferida', 'a meta do REA não pôde ser conferida, por isso ele fica abaixo dos compatíveis com a sua meta'],
+            };
+
+            return [
+                'titulo' => $faixa['titulo'].$sufixo,
+                'descricao' => $faixa['descricao'].'; '.$motivo,
+                'graus' => $faixa['graus'],
             ];
         }
 
         return $faixa;
+    }
+
+    /**
+     * Grau do REA e a conta que o produziu, para o usuário ver por que um item está acima de outro.
+     * Null para REAs gravados antes do grau.
+     *
+     * @return array{total: int, maximo: int, selo: string, conta: string, desempate: ?string}|null
+     */
+    public static function grau($explicacao): ?array
+    {
+        $explicacao = self::paraArray($explicacao);
+        $criterios = $explicacao['criterios'] ?? [];
+
+        if (empty($explicacao['grau']) || empty($criterios)) {
+            return null;
+        }
+
+        // Recalculado dos critérios: é o mesmo valor que o Ranking usa para ordenar.
+        $grau = RuleClassifier::grau($criterios, $explicacao['grau']['posicao'] ?? null);
+        $partes = [];
+
+        foreach ($grau['pontos'] as $nome => $pontos) {
+            $partes[] = self::NOMES[$nome].' '.($pontos > 0 ? "+{$pontos}" : '0 ('.self::motivoZero($criterios[$nome]).')');
+        }
+
+        $repositorio = $criterios['tema']['repositorio'] ?? 'repositório';
+
+        return [
+            'total' => $grau['total'],
+            'maximo' => $grau['maximo'],
+            'selo' => "Grau {$grau['total']} de {$grau['maximo']}",
+            'conta' => "Grau {$grau['total']} de {$grau['maximo']}: ".implode(', ', $partes).'.',
+            'desempate' => $grau['posicao'] === null
+                ? null
+                : "Entre REAs de mesmo grau, vale a posição no repositório: este é o {$grau['posicao']}º resultado do {$repositorio}.",
+        ];
     }
 
     /**
@@ -87,6 +145,11 @@ class ExplanationRenderer
         foreach ($explicacao['criterios'] as $nome => $c) {
             $status = $c['status'] ?? 'nao_avaliado';
 
+            // Nível assumido (o texto não menciona etapa) não conta no grau: aparece como não verificado.
+            if ($status === 'ok' && ($c['assumido'] ?? false)) {
+                $status = 'nao_avaliado';
+            }
+
             $linhas[] = [
                 'criterio' => $nome,
                 'status' => $status,
@@ -111,9 +174,10 @@ class ExplanationRenderer
         $grupos = ['Atende' => [], 'Não atende' => [], 'Não verificado' => []];
 
         foreach ($explicacao['criterios'] as $nome => $c) {
-            $grupo = match ($c['status'] ?? null) {
-                'ok', 'filtro_api' => 'Atende',
-                'falhou' => 'Não atende',
+            // Mesma regra do grau (RuleClassifier::atende): só o que foi conferido e bateu atende.
+            $grupo = match (true) {
+                RuleClassifier::atende($explicacao['criterios'], $nome) => 'Atende',
+                ($c['status'] ?? null) === 'falhou' => 'Não atende',
                 default => 'Não verificado',
             };
             $grupos[$grupo][] = (self::NOMES[$nome] ?? $nome).(self::corrigido($c) ? ' (corrigido por você)' : '');
@@ -268,6 +332,15 @@ class ExplanationRenderer
             'ok' => "Classificado por IA como {$c['valor']}, compatível com a sua meta ({$esperado}).".$modelo,
             'falhou' => "Classificado por IA como {$c['valor']}; sua meta é {$esperado}.".$modelo,
             default => 'Não foi possível classificar a meta deste recurso (IA indisponível ou resposta inválida).'.$modelo,
+        };
+    }
+
+    private static function motivoZero(array $c): string
+    {
+        return match (true) {
+            ($c['status'] ?? null) === 'falhou' => 'não atende',
+            $c['assumido'] ?? false => 'assumido, não conferido',
+            default => 'não verificado',
         };
     }
 

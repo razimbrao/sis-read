@@ -25,8 +25,8 @@ painéis redesenhados).
 | Flag | Funcionalidade | Onde está | Eventos |
 |---|---|---|---|
 | `explicacao-rea` | Painel azul **Por que este REA?** (selo de faixa, critérios, avisos de estimativa, legenda), legenda "Como ler os cartões", coluna **Meta** do cartão (status do critério de meta) | `find-r-e-a.blade.php`, `partials/explicacao-rea` | `abriu_explicacao` |
-| `painel-ordenacao` | Painel **Como ordenamos estes resultados**: faixas, contagem de ocultos por motivo, situação dos repositórios | `partials/transparencia-paineis` (painel 1) | `abriu_ordenacao` |
-| `reas-ocultos` | **Ver os REAs que não aparecem** (lista com título, motivo e resumo), dentro do painel de ordenação | `partials/transparencia-paineis` | `abriu_ocultos` |
+| `painel-ordenacao` | Painel **Como ordenamos estes resultados**: faixas, grupos de meta (não conferida, diferente), contagem de ocultos por motivo, situação dos repositórios | `partials/transparencia-paineis` (painel 1) | `abriu_ordenacao` |
+| `reas-ocultos` | **Ver os REAs que não aparecem** (lista com título, motivo e resumo), dentro do painel de ordenação. Desde 2026-10-06 a meta não oculta REAs, então, com meta, a lista quase nunca tem itens | `partials/transparencia-paineis` | `abriu_ocultos` |
 | `painel-contexto` | Painel **O que usamos sobre você**: perfil, termo, tipos preferidos e origem, meta EMAPRE com médias | `partials/transparencia-paineis` (painel 2) | `abriu_contexto` |
 | `progresso-busca` | "Consultando repositórios… N de 3 responderam" (desligada: "Carregando...") | `find-r-e-a.blade.php` | — |
 | `escrutabilidade` | Corrigir nível e meta (no REA e nos ocultos), editar tipos preferidos, **Desfazer todas** | `partials/corrigir-criterio`, `partials/transparencia-paineis`, ações do `FindREA` | `abriu_correcao` |

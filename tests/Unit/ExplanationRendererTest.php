@@ -278,11 +278,78 @@ class ExplanationRendererTest extends TestCase
         $this->assertNull(ExplanationRenderer::mudancaFaixa($rea['explicacao']));
 
         $subiu = UserCorrections::corrigirMeta($rea, 'ma');
-        $this->assertSame('Faixa alterada pela sua correção: antes Só tema, agora Meta.', ExplanationRenderer::mudancaFaixa($subiu['explicacao']));
+        $this->assertSame('Faixa alterada pela sua correção: antes Tipo ou só tema, agora Só meta.', ExplanationRenderer::mudancaFaixa($subiu['explicacao']));
 
         $igual = UserCorrections::corrigirNivel($rea, 'ensino medio');
         $this->assertSame('Sua correção não mudou a faixa deste REA.', ExplanationRenderer::mudancaFaixa($igual['explicacao']));
 
         $this->assertNull(ExplanationRenderer::mudancaFaixa(json_decode(json_encode(UserCorrections::desfazer($subiu, 'meta')['explicacao']))));
+    }
+
+    public function test_grau_mostra_a_conta_e_o_desempate(): void
+    {
+        $criterios = [
+            'tema' => RuleClassifier::criterioTema('algoritmos', 'Eduplay'),
+            'nivel' => RuleClassifier::criterioNivel('Ensino superior', RuleClassifier::inferirNivel('Grafos', '')),
+            'tipo' => RuleClassifier::criterioTipo('Vídeo', ['video']),
+            'meta' => ['status' => 'nao_avaliado', 'valor' => null, 'esperado' => 'ma', 'fonte' => 'padrao_repositorio'],
+        ];
+        $grau = ExplanationRenderer::grau(RuleClassifier::explicacao($criterios, 'interest', 2));
+
+        $this->assertSame(1, $grau['total']);
+        $this->assertSame(7, $grau['maximo']);
+        $this->assertSame('Grau 1 de 7', $grau['selo']);
+        $this->assertSame('Grau 1 de 7: meta 0 (não verificado), nível 0 (assumido, não conferido), tipo +1.', $grau['conta']);
+        $this->assertSame('Entre REAs de mesmo grau, vale a posição no repositório: este é o 2º resultado do Eduplay.', $grau['desempate']);
+
+        $falhou = ExplanationRenderer::grau(RuleClassifier::explicacao(['nivel' => ['status' => 'falhou'], 'tipo' => ['status' => 'ok']], 'interest'));
+        $this->assertSame('Grau 1 de 3: nível 0 (não atende), tipo +1.', $falhou['conta']);
+        $this->assertNull($falhou['desempate']);
+    }
+
+    public function test_grau_indisponivel_para_rea_antigo(): void
+    {
+        $this->assertNull(ExplanationRenderer::grau(null));
+        $this->assertNull(ExplanationRenderer::grau(['versao_regras' => 1, 'faixa' => 'both', 'criterios' => ['tema' => ['status' => 'ok']]]));
+    }
+
+    public function test_grau_segue_a_correcao(): void
+    {
+        $rea = UserCorrections::corrigirMeta($this->reaAquarela(), 'ma');
+
+        $this->assertSame('Grau 4 de 7', ExplanationRenderer::grau($rea['explicacao'])['selo']);
+        $this->assertSame(4, $rea['explicacao']['grau']['total']);
+    }
+
+    public function test_nivel_assumido_nao_aparece_como_atendido(): void
+    {
+        $explicacao = RuleClassifier::explicacao([
+            'tema' => RuleClassifier::criterioTema('algoritmos', 'Aquarela'),
+            'nivel' => RuleClassifier::criterioNivel('Ensino superior', RuleClassifier::inferirNivel('Grafos', '')),
+        ], 'interest');
+
+        $nivel = $this->linha(ExplanationRenderer::linhas($explicacao), 'nivel');
+
+        $this->assertSame('?', $nivel['icone']);
+        $this->assertSame('nao_avaliado', $nivel['status']);
+        $this->assertSame('Atende: tema. Não verificado: nível.', ExplanationRenderer::resumo($explicacao));
+    }
+
+    public function test_faixa_com_meta_nao_conferida_ou_diferente(): void
+    {
+        // Sem o REA (painel), a faixa reúne os dois grupos abaixo dos compatíveis.
+        $this->assertSame('Nível e tipo, meta não conferida ou diferente da sua', ExplanationRenderer::faixa('both', null, true)['titulo']);
+        $diferente = UserCorrections::corrigirMeta($this->reaAquarela(), 'mpe');
+        $this->assertSame('Tipo ou só tema, meta diferente da sua', ExplanationRenderer::faixa('interest', $diferente['explicacao'])['titulo']);
+        $this->assertStringContainsString('no fim da lista', ExplanationRenderer::faixa('interest', $diferente['explicacao'])['descricao']);
+        $this->assertSame('Nível e tipo', ExplanationRenderer::faixa('both')['titulo']);
+        $this->assertSame('Só meta', ExplanationRenderer::faixa('meta', null, true)['titulo']);
+        $this->assertSame('Tipo ou só tema, meta não conferida', ExplanationRenderer::faixa('interest', $this->reaAquarela()['explicacao'])['titulo']);
+        $this->assertSame('5 a 6', ExplanationRenderer::faixa('meta_one')['graus']);
+    }
+
+    public function test_faixas_cobrem_os_rotulos_do_ranking(): void
+    {
+        $this->assertSame(\App\Recommendation\Ranking::ORDEM_COM_META, array_keys(ExplanationRenderer::FAIXAS));
     }
 }
