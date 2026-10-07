@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  testes:
+    name: Testes e estilo
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # o Pint compara com a branch base
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, intl, zip, pdo_sqlite, sqlite3, pcntl, posix
+          coverage: none
+          tools: composer:v2
+
+      - name: Cache do Composer
+        uses: actions/cache@v4
+        with:
+          path: ~/.composer/cache/files
+          key: composer-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-
+
+      - name: Dependências
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Ambiente
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      # phpunit.xml usa SQLite em memória e fila sync: não precisa de banco nem de worker.
+      - name: Testes
+        run: php artisan test
+
+      # O código anterior ao CI ainda não passa no Pint (24 arquivos em 2026-10-06). Para não
+      # bloquear todo PR por isso, checamos só os arquivos PHP alterados. Depois de um
+      # `vendor/bin/pint` no repositório inteiro, troque por `vendor/bin/pint --test`.
+      - name: Pint (arquivos alterados)
+        if: github.event_name == 'pull_request'
+        run: |
+          arquivos=$(git diff --name-only --diff-filter=ACMR "origin/${{ github.base_ref }}...HEAD" -- '*.php')
+          if [ -n "$arquivos" ]; then
+            vendor/bin/pint --test $arquivos
+          else
+            echo "Nenhum arquivo PHP alterado."
+          fi
+
+  deploy:
+    name: Deploy (Fly.io)
+    needs: testes
+    # Desligado até alguém criar o app no Fly: defina a variável de repositório
+    # FLY_DEPLOY=true e o segredo FLY_API_TOKEN (docs/deploy.md).
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.FLY_DEPLOY == 'true'
+    runs-on: ubuntu-latest
+    concurrency: deploy-producao
+    environment: producao
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - run: flyctl deploy --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

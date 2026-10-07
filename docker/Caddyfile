@@ -1,0 +1,13 @@
+# Caddyfile do FrankenPHP.
+# SERVER_NAME=":8080"            -> HTTP puro na porta 8080 (Fly.io: o proxy do Fly faz o HTTPS)
+# SERVER_NAME="sisread.exemplo.br" -> HTTPS automático (Let's Encrypt) nas portas 80/443 (VPS)
+{
+	frankenphp
+	admin off
+}
+
+{$SERVER_NAME::8080} {
+	root * /app/public
+	encode zstd gzip
+	php_server
+}

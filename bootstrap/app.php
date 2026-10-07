@@ -11,7 +11,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        //
+        // Atrás do proxy do Fly.io/Caddy o HTTPS termina antes do PHP; sem isto o Livewire
+        // geraria URLs http:// (conteúdo misto).
+        $middleware->trustProxies(at: '*');
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //

@@ -56,3 +56,11 @@
 20. Os 24 `collaborators` vieram de uma planilha de artigos (o "nome" é uma referência bibliográfica), e a
     primeira linha é o **cabeçalho da planilha**, o que criou o interesse "Interesse" e o tipo "Item".
 21. 61 `failed_jobs` acumulados, nunca revisados.
+22. ~~O agendamento em `routes/console.php` subia um `queue:work` novo **a cada minuto** quando o agendador
+    rodava por cron, acumulando workers (e com isso a corrida do item 3).~~ **Corrigido** (2026-10-06): ganhou
+    `withoutOverlapping()` e é desligado com `QUEUE_WORKER_SUPERVISIONADO=true` (padrão da imagem Docker). Ver
+    [deploy.md](deploy.md).
+23. `retry_after` da fila `database` é `900000000000` (`config/queue.php`): um job interrompido no meio (deploy,
+    reinício da máquina) fica reservado para sempre e **nunca é refeito**, e a busca fica incompleta. Em
+    produção, evite deploys durante sessões do estudo; o ideal é um `retry_after` um pouco maior que o
+    `--timeout=600` do worker (ex.: 660).

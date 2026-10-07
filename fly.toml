@@ -1,0 +1,42 @@
+# Configuração PROPOSTA para o Fly.io (docs/deploy.md). Troque `app` por um nome livre
+# antes do `fly launch --copy-config --no-deploy`.
+app = "sisread"
+primary_region = "gru" # São Paulo
+
+kill_timeout = 300 # dá tempo ao worker de terminar o job em andamento (máximo do Fly)
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  APP_NAME = "SisREAd"
+  APP_URL = "https://sisread.fly.dev"
+  APP_LOCALE = "pt_BR"
+  APP_TIMEZONE = "America/Sao_Paulo"
+  LOG_LEVEL = "info"
+  # Segredos (APP_KEY, chave da LLM) vão em `fly secrets set`, nunca aqui.
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # A máquina não pode dormir: o worker de fila roda nela. Com uma máquina só e o SQLite
+  # no volume, também não dá para escalar horizontalmente (o volume é de uma máquina).
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    grace_period = "60s"
+    interval = "30s"
+    method = "GET"
+    path = "/up"
+    timeout = "5s"
+
+[mounts]
+  source = "sisread_data"
+  destination = "/data"
+  snapshot_retention = 14 # dias de snapshots diários do volume
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
