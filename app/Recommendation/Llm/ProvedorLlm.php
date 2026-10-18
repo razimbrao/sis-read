@@ -23,8 +23,9 @@ interface ProvedorLlm
      * Envia os prompts (de preferência em paralelo) pedindo resposta em JSON.
      *
      * @param  array<int, string>  $prompts
+     * @param  array|null  $schema  JSON schema da resposta; quem não restringe a saída pode ignorar
      * @return array<int, ?string> texto devolvido pela LLM, na mesma ordem; null quando a chamada falhou
      *                             (erro HTTP, conexão recusada ou tempo esgotado)
      */
-    public function gerarJson(array $prompts, int $timeout): array;
+    public function gerarJson(array $prompts, int $timeout, ?array $schema = null): array;
 }

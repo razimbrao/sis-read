@@ -34,7 +34,10 @@ class OllamaProvedor implements ProvedorLlm
         return rtrim($this->url, '/').'/api/generate';
     }
 
-    public function gerarJson(array $prompts, int $timeout): array
+    /**
+     * Usa `format: json`; o schema não é aplicado.
+     */
+    public function gerarJson(array $prompts, int $timeout, ?array $schema = null): array
     {
         $prompts = array_values($prompts);
         $endpoint = $this->endpoint();

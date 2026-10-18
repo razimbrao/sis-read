@@ -16,8 +16,11 @@ use Illuminate\Support\Facades\Cache;
  */
 class MetaClassifier
 {
-    // Faz parte da chave do cache: mude ao alterar o prompt ou a interpretação da resposta.
+    // Fazem parte da chave do cache: mude ao alterar o prompt ou a interpretação da resposta.
+    // Um REA por chamada (prompt()) e vários por chamada (promptLote()) têm versões e caches separados.
     public const VERSAO_PROMPT = 1;
+
+    public const VERSAO_PROMPT_LOTE = 1;
 
     public const CLASSES = [
         'ma' => 'Aprendizagem',
@@ -55,6 +58,8 @@ class MetaClassifier
             'cache_dias' => 30,
             'aquecer' => true,
             'timeout_aquecimento' => 60,
+            // REAs por chamada à LLM. Com 1, o prompt é o de um REA só (prompt()); acima disso, promptLote().
+            'itens_por_chamada' => 1,
         ];
     }
 
@@ -116,12 +121,17 @@ class MetaClassifier
             $pendentes[$chave] = [$i];
         }
 
-        foreach (array_chunk($pendentes, max(1, (int) $this->config['concorrencia']), true) as $lote) {
+        // Cada chamada leva até `itens_por_chamada` REAs distintos; cada lote, até `concorrencia` chamadas simultâneas.
+        $chamadas = array_chunk($pendentes, $this->itensPorChamada(), true);
+
+        foreach (array_chunk($chamadas, max(1, (int) $this->config['concorrencia'])) as $lote) {
             $motivo = $this->motivoParaNaoConsultar();
 
             if ($motivo !== null) {
-                foreach (array_merge(...array_values($lote)) as $i) {
-                    $resultado[$i] = $this->naoAvaliado($motivo);
+                foreach ($lote as $chamada) {
+                    foreach (array_merge(...array_values($chamada)) as $i) {
+                        $resultado[$i] = $this->naoAvaliado($motivo);
+                    }
                 }
 
                 continue;
@@ -129,12 +139,13 @@ class MetaClassifier
 
             $this->preparar();
 
-            $grupos = array_values($lote);
-            $prompts = array_map(fn (array $indices) => $this->prompt($itens[$indices[0]]), $grupos);
+            // Por chamada, os grupos de índices de cada REA, na ordem em que entram no prompt (REA 1, 2...).
+            $grupos = array_map(fn (array $chamada) => array_values($chamada), $lote);
+            $prompts = array_map(fn (array $chamada) => $this->montarPrompt(array_map(fn (array $indices) => $itens[$indices[0]], $chamada)), $grupos);
 
             $inicio = microtime(true);
             try {
-                $textos = $this->provedor->gerarJson($prompts, (int) $this->config['timeout']);
+                $textos = $this->provedor->gerarJson($prompts, (int) $this->config['timeout'], self::schema($this->itensPorChamada()));
             } catch (\Throwable $e) {
                 // Um provedor com defeito não pode derrubar a busca: o lote inteiro conta como falha.
                 $textos = [];
@@ -144,29 +155,37 @@ class MetaClassifier
             $this->metricas['ollama_time'] += $duracao;
             $this->metricas['ollama_calls'] += count($prompts);
 
-            foreach ($grupos as $j => $indices) {
-                $item = $itens[$indices[0]];
+            foreach ($grupos as $j => $chamada) {
                 $texto = $textos[$j] ?? null;
 
                 if ($texto === null) {
                     $this->metricas['ollama_errors']++;
                     $this->falhasSeguidas++;
-                    $r = $this->naoAvaliado('a IA não respondeu (erro ou tempo esgotado)');
+                    $valores = [];
                 } else {
                     $this->falhasSeguidas = 0;
-                    $valor = self::interpretar($texto);
+                    $valores = $this->itensPorChamada() === 1
+                        ? [1 => self::interpretar($texto)]
+                        : self::interpretarLote($texto, count($chamada));
+                }
 
-                    if ($valor === null) {
+                foreach ($chamada as $posicao => $indices) {
+                    $item = $itens[$indices[0]];
+                    $valor = $valores[$posicao + 1] ?? null;
+
+                    if ($texto === null) {
+                        $r = $this->naoAvaliado('a IA não respondeu (erro ou tempo esgotado)');
+                    } elseif ($valor === null) {
                         $this->metricas['ollama_errors']++;
                         $r = $this->naoAvaliado('a IA respondeu fora do formato esperado');
                     } else {
                         $this->gravarCache((string) $item['chave'], $valor);
                         $r = $this->classificado($valor, $duracao, $item);
                     }
-                }
 
-                foreach ($indices as $i) {
-                    $resultado[$i] = $r;
+                    foreach ($indices as $i) {
+                        $resultado[$i] = $r;
+                    }
                 }
             }
 
@@ -193,8 +212,47 @@ class MetaClassifier
     public static function interpretar(string $texto): ?string
     {
         $json = json_decode($texto, true);
-        $meta = is_array($json) ? ($json['meta'] ?? null) : null;
 
+        return self::canonica(is_array($json) ? ($json['meta'] ?? null) : null);
+    }
+
+    /**
+     * Resposta de promptLote(): a meta de cada REA, pelo número dele (1 a $quantidade). REA que faltar,
+     * vier repetido ou com meta inválida fica de fora (null), sem invalidar os outros.
+     *
+     * @return array<int, ?string>
+     */
+    public static function interpretarLote(string $texto, int $quantidade): array
+    {
+        $json = json_decode($texto, true);
+        $metas = is_array($json) && is_array($json['metas'] ?? null) ? $json['metas'] : [];
+        $valores = [];
+        $repetidos = [];
+
+        foreach ($metas as $m) {
+            $rea = is_array($m) ? ($m['rea'] ?? null) : null;
+
+            if (! is_int($rea) || $rea < 1 || $rea > $quantidade) {
+                continue;
+            }
+
+            if (array_key_exists($rea, $valores)) {
+                $repetidos[$rea] = true;
+            }
+
+            $valores[$rea] = self::canonica($m['meta'] ?? null);
+        }
+
+        $resultado = [];
+        foreach (range(1, $quantidade) as $rea) {
+            $resultado[$rea] = isset($repetidos[$rea]) ? null : ($valores[$rea] ?? null);
+        }
+
+        return $resultado;
+    }
+
+    private static function canonica(mixed $meta): ?string
+    {
         if (! is_string($meta) || trim($meta) === '') {
             return null;
         }
@@ -202,6 +260,43 @@ class MetaClassifier
         $casam = array_filter(array_keys(self::CLASSES), fn (string $codigo) => RuleClassifier::casaMeta($meta, $codigo));
 
         return count($casam) === 1 ? self::CLASSES[reset($casam)] : null;
+    }
+
+    /**
+     * JSON schema da resposta, para provedores que restringem a saída (o Ollama usa só `format: json`).
+     */
+    public static function schema(int $itensPorChamada): array
+    {
+        $meta = ['type' => 'string', 'enum' => array_values(self::CLASSES)];
+
+        if ($itensPorChamada === 1) {
+            return ['type' => 'object', 'properties' => ['meta' => $meta], 'required' => ['meta'], 'additionalProperties' => false];
+        }
+
+        return [
+            'type' => 'object',
+            'properties' => ['metas' => ['type' => 'array', 'items' => [
+                'type' => 'object',
+                'properties' => ['rea' => ['type' => 'integer'], 'meta' => $meta],
+                'required' => ['rea', 'meta'],
+                'additionalProperties' => false,
+            ]]],
+            'required' => ['metas'],
+            'additionalProperties' => false,
+        ];
+    }
+
+    private function itensPorChamada(): int
+    {
+        return max(1, (int) $this->config['itens_por_chamada']);
+    }
+
+    /**
+     * @param  array<int, array>  $itens  REAs da chamada, na ordem em que entram no prompt
+     */
+    private function montarPrompt(array $itens): string
+    {
+        return $this->itensPorChamada() === 1 ? $this->prompt($itens[0]) : $this->promptLote($itens);
     }
 
     public function prompt(array $item): string
@@ -227,6 +322,44 @@ class MetaClassifier
         Escolha a meta predominante considerando principalmente o objetivo pedagógico do recurso, não apenas palavras isoladas do título.
 
         Responda SOMENTE com um JSON no formato {"meta": "<opção>"}, em que <opção> é uma de:
+        Aprendizagem
+        Performance Aproximação
+        Performance Evitação
+        PROMPT;
+    }
+
+    /**
+     * Vários REAs numerados num prompt só, com os critérios uma vez. Os critérios e a instrução de escolha
+     * são os mesmos de prompt(); muda a abertura, a lista e o formato da resposta.
+     *
+     * @param  array<int, array>  $itens
+     */
+    public function promptLote(array $itens): string
+    {
+        $reas = [];
+        foreach (array_values($itens) as $n => $item) {
+            $titulo = self::campo($item['titulo'] ?? null);
+            $descricao = self::campo($item['descricao'] ?? null);
+            $tipo = self::campo($item['tipo'] ?? null);
+            $dtype = empty($item['dtype']) ? '' : "\nDType: {$item['dtype']}";
+            $reas[] = 'REA '.($n + 1)."\nTítulo: {$titulo}\nDescrição: {$descricao}\nTipo: {$tipo}{$dtype}";
+        }
+        $lista = implode("\n\n", $reas);
+
+        return <<<PROMPT
+        Classifique CADA um dos REAs abaixo em APENAS uma das metas. Avalie cada REA de forma independente dos demais.
+
+        Critérios:
+
+        - Aprendizagem: prioriza compreensão profunda, construção de conhecimento, investigação, criação de projetos, resolução de problemas, desenvolvimento de habilidades e autonomia.
+        - Performance Aproximação: prioriza demonstrar desempenho, alcançar resultados, competir, testar conhecimentos, desafios, jogos, avaliações ou obtenção de reconhecimento.
+        - Performance Evitação: prioriza reduzir dificuldades, facilitar a entrada no tema, apresentar conceitos introdutórios, básicos ou simplificados, minimizando erros e insegurança.
+
+        Escolha a meta predominante considerando principalmente o objetivo pedagógico do recurso, não apenas palavras isoladas do título.
+
+        {$lista}
+
+        Responda SOMENTE com um JSON no formato {"metas": [{"rea": 1, "meta": "<opção>"}, {"rea": 2, "meta": "<opção>"}, ...]}, com um item para cada REA, em que <opção> é uma de:
         Aprendizagem
         Performance Aproximação
         Performance Evitação
@@ -290,7 +423,9 @@ class MetaClassifier
 
     private function chaveCache(string $chave): string
     {
-        return 'meta_llm:v'.self::VERSAO_PROMPT.':'.$this->modelo().':'.$chave;
+        $versao = $this->itensPorChamada() === 1 ? 'v'.self::VERSAO_PROMPT : 'lote-v'.self::VERSAO_PROMPT_LOTE;
+
+        return 'meta_llm:'.$versao.':'.$this->modelo().':'.$chave;
     }
 
     private function lerCache(string $chave): ?string

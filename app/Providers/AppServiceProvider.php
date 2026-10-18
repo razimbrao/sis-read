@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Experimento\Experimento;
 use App\Recommendation\Llm\OllamaProvedor;
+use App\Recommendation\Llm\OpenAiCompativelProvedor;
 use App\Recommendation\Llm\ProvedorLlm;
 use App\Recommendation\MetaClassifier;
 use Illuminate\Support\Facades\Blade;
@@ -20,13 +21,14 @@ class AppServiceProvider extends ServiceProvider
         // Provedor da LLM de classificação de meta (config/llm.php). Um provedor novo entra neste match.
         $this->app->bind(ProvedorLlm::class, fn () => match (config('llm.provedor')) {
             'ollama' => new OllamaProvedor(config('llm.ollama.url'), config('llm.ollama.modelo'), (string) config('llm.ollama.keep_alive', '10m')),
+            'groq' => new OpenAiCompativelProvedor(config('llm.groq.url'), config('llm.groq.chave'), config('llm.groq.modelo'), (array) config('llm.groq.extras', []), (int) config('llm.groq.espera_max_segundos', 60)),
         });
 
         // Uma instância por job: as métricas e o orçamento de tempo são de cada job.
         $this->app->bind(MetaClassifier::class, function ($app) {
             $provedor = config('llm.provedor');
 
-            if ($provedor !== 'ollama') {
+            if (! in_array($provedor, ['ollama', 'groq'], true)) {
                 if ($provedor !== 'nenhum') {
                     Log::warning("LLM_PROVEDOR desconhecido ({$provedor}); a classificação de meta fica desativada.");
                 }
@@ -34,7 +36,10 @@ class AppServiceProvider extends ServiceProvider
                 return new MetaClassifier(null, config('llm', []));
             }
 
-            return new MetaClassifier($app->make(ProvedorLlm::class), config('llm', []));
+            // `itens_por_chamada` é de cada provedor.
+            $config = array_merge(config('llm', []), ['itens_por_chamada' => (int) config("llm.{$provedor}.itens_por_chamada", 1)]);
+
+            return new MetaClassifier($app->make(ProvedorLlm::class), $config);
         });
 
         $this->app->scoped(Experimento::class);
