@@ -6,7 +6,7 @@
  */
 return [
 
-    // ollama | nenhum (desliga a classificação: o critério de meta fica "não avaliado", com o motivo)
+    // ollama | groq | nenhum (desliga a classificação: o critério de meta fica "não avaliado", com o motivo)
     'provedor' => env('LLM_PROVEDOR', 'ollama'),
 
     'ollama' => [
@@ -14,6 +14,25 @@ return [
         'modelo' => env('OLLAMA_MODELO', 'gemma3:4b'),
         // Quanto tempo o Ollama mantém o modelo carregado depois da última chamada.
         'keep_alive' => env('OLLAMA_KEEP_ALIVE', '10m'),
+        // REAs por chamada. Modelos locais pequenos se perdem com vários; fica 1 (um prompt por REA).
+        'itens_por_chamada' => (int) env('OLLAMA_ITENS_POR_CHAMADA', 1),
+    ],
+
+    // Groq (formato da OpenAI). Plano gratuito sem cartão, com limites por minuto e por dia em
+    // console.groq.com/settings/limits. Modelos disponíveis em console.groq.com/docs/models.
+    'groq' => [
+        'url' => env('GROQ_URL', 'https://api.groq.com/openai/v1'),
+        'chave' => env('GROQ_API_KEY'),
+        'modelo' => env('GROQ_MODELO', 'openai/gpt-oss-20b'),
+        // Quanto um lote pode esperar, somando as pausas pedidas pelo Groq quando o limite por minuto estoura.
+        'espera_max_segundos' => (int) env('GROQ_ESPERA_MAX_SEGUNDOS', 60),
+        // REAs por chamada. Os critérios vão uma vez por chamada, o que cabe mais REAs no limite de tokens por minuto.
+        'itens_por_chamada' => (int) env('GROQ_ITENS_POR_CHAMADA', 10),
+        // Parâmetros próprios do Groq: raciocínio curto e sem devolver o raciocínio, que não é usado.
+        'extras' => [
+            'reasoning_effort' => env('GROQ_ESFORCO', 'low'),
+            'include_reasoning' => false,
+        ],
     ],
 
     // Tempo máximo de cada chamada, em segundos.

@@ -68,7 +68,7 @@
     critério quase não filtra. A explicação declara o modelo usado, mas vale testar prompt ou modelo maior.
     Com a LLM nos três repositórios (2026-10-06), o viés aparece em todos: na busca "algoritmos" com meta
     `ma`, os 157 REAs (Aquarela, MEC RED e Eduplay) saíram "Aprendizagem". O cache guarda a classe por REA:
-    ao trocar o prompt, incremente `MetaClassifier::VERSAO_PROMPT`; ao trocar o modelo, o cache já separa
+    ao trocar o prompt, incremente `MetaClassifier::VERSAO_PROMPT` (ou `VERSAO_PROMPT_LOTE`, se for o `promptLote`); ao trocar o modelo, o cache já separa
     por `OLLAMA_MODELO`. Efeito na lista: numa busca real com meta `mpa`, os 39 REAs saíram com meta
     `falhou`, e como a meta incompatível ocultava o REA, a lista ficava **vazia**. **Mitigado** (2026-10-06):
     a meta diferente não esconde mais o REA; ele vai para o fim da lista, marcado "meta diferente da sua",

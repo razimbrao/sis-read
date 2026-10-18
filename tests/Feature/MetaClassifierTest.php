@@ -113,7 +113,7 @@ class MetaClassifierTest extends TestCase
                 throw new \RuntimeException('falhou');
             }
 
-            public function gerarJson(array $prompts, int $timeout): array
+            public function gerarJson(array $prompts, int $timeout, ?array $schema = null): array
             {
                 throw new \RuntimeException('falhou');
             }
@@ -282,5 +282,95 @@ class MetaClassifierTest extends TestCase
         $this->assertStringContainsString('Descrição: não informado', $prompt);
         $this->assertStringNotContainsString('DType', $prompt);
         $this->assertStringContainsString('{"meta": "<opção>"}', $prompt);
+    }
+
+    private function classificadorEmLote(int $itensPorChamada, array $config = []): MetaClassifier
+    {
+        return $this->classificador(array_merge($config, ['ollama' => array_merge(config('llm.ollama'), ['itens_por_chamada' => $itensPorChamada])]));
+    }
+
+    public function test_em_lote_manda_varios_reas_numa_chamada_e_le_cada_um_pelo_numero(): void
+    {
+        $this->fakeOllama(Http::response(['response' => json_encode(['metas' => [
+            ['rea' => 2, 'meta' => 'Performance Evitação'],
+            ['rea' => 1, 'meta' => 'Aprendizagem'],
+            ['rea' => 3, 'meta' => 'Performance Aproximação'],
+        ]])]));
+
+        $classificador = $this->classificadorEmLote(3);
+        $r = $classificador->classificar($this->itens(3));
+
+        $this->assertSame(['Aprendizagem', 'Performance Evitação', 'Performance Aproximação'], array_column($r, 'valor'));
+        $this->assertSame(1, $classificador->metricas()['ollama_calls']);
+        Http::assertSent(fn (Request $req) => str_contains($req['prompt'], "REA 1\nTítulo: Recurso 1")
+            && str_contains($req['prompt'], "REA 3\nTítulo: Recurso 3")
+            && substr_count($req['prompt'], '- Aprendizagem:') === 1);
+    }
+
+    public function test_em_lote_divide_em_chamadas_de_ate_n_reas(): void
+    {
+        $this->fakeOllama(fn (Request $req) => Http::response(['response' => json_encode(['metas' => array_map(
+            fn ($n) => ['rea' => $n, 'meta' => 'Aprendizagem'],
+            range(1, substr_count($req['prompt'], 'Título:'))
+        )])]));
+
+        $classificador = $this->classificadorEmLote(10, ['concorrencia' => 2]);
+        $r = $classificador->classificar($this->itens(25));
+
+        $this->assertCount(25, array_filter(array_column($r, 'valor')));
+        $this->assertSame(3, $classificador->metricas()['ollama_calls']);
+    }
+
+    public function test_em_lote_rea_faltando_repetido_ou_invalido_fica_nao_avaliado_sem_afetar_os_outros(): void
+    {
+        $this->fakeOllama(Http::response(['response' => json_encode(['metas' => [
+            ['rea' => 1, 'meta' => 'Aprendizagem'],
+            ['rea' => 2, 'meta' => 'Aprendizagem'],
+            ['rea' => 2, 'meta' => 'Performance Evitação'],
+            ['rea' => 3, 'meta' => 'qualquer coisa'],
+            ['rea' => 9, 'meta' => 'Aprendizagem'],
+        ]])]));
+
+        $classificador = $this->classificadorEmLote(4);
+        $r = $classificador->classificar($this->itens(4));
+
+        $this->assertSame(['Aprendizagem', null, null, null], array_column($r, 'valor'));
+        $this->assertSame('a IA respondeu fora do formato esperado', $r[1]['evidencia']);
+        $this->assertSame(3, $classificador->metricas()['ollama_errors']);
+        $this->assertSame(3, $classificador->metricas()['llm_nao_avaliados']);
+    }
+
+    public function test_em_lote_o_cache_e_separado_do_cache_de_um_rea_por_chamada(): void
+    {
+        $this->fakeOllama(Http::sequence()
+            ->push(['response' => '{"meta": "Aprendizagem"}'])
+            ->push(['response' => json_encode(['metas' => [['rea' => 1, 'meta' => 'Performance Evitação']]])]));
+
+        $this->assertSame('Aprendizagem', $this->classificador()->classificar($this->itens(1))[0]['valor']);
+
+        $emLote = $this->classificadorEmLote(10)->classificar($this->itens(1))[0];
+        $this->assertSame('Performance Evitação', $emLote['valor']);
+        Http::assertSentCount(2);
+    }
+
+    public function test_prompt_em_lote_mantem_os_criterios_e_pede_a_lista_de_metas(): void
+    {
+        $classificador = app(MetaClassifier::class);
+        $unico = $classificador->prompt(['chave' => 'x', 'titulo' => 'A']);
+        $lote = $classificador->promptLote([['chave' => 'x', 'titulo' => 'A'], ['chave' => 'y', 'titulo' => 'B', 'dtype' => 'video']]);
+
+        $criterios = substr($unico, strpos($unico, 'Critérios:'), strpos($unico, 'Responda SOMENTE') - strpos($unico, 'Critérios:'));
+        $this->assertStringContainsString(trim($criterios), $lote);
+        $this->assertStringContainsString('Avalie cada REA de forma independente dos demais.', $lote);
+        $this->assertStringContainsString("REA 2\nTítulo: B\nDescrição: não informado\nTipo: não informado\nDType: video", $lote);
+        $this->assertStringContainsString('{"metas": [{"rea": 1, "meta": "<opção>"}', $lote);
+    }
+
+    public function test_schema_restringe_as_metas_em_um_e_em_varios_reas(): void
+    {
+        $classes = array_values(MetaClassifier::CLASSES);
+
+        $this->assertSame($classes, MetaClassifier::schema(1)['properties']['meta']['enum']);
+        $this->assertSame($classes, MetaClassifier::schema(10)['properties']['metas']['items']['properties']['meta']['enum']);
     }
 }
