@@ -16,6 +16,14 @@ return [
     'default' => env('QUEUE_CONNECTION', 'database'),
 
     /*
+    | Quando true, o worker roda sob um supervisor (supervisord no Docker, ver docs/deploy.md)
+    | e o agendamento de queue:work em routes/console.php é desligado, para não subir um
+    | segundo worker (dois workers causam a condição de corrida de docs/problemas-conhecidos.md).
+    */
+
+    'worker_supervisionado' => (bool) env('QUEUE_WORKER_SUPERVISIONADO', false),
+
+    /*
     |--------------------------------------------------------------------------
     | Queue Connections
     |--------------------------------------------------------------------------
@@ -39,7 +47,9 @@ return [
             'connection' => env('DB_QUEUE_CONNECTION'),
             'table' => env('DB_QUEUE_TABLE', 'jobs'),
             'queue' => env('DB_QUEUE', 'default'),
-            'retry_after' => 900000000000,
+            // Um pouco acima do --timeout=600 do worker: um job interrompido (deploy, reinício
+            // da VM) volta para a fila em vez de ficar reservado para sempre.
+            'retry_after' => (int) env('DB_QUEUE_RETRY_AFTER', 660),
             'after_commit' => false,
         ],
 
