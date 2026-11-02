@@ -85,3 +85,10 @@
     (`MECRED_SITE_URL`; o antigo `plataformaintegrada.mec.gov.br/recurso/{id}` redireciona para lá). Buscas
     gravadas antes disso não têm o `id` e continuam sem link: o cartão mostra "Abrir recurso" desabilitado,
     com tooltip.
+23. ~~O agendamento em `routes/console.php` subia um `queue:work` novo **a cada minuto** quando o agendador
+    rodava por cron, acumulando workers (e com isso a corrida do item 3).~~ **Corrigido** (2026-11-02): ganhou
+    `withoutOverlapping()` e é desligado com `QUEUE_WORKER_SUPERVISIONADO=true` (padrão da imagem Docker). Ver
+    [deploy.md](deploy.md).
+24. ~~`retry_after` da fila `database` era `900000000000` (`config/queue.php`): um job interrompido no meio
+    (deploy, reinício da máquina) ficava reservado para sempre e a busca ficava incompleta.~~ **Corrigido**
+    (2026-11-02): agora é 660 s (`DB_QUEUE_RETRY_AFTER`), um pouco acima do `--timeout=600` do worker.
