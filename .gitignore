@@ -26,3 +26,6 @@ CLAUDE.local.md
 /database/*.sqlite-journal
 /database/*.sqlite-shm
 /database/*.sqlite-wal
+
+# Banco e backups da VM de produção (docker-compose.prod.yml)
+/data/

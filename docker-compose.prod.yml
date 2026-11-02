@@ -1,0 +1,27 @@
+# Produção numa VM com Docker (Azure for Students, Google e2-micro, Oracle etc.). Ver docs/deploy.md.
+# Uso (no servidor, na pasta do repositório):
+#   docker compose -f docker-compose.prod.yml up -d --build
+# O FrankenPHP (Caddy) emite o certificado HTTPS sozinho; o domínio em SERVER_NAME precisa apontar
+# para o IP da VM e as portas 80 e 443 precisam estar abertas.
+services:
+  app:
+    build: .
+    image: sisread:latest
+    restart: unless-stopped
+    stop_grace_period: 11m # o worker pode estar no meio de um job de até 600s
+    # APP_KEY, APP_URL, SERVER_NAME (o domínio), chave da LLM... Fora do git; modelo em
+    # .env.production.example.
+    env_file: .env.production
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    # Pasta da VM, e não volume nomeado: assim o banco e os backups ficam à mão para scp.
+    # Tem dados pessoais: nunca a coloque dentro de public/ nem a versione.
+    volumes:
+      - ./data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS --resolve $${SERVER_NAME}:443:127.0.0.1 https://$${SERVER_NAME}/up || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
