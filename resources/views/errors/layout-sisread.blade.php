@@ -12,7 +12,7 @@
             :focus-visible { outline: 3px solid #047857; outline-offset: 2px; border-radius: 6px; }
         </style>
     </head>
-    <body class="min-h-screen bg-slate-50 text-slate-900 antialiased flex items-center justify-center px-4">
+    <body class="min-h-screen bg-slate-50 text-slate-900 antialiased flex items-center justify-center px-4 py-6">
         <main class="max-w-xl w-full bg-white border border-slate-200 rounded-2xl px-6 py-12 sm:px-10 flex flex-col items-center text-center gap-4">
             <span class="w-11 h-11 rounded-xl bg-emerald-700 flex items-center justify-center" aria-hidden="true">
                 <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2z"/><path d="M4 19V5"/><path d="M9 8h6M9 12h4"/></svg>

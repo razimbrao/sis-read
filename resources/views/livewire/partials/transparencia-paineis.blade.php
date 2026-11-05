@@ -9,7 +9,7 @@
         'falhou' => ['cor' => 'bg-red-500', 'texto' => 'text-red-700'],
     ];
 @endphp
-<div class="grid gap-4 md:grid-cols-2 items-start text-[15px] text-slate-700">
+<div class="grid grid-cols-1 gap-4 md:grid-cols-2 items-start text-[15px] text-slate-700 break-words">
     {{-- Painel 1: como a lista foi montada. --}}
     @explicabilidade('painel-ordenacao')
     <details wire:ignore.self class="group bg-white border border-indigo-200 rounded-2xl overflow-hidden" x-on:toggle="if ($el.open) $wire.registrarExplicacao('abriu_ordenacao')">
@@ -44,14 +44,14 @@
                             $faixa = ExplanationRenderer::faixa($rotulo, null, $resumo['com_meta']);
                             $quantidade = $resumo['faixas'][$rotulo];
                         @endphp
-                        <li class="flex items-start gap-3 p-3 rounded-lg bg-slate-50">
+                        <li class="grid grid-cols-[auto_minmax(0,1fr)] sm:flex items-start gap-x-3 gap-y-1.5 p-3 rounded-lg bg-slate-50">
                             <span class="flex items-center justify-center w-6 h-6 rounded-full bg-indigo-600 text-white text-sm font-semibold shrink-0">{{ $loop->iteration }}</span>
                             <span class="flex-1 min-w-0">
                                 <span class="block font-medium text-slate-900">{{ $faixa['titulo'] }} <span class="font-normal text-slate-600">· grau {{ $faixa['graus'] }}</span></span>
                                 <span class="block text-sm text-slate-600">{{ $faixa['descricao'] }}</span>
                             </span>
                             <span @class([
-                                'px-2 py-0.5 rounded-full text-sm font-medium shrink-0',
+                                'col-start-2 justify-self-start px-2 py-0.5 rounded-full text-sm font-medium shrink-0',
                                 'bg-indigo-100 text-indigo-700' => $quantidade > 0,
                                 'bg-slate-200 text-slate-600' => $quantidade === 0,
                             ])>{{ $quantidade }} {{ $quantidade === 1 ? 'REA' : 'REAs' }}</span>
@@ -91,7 +91,7 @@
                             {{ $resumo['mudaram_faixa'] }} {{ $resumo['mudaram_faixa'] === 1 ? 'REA mudou' : 'REAs mudaram' }} de faixa por correções suas.
                         @endif
                     </span>
-                    <button type="button" class="font-medium text-indigo-700 hover:underline" wire:click="desfazerTodas"
+                    <button type="button" class="min-h-11 font-medium text-indigo-700 hover:underline" wire:click="desfazerTodas"
                         wire:confirm="Desfazer todas as suas correções nesta busca?">Desfazer todas</button>
                 </div>
             @endif
@@ -121,13 +121,13 @@
                     </div>
                     @if (!empty($ocultos) && \App\Experimento\Experimento::ativa('reas-ocultos'))
                         <details wire:ignore.self class="group/ocultos border-t border-slate-200" x-on:toggle="if ($el.open) $wire.registrarExplicacao('abriu_ocultos')">
-                            <summary class="flex items-center justify-between gap-2 px-3 py-2 cursor-pointer list-none [&::-webkit-details-marker]:hidden text-indigo-700 font-medium hover:bg-indigo-50">
+                            <summary class="flex items-center justify-between gap-2 min-h-11 px-3 py-2 cursor-pointer list-none [&::-webkit-details-marker]:hidden text-indigo-700 font-medium hover:bg-indigo-50">
                                 <span>Ver os REAs que não aparecem</span>
                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0 transition-transform group-open/ocultos:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M6 9l6 6 6-6" />
                                 </svg>
                             </summary>
-                            <ul class="p-3 space-y-2 max-h-[28rem] overflow-y-auto bg-white">
+                            <ul class="p-3 space-y-2 sm:max-h-[28rem] sm:overflow-y-auto bg-white">
                                 @php $ocorrenciasOcultos = []; @endphp
                                 @foreach ($ocultos as $o)
                                     <li class="p-3 rounded-lg border border-slate-200">
@@ -168,8 +168,9 @@
                 <ul class="space-y-1.5">
                     @foreach ($repositorios as $nome => $r)
                         @php $s = $situacoes[$r['situacao']] ?? ['cor' => 'bg-gray-300 animate-pulse', 'texto' => 'text-slate-600']; @endphp
-                        <li class="flex items-center gap-2">
-                            <span class="w-2 h-2 rounded-full shrink-0 {{ $s['cor'] }}" aria-hidden="true"></span>
+                        <li class="flex items-start gap-2">
+                            <span class="w-2 h-2 mt-2 rounded-full shrink-0 {{ $s['cor'] }}" aria-hidden="true"></span>
+                            <span class="min-w-0">
                             <span class="font-medium text-slate-900">{{ $nome }}</span>
                             <span class="{{ $s['texto'] }}">
                                 @switch($r['situacao'])
@@ -178,6 +179,7 @@
                                     @case('falhou') não respondeu (tempo esgotado ou erro); nenhum item deste repositório @break
                                     @default ainda consultando…
                                 @endswitch
+                            </span>
                             </span>
                         </li>
                     @endforeach
@@ -208,7 +210,7 @@
             </span>
             <span class="flex-1 min-w-0">
                 <span class="block font-bold text-indigo-950">O que usamos sobre você</span>
-                <span class="block text-sm text-slate-600 truncate">
+                <span class="block text-sm text-slate-600 sm:truncate">
                     @if ($contexto)
                         {{ $contexto['perfil'] }} · {{ $contexto['interesse'] }}@if ($contexto['meta']) · meta {{ mb_strtolower(RuleClassifier::METAS[$contexto['meta']['dominante']] ?? $contexto['meta']['dominante']) }}@endif
                     @else
@@ -266,7 +268,7 @@
                                 @endif
                             @endif
                             @auth
-                                <a href="{{ route('preferencias') }}" class="inline-block mt-1 text-sm text-indigo-700 hover:underline">
+                                <a href="{{ route('preferencias') }}" class="inline-flex items-center min-h-11 text-sm text-indigo-700 hover:underline">
                                     {{ $daConta ? 'Editar os tipos da sua conta' : 'Salvar tipos preferidos na sua conta' }}
                                 </a>
                             @endauth
@@ -369,16 +371,16 @@
                                 <ul class="mt-1 space-y-1.5">
                                     @foreach (['ma' => 'Aprendizagem', 'mpa' => 'Performance-aproximação', 'mpe' => 'Performance-evitação'] as $codigo => $nome)
                                         @php $valor = (float) $contexto['meta'][$codigo]; @endphp
-                                        <li class="grid grid-cols-[minmax(0,11rem)_1fr_2.5rem] items-center gap-2 text-sm">
-                                            <span @class(['truncate', 'font-semibold text-slate-900' => $codigo === $contexto['meta']['dominante']])>{{ $nome }}</span>
-                                            <span class="h-2 rounded-full bg-slate-200 overflow-hidden" aria-hidden="true">
+                                        <li class="grid grid-cols-[minmax(0,1fr)_2.5rem] sm:grid-cols-[minmax(0,11rem)_1fr_2.5rem] items-center gap-x-2 gap-y-1 text-sm">
+                                            <span @class(['sm:truncate', 'font-semibold text-slate-900' => $codigo === $contexto['meta']['dominante']])>{{ $nome }}</span>
+                                            <span class="col-span-2 row-start-2 sm:col-span-1 sm:row-start-auto h-2 rounded-full bg-slate-200 overflow-hidden" aria-hidden="true">
                                                 <span @class([
                                                     'block h-full rounded-full',
                                                     'bg-emerald-500' => $codigo === $contexto['meta']['dominante'],
                                                     'bg-gray-400' => $codigo !== $contexto['meta']['dominante'],
                                                 ]) style="width: {{ max(0, min(100, $valor / 5 * 100)) }}%"></span>
                                             </span>
-                                            <span class="text-right tabular-nums">{{ $contexto['meta'][$codigo] }}</span>
+                                            <span class="col-start-2 row-start-1 sm:col-start-auto sm:row-start-auto text-right tabular-nums">{{ $contexto['meta'][$codigo] }}</span>
                                         </li>
                                     @endforeach
                                 </ul>
