@@ -72,6 +72,15 @@ class CadastroTest extends TestCase
             ->assertSee('[...senha].length >= '.Register::SENHA_MINIMA);
     }
 
+    public function test_mensagens_de_erro_podem_sumir_quando_o_campo_e_resolvido(): void
+    {
+        Livewire::test(Register::class)
+            ->call('register')
+            ->assertSeeHtml('x-bind:hidden="! erroNome()"')
+            ->assertSeeHtml('x-bind:hidden="! erroEmail()"')
+            ->assertSeeHtml('x-bind:hidden="! erroSenha()"');
+    }
+
     public function test_traducao_tem_todas_as_chaves_do_framework(): void
     {
         $framework = require base_path('vendor/laravel/framework/src/Illuminate/Translation/lang/en/validation.php');
