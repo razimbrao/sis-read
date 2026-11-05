@@ -9,7 +9,7 @@
 >
     <div class="sticky top-0 z-10 bg-white/95 backdrop-blur border-b border-slate-200">
         <div class="max-w-3xl mx-auto px-4 sm:px-6 py-3 space-y-2">
-            <div class="flex justify-between text-sm text-slate-600">
+            <div class="flex flex-wrap justify-between gap-x-3 text-sm text-slate-600">
                 <span class="font-semibold text-slate-900">Questionário de metas</span>
                 <span><span x-text="respondidas">0</span> de {{ $total }} respondidas</span>
             </div>
@@ -66,7 +66,7 @@
             @endforeach
 
             <div class="flex flex-wrap items-center justify-between gap-4 pt-2">
-                <a href="{{ url('/') }}" class="text-[15px] font-semibold text-emerald-800 hover:underline underline-offset-4">Responder depois</a>
+                <a href="{{ url('/') }}" class="inline-flex items-center min-h-11 text-[15px] font-semibold text-emerald-800 hover:underline underline-offset-4">Responder depois</a>
                 <button type="submit" class="min-h-[52px] px-7 rounded-xl bg-emerald-700 text-white text-base font-bold hover:bg-emerald-800">Enviar respostas</button>
             </div>
         </form>

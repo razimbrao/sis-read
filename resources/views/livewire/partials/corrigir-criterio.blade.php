@@ -9,19 +9,19 @@
     $acao = $criterio === 'nivel' ? 'corrigirNivel' : 'corrigirMeta';
     $pergunta = $criterio === 'nivel' ? 'Qual é a etapa deste REA?' : 'Qual é a meta deste REA?';
 @endphp
-<span class="inline-flex flex-wrap items-center gap-2 text-sm">
+<span class="flex flex-wrap items-center gap-2 max-w-full text-sm">
     {{-- wire:ignore: o poll não pode fechar o formulário nem limpar a escolha enquanto o usuário edita.
          A chave muda quando o critério é corrigido ou desfeito, e aí o Livewire troca o elemento. --}}
-    <span wire:ignore wire:key="{{ $prefixo }}-{{ $criterio }}-{{ $corrigido ? 'corrigido' : 'estimado' }}" x-data="{ editando: false, valor: '' }" class="inline-flex flex-wrap items-center gap-2">
+    <span wire:ignore wire:key="{{ $prefixo }}-{{ $criterio }}-{{ $corrigido ? 'corrigido' : 'estimado' }}" x-data="{ editando: false, valor: '' }" class="flex flex-wrap items-center gap-2 max-w-full">
         <button
             type="button"
             x-show="!editando"
             class="min-h-11 px-3.5 rounded-lg border border-indigo-300 bg-white font-semibold text-indigo-800 hover:bg-indigo-50"
             @click="editando = true; $wire.registrarExplicacao('abriu_correcao', @js($repositorio), @js($titulo), @js($faixa))"
         >{{ $corrigido ? 'Corrigir de novo' : 'Corrigir' }}</button>
-        <span x-show="editando" style="display: none" class="inline-flex flex-wrap items-center gap-2">
-            <select x-model="valor" aria-label="{{ $pergunta }}" class="min-h-11 border border-slate-300 rounded-lg px-2.5 text-[15px] bg-white">
-                <option value="">{{ $pergunta }}</option>
+        <span x-show="editando" style="display: none" class="flex flex-wrap items-center gap-2 max-w-full">
+            <select x-model="valor" aria-label="{{ $pergunta }}" class="w-full sm:w-auto max-w-full min-h-11 border border-slate-300 rounded-lg px-2.5 text-base sm:text-[15px] bg-white">
+                <option value="">{{ $criterio === 'nivel' ? 'Qual é a etapa?' : 'Qual é a meta?' }}</option>
                 @foreach ($opcoes as $codigo => $nome)
                     <option value="{{ $codigo }}">{{ $nome }}</option>
                 @endforeach

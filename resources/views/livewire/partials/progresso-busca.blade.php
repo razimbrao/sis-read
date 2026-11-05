@@ -5,7 +5,7 @@
     {{-- Não é explicabilidade: aparece nos três grupos; se o worker cair, o job não é refeito. --}}
     <div role="alert" class="flex flex-wrap items-center gap-4 p-5 rounded-2xl bg-white border-2 border-amber-500">
         <svg class="w-7 h-7 text-amber-700 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-        <div class="flex-[1_1_320px] space-y-1">
+        <div class="flex-[1_1_240px] min-w-0 space-y-1">
             <p class="text-lg font-bold">A busca não terminou</p>
             <p class="text-[15px] text-slate-600">Algum repositório parou de responder. Os resultados que já chegaram continuam abaixo.</p>
         </div>
@@ -17,7 +17,7 @@
         <div class="flex items-center gap-3.5">
             <span class="w-7 h-7 rounded-full border-[3px] border-emerald-100 border-t-emerald-700 animate-spin shrink-0" aria-hidden="true"></span>
             @explicabilidade('progresso-busca')
-            <div>
+            <div class="min-w-0">
                 <p class="text-lg font-bold">Consultando repositórios… {{ $respondidos }} de {{ count($repos) }} responderam.</p>
                 <p class="text-[15px] text-slate-600">
                     A lista continua crescendo até o último responder.
