@@ -2,7 +2,9 @@
 
 O SisREAd roda em produção num **único container Docker** numa VM, com o SQLite num diretório da VM.
 O caminho escolhido (2026-11) é gratuito: **VM do Azure for Students** (via GitHub Student Pack), na
-região East US, com **Groq** como LLM.
+região North Central US, com **Groq** como LLM.
+
+Produção: <https://sisread.northcentralus.cloudapp.azure.com>.
 
 ## Por que uma VM, e não um PaaS gratuito
 
@@ -65,7 +67,9 @@ Arquivos:
    <https://azure.microsoft.com/free/students>, com o e-mail da universidade.
 2. No portal, **Virtual machines → Create → Azure virtual machine**:
    - *Subscription*: Azure for Students. *Resource group*: novo, `sisread`.
-   - *Virtual machine name*: `sisread`. *Region*: **(US) East US** (ou East US 2).
+   - *Virtual machine name*: `sisread`. *Region*: **(US) North Central US**. A
+     política da assinatura só permite `northcentralus`, `brazilsouth`, `francecentral`, `spaincentral`
+     e `southafricanorth`; East US é recusada. Confira com `az policy assignment list`.
    - *Image*: **Ubuntu Server 24.04 LTS – x64 Gen2**.
    - *Size*: **Standard_B2ats_v2** (o portal marca os tamanhos *free services eligible*; se não
      houver, tente B1s ou outra região).
@@ -74,7 +78,7 @@ Arquivos:
    - Aba *Disks*: *OS disk type* **Premium SSD**, tamanho **64 GiB** (P6, o que entra na gratuidade).
    - Aba *Management*: deixe **auto-shutdown desligado** (o worker precisa ficar ligado).
 3. Depois de criada: **VM → Overview → DNS name → Configure**, rótulo `sisread` (ou outro livre).
-   O domínio fica `sisread.eastus.cloudapp.azure.com`. Na mesma tela do IP, mude *Assignment* para
+   O domínio fica `sisread.northcentralus.cloudapp.azure.com`. Na mesma tela do IP, mude *Assignment* para
    **Static**.
 4. **Cost Management → Budgets**: crie um orçamento de US$ 5/mês com alerta por e-mail, para saber
    se algo saiu da gratuidade.
@@ -82,7 +86,7 @@ Arquivos:
 ### 3. Na VM (por SSH)
 
 ```bash
-ssh azureuser@sisread.eastus.cloudapp.azure.com
+ssh azureuser@sisread.northcentralus.cloudapp.azure.com
 git clone https://github.com/razimbrao/sis-read.git
 cd sis-read
 sudo sh scripts/provisionar-vm.sh
@@ -105,7 +109,7 @@ Pare o `php artisan serve` e o worker locais (para o arquivo não mudar no meio 
 PowerShell, na pasta do projeto:
 
 ```powershell
-scp database\database.sqlite azureuser@sisread.eastus.cloudapp.azure.com:~/sis-read/data/database.sqlite
+scp database\database.sqlite azureuser@sisread.northcentralus.cloudapp.azure.com:~/sis-read/data/database.sqlite
 ```
 
 Se pular este passo, o container cria um banco vazio.
@@ -119,7 +123,7 @@ docker compose -f docker-compose.prod.yml logs -f   # Ctrl+C para sair
 ```
 
 O primeiro build leva alguns minutos (o swap evita falta de memória). Quando o log mostrar o Caddy
-com o certificado obtido, abra `https://sisread.eastus.cloudapp.azure.com`, faça login e rode uma
+com o certificado obtido, abra `https://sisread.northcentralus.cloudapp.azure.com`, faça login e rode uma
 busca com meta para conferir worker e Groq.
 
 ## Operação
@@ -130,6 +134,7 @@ busca com meta para conferir worker e Groq.
 | Ver logs | `docker compose -f docker-compose.prod.yml logs -f --tail 200` |
 | Rodar um artisan | `docker compose -f docker-compose.prod.yml exec app php artisan <comando>` |
 | Reiniciar | `docker compose -f docker-compose.prod.yml restart` |
+| Aplicar mudança no `.env.production` | `docker compose -f docker-compose.prod.yml up -d --force-recreate` (o `restart` não relê o arquivo) |
 | Backup na hora | `docker compose -f docker-compose.prod.yml exec app sh docker/backup-sqlite.sh` |
 
 Evite atualizar durante sessões do estudo: o container espera até 11 min o job em andamento, e um job
@@ -142,8 +147,8 @@ ruim, não de perder a VM. De tempos em tempos (e antes de cada atualização), 
 arquivos são criados pelo root do container com permissão 600, por isso o `chown` antes:
 
 ```powershell
-ssh azureuser@sisread.eastus.cloudapp.azure.com "sudo chown -R azureuser ~/sis-read/data/backups"
-scp "azureuser@sisread.eastus.cloudapp.azure.com:~/sis-read/data/backups/*.gz" .\backups-producao\
+ssh azureuser@sisread.northcentralus.cloudapp.azure.com "sudo chown -R azureuser ~/sis-read/data/backups"
+scp "azureuser@sisread.northcentralus.cloudapp.azure.com:~/sis-read/data/backups/*.gz" .\backups-producao\
 ```
 
 Os arquivos têm dados pessoais (e-mails, hashes de senha): não os coloque no repositório nem em pasta
