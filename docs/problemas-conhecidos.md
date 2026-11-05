@@ -92,3 +92,6 @@
 24. ~~`retry_after` da fila `database` era `900000000000` (`config/queue.php`): um job interrompido no meio
     (deploy, reinício da máquina) ficava reservado para sempre e a busca ficava incompleta.~~ **Corrigido**
     (2026-11-02): agora é 660 s (`DB_QUEUE_RETRY_AFTER`), um pouco acima do `--timeout=600` do worker.
+25. ~~Em produção, as mensagens de validação apareciam como a chave crua (`validation.required`): o locale e o
+    fallback eram `pt_BR`, e o projeto não tinha `lang/pt_BR/validation.php`.~~ **Corrigido** (2026-11-05): o arquivo
+    existe, `pt_BR` é o locale padrão e o fallback recomendado é `en`. Um teste confere que nenhuma chave do framework falta.
