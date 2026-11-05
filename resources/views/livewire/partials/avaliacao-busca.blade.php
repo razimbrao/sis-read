@@ -43,9 +43,9 @@
                         <legend class="text-[15px] font-semibold mb-2">O que se destacou?</legend>
                         <div class="flex flex-wrap gap-2">
                             @foreach ($this->motivosFeedback() as $reason)
-                                <label class="cursor-pointer">
+                                <label class="inline-flex max-w-full cursor-pointer">
                                     <input type="checkbox" wire:model="selectedReasons" value="{{ $reason->id }}" class="peer sr-only">
-                                    <span class="inline-flex px-3.5 py-2 text-sm rounded-full border border-slate-300 text-slate-700 bg-white peer-checked:bg-slate-900 peer-checked:text-white peer-checked:border-slate-900 peer-focus-visible:outline peer-focus-visible:outline-[3px] peer-focus-visible:outline-emerald-700">
+                                    <span class="inline-flex items-center min-h-11 px-3.5 py-2 text-sm rounded-2xl border border-slate-300 text-slate-700 bg-white peer-checked:bg-slate-900 peer-checked:text-white peer-checked:border-slate-900 peer-focus-visible:outline peer-focus-visible:outline-[3px] peer-focus-visible:outline-emerald-700">
                                         {{ $reason->phrase }}
                                     </span>
                                 </label>

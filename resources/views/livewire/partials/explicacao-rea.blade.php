@@ -14,7 +14,7 @@
     $temCorrigivel = $chave && \App\Experimento\Experimento::ativa('escrutabilidade') && collect($linhas)->contains('corrigivel', true);
     $politica = ! empty(is_array($explicacao) ? ($explicacao['observacao'] ?? null) : ($explicacao->observacao ?? null));
 @endphp
-<div class="space-y-4 text-[15px]">
+<div class="space-y-4 text-[15px] break-words">
     <div class="bg-white rounded-xl border border-indigo-100 p-4 space-y-1.5">
         <p class="text-xs font-bold uppercase tracking-wider text-indigo-700">Posição na lista</p>
         <p class="font-semibold text-slate-900">

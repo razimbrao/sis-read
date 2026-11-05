@@ -49,9 +49,9 @@
                         </span>
                     @endif
                 @endexplicabilidade
-                <span class="px-2.5 py-1 rounded-full bg-slate-100 text-slate-700">{{ $rea->repositorio }}</span>
+                <span class="max-w-full break-words px-2.5 py-1 rounded-full bg-slate-100 text-slate-700">{{ $rea->repositorio }}</span>
                 @if (! empty($rea->type))
-                    <span class="px-2.5 py-1 rounded-full bg-slate-100 text-slate-700">{{ $rea->type }}</span>
+                    <span class="max-w-full break-words px-2.5 py-1 rounded-2xl bg-slate-100 text-slate-700">{{ $rea->type }}</span>
                 @endif
             </div>
 
@@ -59,11 +59,11 @@
             <h2 class="text-lg sm:text-xl font-bold leading-snug break-words">{{ $rea->title }}</h2>
 
             @if ($descricao)
-                <p class="text-[15px] leading-relaxed text-slate-600 max-w-prose line-clamp-2">{{ $descricao }}</p>
+                <p class="text-[15px] leading-relaxed text-slate-600 max-w-prose line-clamp-2 break-words">{{ $descricao }}</p>
             @endif
 
             @if ($caracteristicas->isNotEmpty() || $criterioMeta)
-                <p class="text-sm text-slate-600">
+                <p class="text-sm text-slate-600 break-words">
                     {{ $caracteristicas->map(fn ($v, $k) => $k.': '.$v)->implode(' · ') }}
                     @explicabilidade('explicacao-rea')
                         @if ($criterioMeta)
@@ -92,7 +92,8 @@
             {{-- Sem link (ex.: a busca do MEC RED não devolve o endereço, problema #22). --}}
             @php $semLinkId = 'sem-link-'.substr(md5(($rea->chave ?? '').($rea->title ?? '')), 0, 10); @endphp
             {{-- Tooltip próprio: o navegador não mostra `title` sobre botão desabilitado. Abre ao passar o
-                 mouse e ao focar pelo teclado (o span é focável; o botão desabilitado não é). --}}
+                 mouse e ao focar pelo teclado (o span é focável; o botão desabilitado não é).
+                 No celular não há hover: o aviso fica sempre visível, abaixo do botão. --}}
             <div class="flex-[1_1_180px] flex flex-col justify-center gap-2">
                 <div class="relative group">
                     <span tabindex="0" aria-describedby="{{ $semLinkId }}" class="block rounded-xl cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 focus-visible:ring-offset-2">
@@ -102,7 +103,7 @@
                         </button>
                     </span>
                     <span id="{{ $semLinkId }}" role="tooltip"
-                          class="pointer-events-none absolute z-20 bottom-full left-1/2 -translate-x-1/2 mb-1.5 sm:bottom-auto sm:left-auto sm:right-full sm:top-1/2 sm:-translate-y-1/2 sm:translate-x-0 sm:mb-0 sm:mr-2 w-max max-w-[13rem] rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-center text-xs text-slate-600 shadow-sm opacity-0 invisible transition-opacity duration-150 group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible">
+                          class="pointer-events-none block mt-1.5 sm:mt-0 sm:absolute sm:z-20 sm:right-full sm:top-1/2 sm:-translate-y-1/2 sm:mr-2 sm:w-max sm:max-w-[13rem] sm:rounded-md sm:border sm:border-slate-200 sm:bg-white sm:px-2.5 sm:py-1.5 text-center text-xs text-slate-600 sm:shadow-sm sm:opacity-0 sm:invisible transition-opacity duration-150 sm:group-hover:opacity-100 sm:group-hover:visible sm:group-focus-within:opacity-100 sm:group-focus-within:visible">
                         O repositório não informou o link deste recurso.
                     </span>
                 </div>

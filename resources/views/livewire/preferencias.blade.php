@@ -6,7 +6,7 @@
 <div class="max-w-3xl mx-auto px-4 sm:px-6 py-10 space-y-6">
     <div>
         <h1 class="text-3xl font-extrabold tracking-tight">Minhas preferências</h1>
-        <p class="mt-1 text-[15px] text-slate-600">{{ auth()->user()->name }} · {{ auth()->user()->email }}</p>
+        <p class="mt-1 text-[15px] text-slate-600 break-words">{{ auth()->user()->name }} · {{ auth()->user()->email }}</p>
     </div>
 
     <form wire:submit.prevent="salvar" class="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 space-y-5">
@@ -20,12 +20,12 @@
             </p>
 
             @if ($opcoes)
-                <div class="flex flex-wrap gap-2.5 max-h-80 overflow-y-auto p-0.5">
+                <div class="flex flex-wrap gap-2.5 sm:max-h-80 sm:overflow-y-auto p-0.5">
                     @foreach ($opcoes as $tipo => $origens)
                         <label wire:key="opcao-{{ md5($tipo) }}"
-                            class="inline-flex items-center gap-2.5 px-4 py-2.5 min-h-12 rounded-full border-2 border-slate-300 bg-white cursor-pointer hover:bg-slate-50 has-[:checked]:border-emerald-700 has-[:checked]:bg-emerald-50 has-[:focus-visible]:outline has-[:focus-visible]:outline-[3px] has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-emerald-700">
-                            <input type="checkbox" value="{{ $tipo }}" wire:model="tipos" class="w-[18px] h-[18px] accent-emerald-700">
-                            <span>
+                            class="inline-flex items-center gap-2.5 max-w-full px-4 py-2.5 min-h-12 rounded-2xl sm:rounded-full border-2 border-slate-300 bg-white cursor-pointer hover:bg-slate-50 has-[:checked]:border-emerald-700 has-[:checked]:bg-emerald-50 has-[:focus-visible]:outline has-[:focus-visible]:outline-[3px] has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-emerald-700">
+                            <input type="checkbox" value="{{ $tipo }}" wire:model="tipos" class="w-[18px] h-[18px] shrink-0 accent-emerald-700">
+                            <span class="min-w-0 break-words">
                                 <span class="font-semibold">{{ $tipo }}</span>
                                 <span class="text-sm text-slate-600">({{ implode('; ', $origens) }})</span>
                             </span>
@@ -73,12 +73,12 @@
             <ul class="space-y-2">
                 @foreach ($metas as $codigo => $nome)
                     @php $valor = (float) $questionario->{$codigo}; @endphp
-                    <li class="grid grid-cols-[minmax(0,13rem)_1fr_2.5rem] items-center gap-3 text-[15px]">
+                    <li class="grid grid-cols-[minmax(0,1fr)_2.5rem] sm:grid-cols-[minmax(0,13rem)_1fr_2.5rem] items-center gap-x-3 gap-y-1 text-[15px]">
                         <span @class(['font-bold' => $codigo === $questionario->dominant])>{{ $nome }}</span>
-                        <span class="h-2.5 rounded-full bg-slate-200 overflow-hidden" aria-hidden="true">
+                        <span class="col-span-2 row-start-2 sm:col-span-1 sm:row-start-auto h-2.5 rounded-full bg-slate-200 overflow-hidden" aria-hidden="true">
                             <span @class(['block h-full rounded-full', 'bg-emerald-700' => $codigo === $questionario->dominant, 'bg-slate-400' => $codigo !== $questionario->dominant]) style="width: {{ max(0, min(100, $valor / 5 * 100)) }}%"></span>
                         </span>
-                        <span class="text-right tabular-nums">{{ number_format($valor, 1, ',', '') }}</span>
+                        <span class="col-start-2 row-start-1 sm:col-start-auto sm:row-start-auto text-right tabular-nums">{{ number_format($valor, 1, ',', '') }}</span>
                     </li>
                 @endforeach
             </ul>
@@ -90,5 +90,5 @@
         @endif
     </section>
 
-    <p><a href="{{ url('/') }}" class="text-[15px] font-semibold text-emerald-800 hover:underline underline-offset-4">Voltar à busca</a></p>
+    <p><a href="{{ url('/') }}" class="inline-flex items-center min-h-11 text-[15px] font-semibold text-emerald-800 hover:underline underline-offset-4">Voltar à busca</a></p>
 </div>

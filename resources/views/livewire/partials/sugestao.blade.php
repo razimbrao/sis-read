@@ -9,14 +9,14 @@
             <label for="message" class="block text-[15px] font-semibold mb-1.5">@lang('Deixe seu feedback')</label>
             <textarea id="message" maxlength="4096" wire:model.live="message" rows="8" aria-describedby="contador-mensagem"
                 class="w-full rounded-xl border border-slate-300 p-3.5 text-base resize-y"></textarea>
-            <div class="mt-1 flex justify-between gap-3 text-sm">
+            <div class="mt-1 flex flex-wrap justify-between gap-x-3 gap-y-1 text-sm">
                 <span class="text-red-700">@error('message') {{ $message }} @enderror</span>
                 <span id="contador-mensagem" class="text-slate-600">{{ $charCount }} de 4096 caracteres</span>
             </div>
         </div>
         <div class="flex flex-wrap items-center gap-4">
             <button type="submit" class="min-h-12 px-6 rounded-xl bg-emerald-700 text-white font-bold hover:bg-emerald-800">@lang('Enviar')</button>
-            <a href="{{ url('/') }}" class="text-[15px] font-semibold text-emerald-800 hover:underline underline-offset-4">Voltar à busca</a>
+            <a href="{{ url('/') }}" class="inline-flex items-center min-h-11 text-[15px] font-semibold text-emerald-800 hover:underline underline-offset-4">Voltar à busca</a>
             @if ($this->showMessage)
                 <p class="text-[15px] font-medium text-green-800" role="status">✓ @lang('Feedback enviado com sucesso!')</p>
             @endif

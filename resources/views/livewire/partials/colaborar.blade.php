@@ -11,7 +11,7 @@
     </div>
 
     <form wire:submit="insert" class="space-y-5">
-        <fieldset class="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 grid gap-4 sm:grid-cols-2">
+        <fieldset class="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 min-w-0 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <legend class="text-lg font-bold px-1">Sobre o recurso</legend>
             <div class="sm:col-span-2">
                 <label for="reaTitle" class="{{ $rotulo }}">@lang('Título do REA')</label>
@@ -49,7 +49,7 @@
             </div>
         </fieldset>
 
-        <fieldset class="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 grid gap-4 sm:grid-cols-3">
+        <fieldset class="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 min-w-0 grid grid-cols-1 gap-4 sm:grid-cols-3">
             <legend class="text-lg font-bold px-1">Sobre você</legend>
             <div>
                 <label for="name" class="{{ $rotulo }}">@lang('Nome completo')</label>
@@ -70,7 +70,7 @@
 
         <div class="flex flex-wrap items-center gap-4">
             <button type="submit" class="min-h-[52px] px-7 rounded-xl bg-emerald-700 text-white text-base font-bold hover:bg-emerald-800">Enviar contribuição</button>
-            <a href="{{ url('/') }}" class="text-[15px] font-semibold text-emerald-800 hover:underline underline-offset-4">Voltar à busca</a>
+            <a href="{{ url('/') }}" class="inline-flex items-center min-h-11 text-[15px] font-semibold text-emerald-800 hover:underline underline-offset-4">Voltar à busca</a>
             @if ($this->showMessage)
                 <p class="text-[15px] font-medium text-green-800" role="status">✓ @lang('Registro inserido com sucesso!')</p>
             @endif
