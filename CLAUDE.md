@@ -8,7 +8,7 @@ Documentação completa em `docs/` (comece por `docs/README.md` e `docs/arquitet
 - Rodar: `php artisan serve` **e** `php artisan queue:work --timeout=600` (sem o worker, as buscas nunca terminam)
 - Testes: `php artisan test`
 - Formatação: `vendor/bin/pint`
-- Deploy (VM com Docker, Azure for Students): `docs/deploy.md`; na VM, `docker compose -f docker-compose.prod.yml up -d --build`
+- Deploy (VM com Docker, Azure for Students): `docs/deploy.md`; cada push na `main` faz deploy se o CI passar (pausar: `gh variable set DEPLOY_AUTOMATICO --body false`)
 - Composer no Windows: sempre com `--ignore-platform-req=ext-pcntl --ignore-platform-req=ext-posix`
 
 ## Onde está o quê
