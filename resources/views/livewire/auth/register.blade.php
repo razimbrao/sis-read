@@ -6,7 +6,8 @@
         </div>
 
         @php $campo = 'w-full rounded-xl border border-slate-300 px-3.5 py-3 text-base'; @endphp
-        <form wire:submit.prevent="register" class="space-y-4">
+        {{-- A conferência dos requisitos fica no navegador: a senha só vai ao servidor ao enviar o formulário. --}}
+        <form wire:submit.prevent="register" class="space-y-4" x-data="{ senha: '', confirmacao: '' }">
             <div>
                 <label for="name" class="block text-[15px] font-semibold mb-1.5">Nome</label>
                 <input id="name" type="text" autocomplete="name" wire:model="name" class="{{ $campo }}" @error('name') aria-invalid="true" @enderror>
@@ -19,12 +20,18 @@
             </div>
             <div>
                 <label for="password" class="block text-[15px] font-semibold mb-1.5">Senha</label>
-                <input id="password" type="password" autocomplete="new-password" wire:model="password" class="{{ $campo }}" @error('password') aria-invalid="true" @enderror>
+                <input id="password" type="password" autocomplete="new-password" wire:model="password" x-on:input="senha = $event.target.value" aria-describedby="requisito-tamanho" class="{{ $campo }}" @error('password') aria-invalid="true" @enderror>
                 @error('password') <p class="mt-1 text-sm text-red-700" role="alert">{{ $message }}</p> @enderror
+                <ul id="requisito-tamanho" class="mt-2">
+                    <x-requisito-senha cumprido="[...senha].length >= {{ $senhaMinima }}">Pelo menos {{ $senhaMinima }} caracteres</x-requisito-senha>
+                </ul>
             </div>
             <div>
                 <label for="password_confirmation" class="block text-[15px] font-semibold mb-1.5">Repita a senha</label>
-                <input id="password_confirmation" type="password" autocomplete="new-password" wire:model="password_confirmation" class="{{ $campo }}">
+                <input id="password_confirmation" type="password" autocomplete="new-password" wire:model="password_confirmation" x-on:input="confirmacao = $event.target.value" aria-describedby="requisito-igual" class="{{ $campo }}">
+                <ul id="requisito-igual" class="mt-2">
+                    <x-requisito-senha cumprido="senha !== '' && senha === confirmacao">As duas senhas são iguais</x-requisito-senha>
+                </ul>
             </div>
 
             <button type="submit" class="w-full min-h-[52px] rounded-xl bg-emerald-700 text-white text-base font-bold hover:bg-emerald-800">Criar conta</button>
