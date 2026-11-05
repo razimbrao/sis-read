@@ -58,7 +58,7 @@ jobs:
 
   imagem:
     name: Build da imagem Docker
-    # Só confere que o Dockerfile compila; o deploy é manual na VM (docs/deploy.md).
+    # Só confere que o Dockerfile compila; a imagem de produção é construída na VM.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -69,3 +69,29 @@ jobs:
           push: false
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy
+    needs: [testes, imagem]
+    # A chave só existe no ambiente `producao`, que aceita apenas a main; PRs nunca chegam aqui.
+    # Para pausar durante sessões do estudo: DEPLOY_AUTOMATICO=false (docs/deploy.md).
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.DEPLOY_AUTOMATICO == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment: producao
+    concurrency:
+      group: deploy-producao
+      cancel-in-progress: false
+    permissions: {}
+    # Sem checkout e sem actions de terceiros: nenhum código além destas linhas vê a chave.
+    steps:
+      - name: Disparar o deploy na VM
+        env:
+          CHAVE: ${{ secrets.DEPLOY_SSH_KEY }}
+          HOST_KEY: ${{ vars.DEPLOY_KNOWN_HOSTS }}
+          DESTINO: ${{ vars.DEPLOY_DESTINO }}
+        run: |
+          install -m 700 -d ~/.ssh
+          ( umask 077; echo "$CHAVE" > ~/.ssh/deploy )
+          echo "$HOST_KEY" > ~/.ssh/known_hosts
+          ssh -i ~/.ssh/deploy -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 "$DESTINO"

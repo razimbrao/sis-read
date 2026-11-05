@@ -49,7 +49,8 @@ Arquivos:
 | `docker-compose.prod.yml` | Sobe o container na VM, com `./data` montado em `/data` |
 | `.env.production.example` | Modelo do `.env.production` (que fica só na VM) |
 | `scripts/provisionar-vm.sh` | Prepara a VM Ubuntu: swap de 2 GB, Docker, atualizações automáticas |
-| `.github/workflows/ci.yml` | Testes, Pint e build da imagem a cada PR (não faz deploy) |
+| `.github/workflows/ci.yml` | Testes, Pint e build da imagem a cada PR; deploy a cada push na `main` |
+| `scripts/deploy-vm.sh` | Atualiza o código e recria o container na VM (instalado em `/usr/local/bin/sisread-deploy`) |
 
 ## Primeiro deploy
 
@@ -126,18 +127,55 @@ O primeiro build leva alguns minutos (o swap evita falta de memória). Quando o 
 com o certificado obtido, abra `https://sisread.northcentralus.cloudapp.azure.com`, faça login e rode uma
 busca com meta para conferir worker e Groq.
 
+## Deploy automático
+
+Cada push na `main` roda testes e build da imagem e, se passarem, o job `deploy` entra na VM por SSH e
+roda `scripts/deploy-vm.sh`. Um PR não faz deploy.
+
+**Pausar** (por exemplo, durante sessões do estudo, porque o deploy recria o container):
+
+```bash
+gh variable set DEPLOY_AUTOMATICO --body false
+```
+
+Volte com `--body true`. Um merge feito durante a pausa só vai para a VM no próximo push.
+
+Como o repositório é público, o desenho evita vazamentos:
+
+- **Chave própria e restrita:** a chave do CI só serve para isso. No `authorized_keys` ela tem
+  `command="/usr/local/bin/sisread-deploy"` e `restrict`: não abre shell nem túnel, e o comando enviado
+  é ignorado. Mesmo vazada, ela só consegue disparar um deploy da `main`.
+- **Segredo no ambiente `producao`:** o ambiente só aceita a `main`, e PRs de fork não recebem segredos.
+- **Log público enxuto:** a saída detalhada fica em `~/deploy.log` na VM; o Actions mostra só o resultado.
+- **Host verificado:** o CI confere a chave da VM (`DEPLOY_KNOWN_HOSTS`) em vez de aceitar qualquer uma.
+- **Segredos da aplicação** (`.env.production`, banco) ficam só na VM; não passam pelo GitHub nem pela
+  imagem (`.dockerignore`).
+
+Regras do GitHub: o ruleset `proteger-main` bloqueia push, force-push e exclusão na `main` para todos,
+exceto administradores do repositório. O Actions só aceita actions do GitHub e as listadas nas
+configurações, e todo PR de pessoa de fora precisa de aprovação para rodar.
+
+Ao alterar `scripts/deploy-vm.sh`, reinstale na VM (o CI não troca o próprio script):
+
+```bash
+sudo install -m 755 ~/sis-read/scripts/deploy-vm.sh /usr/local/bin/sisread-deploy
+```
+
+**Trocar a chave:** gere outra, atualize o `authorized_keys` da VM e o segredo `DEPLOY_SSH_KEY` do
+ambiente `producao`.
+
 ## Operação
 
 | Tarefa | Comando (na VM, em `~/sis-read`) |
 |---|---|
-| Atualizar o código | `git pull && docker compose -f docker-compose.prod.yml up -d --build` |
+| Atualizar à mão (com o deploy automático pausado) | `git pull && docker compose -f docker-compose.prod.yml up -d --build` |
 | Ver logs | `docker compose -f docker-compose.prod.yml logs -f --tail 200` |
 | Rodar um artisan | `docker compose -f docker-compose.prod.yml exec app php artisan <comando>` |
 | Reiniciar | `docker compose -f docker-compose.prod.yml restart` |
 | Aplicar mudança no `.env.production` | `docker compose -f docker-compose.prod.yml up -d --force-recreate` (o `restart` não relê o arquivo) |
 | Backup na hora | `docker compose -f docker-compose.prod.yml exec app sh docker/backup-sqlite.sh` |
 
-Evite atualizar durante sessões do estudo: o container espera até 11 min o job em andamento, e um job
+Evite deploy durante sessões do estudo: o container espera até 11 min o job em andamento, e um job
 interrompido volta para a fila só depois de `retry_after` (660 s).
 
 ### Backups
