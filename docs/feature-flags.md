@@ -137,18 +137,30 @@ php artisan experimento:grupo p@ufjf.br --limpar           # apaga (link ou sort
 
 ## 5. Desenho do experimento
 
-- **Entre sujeitos**, três condições: `controle` × `transparencia` × `escrutabilidade`. A diferença
-  entre `controle` e `transparencia` mede o efeito das explicações. A diferença entre `transparencia`
-  e `escrutabilidade` mede o efeito de poder corrigir.
+> O protocolo completo da avaliação (etapas, questionário, análise e a justificativa de cada
+> escolha) fica no repositório `sis-read-docs`, em `avaliacao/README.md` e
+> `avaliacao/questionario.md`. Aquele protocolo é a fonte de verdade sobre a avaliação; esta seção
+> só resume o que importa para o sistema.
+
+- **Intra-sujeitos**, três condições: cada participante passa por `controle`, `transparencia` e
+  `escrutabilidade`, **nessa ordem**, com um interesse diferente em cada busca. A diferença entre
+  `controle` e `transparencia` mede o efeito das explicações. A diferença entre `transparencia` e
+  `escrutabilidade` mede o efeito de poder corrigir. A ordem é fixa porque quem viu as explicações
+  não volta a ser um usuário sem explicação, e a escrutabilidade contém a transparência.
 - **Mantido igual**: repositórios consultados, regras, rótulos, ordenação, itens ocultos, texto da
   busca e avaliação por estrelas. O teste `FeatureFlagsTest::test_ordenacao_e_igual_em_todos_os_grupos`
   garante que a ordem dos REAs não depende do grupo. Correções mudam a ordem, mas só existem no
   grupo `escrutabilidade`, e isso faz parte do tratamento.
-- **Atribuição**: links distribuídos pelo pesquisador (balanceamento manual) ou sorteio para quem chega
-  sem link. Registre fora do sistema quem recebeu qual link.
-- **Ameaças à validade**: o participante pode editar o link e trocar de grupo (use códigos opacos);
-  a resposta das APIs externas e do Ollama varia entre buscas (compare as métricas de falha por
-  grupo); o mesmo participante pode fazer várias buscas (agregue por `participante`, e não só por busca).
+- **Troca de condição**: o participante entra com conta própria (para ter meta EMAPRE e manter o
+  mesmo `participante` nas três buscas) e o pesquisador entrega os três links, um por etapa. Cada
+  link novo troca o grupo da conta (§4); confira com `php artisan experimento:grupo <email>`.
+  O sorteio (`EXPERIMENTO_SEM_LINK=sorteio`) não é usado no estudo. Registre fora do sistema a
+  sequência de temas de cada participante e o horário de cada etapa.
+- **Ameaças à validade**: a ordem fixa mistura aprendizado e cansaço com a condição (mitigado com
+  temas diferentes e sessão curta); o participante pode editar o link e trocar de grupo (use códigos
+  opacos); a resposta das APIs externas e do Ollama varia entre buscas (compare as métricas de falha
+  por grupo). Na análise, agregue por `participante` **e** `grupo`, e não só por busca: cada
+  participante tem buscas nos três grupos.
 
 ## 6. Métricas
 
