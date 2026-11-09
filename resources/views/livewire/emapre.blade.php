@@ -66,7 +66,7 @@
             @endforeach
 
             <div class="flex flex-wrap items-center justify-between gap-4 pt-2">
-                <a href="{{ url('/') }}" class="inline-flex items-center min-h-11 text-[15px] font-semibold text-emerald-800 hover:underline underline-offset-4">Responder depois</a>
+                <a href="{{ comParams(url('/')) }}" class="inline-flex items-center min-h-11 text-[15px] font-semibold text-emerald-800 hover:underline underline-offset-4">Responder depois</a>
                 <button type="submit" class="min-h-[52px] px-7 rounded-xl bg-emerald-700 text-white text-base font-bold hover:bg-emerald-800">Enviar respostas</button>
             </div>
         </form>

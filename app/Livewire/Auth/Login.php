@@ -19,7 +19,7 @@ class Login extends Component
 
         if (Auth::attempt(['email' => $this->email, 'password' => $this->password])) {
             session()->regenerate();
-            return redirect('/');
+            return redirect(comParams(url('/')));
         }
 
         $this->addError('email', 'E-mail ou senha inválidos.');

@@ -44,7 +44,7 @@ class Emapre extends Component
             'dominant' => $dominante,
         ]);
 
-        return redirect('/');
+        return redirect(comParams(url('/')));
     }
 
     public function render()

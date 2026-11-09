@@ -29,4 +29,5 @@ Documentação completa em `docs/` (comece por `docs/README.md` e `docs/arquitet
 - Os jobs gravam `chave` em cada REA; sem ela o REA não aceita correção. Depois de mexer nos jobs, rode `php artisan queue:restart`.
 - `database/database.sqlite` **não** é versionado (tem dados reais). É criado por `scripts/setup.ps1`; não rode `migrate:fresh` num banco com dados sem pedir.
 - Funcionalidade nova de explicabilidade entra atrás de uma flag (`Experimento::FLAGS` + grupos em `config/experimento.php`), escondendo a UI **e** recusando a ação no servidor. Recomendação e ordenação não dependem do grupo.
+- Links internos e redirects passam por `comParams()` (`app/Helpers/helpers.php`), para os query params acompanharem a navegação.
 - Bugs conhecidos estão em `docs/problemas-conhecidos.md`. Atualize esse arquivo ao corrigir algum.

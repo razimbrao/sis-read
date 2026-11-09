@@ -83,12 +83,12 @@
                 @endforeach
             </ul>
             <p class="text-sm text-slate-600">Médias de 1 a 5. A maior define a meta.</p>
-            <a href="{{ route('emapre') }}" class="inline-flex items-center min-h-12 px-5 rounded-xl border border-emerald-700 text-emerald-800 font-bold hover:bg-emerald-50">Refazer o questionário</a>
+            <a href="{{ comParams(route('emapre')) }}" class="inline-flex items-center min-h-12 px-5 rounded-xl border border-emerald-700 text-emerald-800 font-bold hover:bg-emerald-50">Refazer o questionário</a>
         @else
             <p class="text-[15px] text-slate-700">Você ainda não respondeu. São 28 frases rápidas (uns 5 minutos).</p>
-            <a href="{{ route('emapre') }}" class="inline-flex items-center min-h-12 px-5 rounded-xl bg-emerald-700 text-white font-bold hover:bg-emerald-800">Responder o questionário</a>
+            <a href="{{ comParams(route('emapre')) }}" class="inline-flex items-center min-h-12 px-5 rounded-xl bg-emerald-700 text-white font-bold hover:bg-emerald-800">Responder o questionário</a>
         @endif
     </section>
 
-    <p><a href="{{ url('/') }}" class="inline-flex items-center min-h-11 text-[15px] font-semibold text-emerald-800 hover:underline underline-offset-4">Voltar à busca</a></p>
+    <p><a href="{{ comParams(url('/')) }}" class="inline-flex items-center min-h-11 text-[15px] font-semibold text-emerald-800 hover:underline underline-offset-4">Voltar à busca</a></p>
 </div>

@@ -268,7 +268,7 @@
                                 @endif
                             @endif
                             @auth
-                                <a href="{{ route('preferencias') }}" class="inline-flex items-center min-h-11 text-sm text-indigo-700 hover:underline">
+                                <a href="{{ comParams(route('preferencias')) }}" class="inline-flex items-center min-h-11 text-sm text-indigo-700 hover:underline">
                                     {{ $daConta ? 'Editar os tipos da sua conta' : 'Salvar tipos preferidos na sua conta' }}
                                 </a>
                             @endauth

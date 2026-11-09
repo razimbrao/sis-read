@@ -2,7 +2,7 @@
     <section class="bg-white border border-slate-200 rounded-2xl p-6 sm:p-8 space-y-6">
         <div class="space-y-1.5">
             <h1 class="text-2xl font-extrabold tracking-tight">Entrar</h1>
-            <p class="text-[15px] text-slate-600">Use a conta para salvar suas preferências e a sua meta de aprendizagem. Você também pode <a href="{{ url('/') }}" class="font-semibold text-emerald-800 underline underline-offset-4">buscar sem conta</a>.</p>
+            <p class="text-[15px] text-slate-600">Use a conta para salvar suas preferências e a sua meta de aprendizagem. Você também pode <a href="{{ comParams(url('/')) }}" class="font-semibold text-emerald-800 underline underline-offset-4">buscar sem conta</a>.</p>
         </div>
 
         <form wire:submit.prevent="login" class="space-y-4" x-data="{ verSenha: false }">
@@ -30,7 +30,7 @@
         </form>
 
         <p class="text-[15px] text-center text-slate-600">
-            Não tem conta? <a href="{{ route('register') }}" class="inline-flex items-center min-h-11 font-semibold text-emerald-800 underline underline-offset-4">Criar conta</a>
+            Não tem conta? <a href="{{ comParams(route('register')) }}" class="inline-flex items-center min-h-11 font-semibold text-emerald-800 underline underline-offset-4">Criar conta</a>
         </p>
     </section>
 </div>

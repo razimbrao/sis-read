@@ -16,7 +16,7 @@
         </div>
         <div class="flex flex-wrap items-center gap-4">
             <button type="submit" class="min-h-12 px-6 rounded-xl bg-emerald-700 text-white font-bold hover:bg-emerald-800">@lang('Enviar')</button>
-            <a href="{{ url('/') }}" class="inline-flex items-center min-h-11 text-[15px] font-semibold text-emerald-800 hover:underline underline-offset-4">Voltar à busca</a>
+            <a href="{{ comParams(url('/')) }}" class="inline-flex items-center min-h-11 text-[15px] font-semibold text-emerald-800 hover:underline underline-offset-4">Voltar à busca</a>
             @if ($this->showMessage)
                 <p class="text-[15px] font-medium text-green-800" role="status">✓ @lang('Feedback enviado com sucesso!')</p>
             @endif

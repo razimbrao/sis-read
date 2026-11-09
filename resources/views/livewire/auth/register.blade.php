@@ -2,7 +2,7 @@
     <section class="bg-white border border-slate-200 rounded-2xl p-6 sm:p-8 space-y-6">
         <div class="space-y-1.5">
             <h1 class="text-2xl font-extrabold tracking-tight">Criar conta</h1>
-            <p class="text-[15px] text-slate-600">É gratuito. Com a conta, você salva os tipos de recurso preferidos e responde o questionário de metas. Veja <a href="{{ route('privacidade') }}" class="font-semibold text-emerald-800 underline underline-offset-4">o que guardamos</a>.</p>
+            <p class="text-[15px] text-slate-600">É gratuito. Com a conta, você salva os tipos de recurso preferidos e responde o questionário de metas. Veja <a href="{{ comParams(route('privacidade')) }}" class="font-semibold text-emerald-800 underline underline-offset-4">o que guardamos</a>.</p>
         </div>
 
         @php $campo = 'w-full rounded-xl border border-slate-300 px-3.5 py-3 text-base'; @endphp
@@ -58,7 +58,7 @@
         </form>
 
         <p class="text-[15px] text-center text-slate-600">
-            Já tem conta? <a href="{{ route('login') }}" class="inline-flex items-center justify-center min-h-11 min-w-11 font-semibold text-emerald-800 underline underline-offset-4">Entrar</a>
+            Já tem conta? <a href="{{ comParams(route('login')) }}" class="inline-flex items-center justify-center min-h-11 min-w-11 font-semibold text-emerald-800 underline underline-offset-4">Entrar</a>
         </p>
     </section>
 </div>

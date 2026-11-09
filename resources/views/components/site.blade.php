@@ -46,7 +46,7 @@
             <div class="max-w-6xl mx-auto px-4 sm:px-6 py-5 flex flex-wrap items-center justify-between gap-4 text-sm text-slate-600">
                 <span>Projeto acadêmico da UFJF e da UTFPR</span>
                 <div class="flex items-center gap-5">
-                    <a href="{{ route('privacidade') }}" class="inline-flex items-center min-h-11 font-medium text-emerald-700 hover:text-emerald-800 underline-offset-4 hover:underline">Privacidade</a>
+                    <a href="{{ comParams(route('privacidade')) }}" class="inline-flex items-center min-h-11 font-medium text-emerald-700 hover:text-emerald-800 underline-offset-4 hover:underline">Privacidade</a>
                     <img src="{{ asset('assets/img/ufjf.png') }}" alt="UFJF" class="h-9 w-auto">
                     <img src="{{ asset('assets/img/logo-utfpr.png') }}" alt="UTFPR" class="h-9 w-auto">
                 </div>
