@@ -1,6 +1,6 @@
 <?php
 
-if (!function_exists('comParams')) {
+if (! function_exists('comParams')) {
     /**
      * Acrescenta a um link interno os query params da página atual, para que eles acompanhem a navegação.
      * Os params do próprio link têm prioridade. `secao` e `page` dizem respeito só à página em que estão.
@@ -31,38 +31,38 @@ if (!function_exists('comParams')) {
     }
 }
 
-if (!function_exists('mecRedEtapas')) {
+if (! function_exists('mecRedEtapas')) {
     /**
      * IDs de `educational_stages` do MEC RED para o perfil (vazio = sem filtro de nível).
      */
     function mecRedEtapas($profile): array
     {
         return match ($profile) {
-            'Educação infantil'  => [1],
+            'Educação infantil' => [1],
             'Ensino fundamental' => [2, 3],
-            'Ensino médio'       => [4],
-            'Ensino superior'    => [5],
-            default              => [],
+            'Ensino médio' => [4],
+            'Ensino superior' => [5],
+            default => [],
         };
     }
 }
 
-if (!function_exists('mecRedTiposObjeto')) {
+if (! function_exists('mecRedTiposObjeto')) {
     /**
      * IDs de `object_type` do MEC RED associados à meta (vazio = sem filtro de tipo).
      */
     function mecRedTiposObjeto($meta): array
     {
         return match ($meta) {
-            'ma'    => [6, 8, 22, 18, 21, 3, 20, 4, 5, 1],
-            'mpa'   => [17, 13, 3, 19, 20, 8, 18],
-            'mpe'   => [17, 22, 6, 18, 13],
+            'ma' => [6, 8, 22, 18, 21, 3, 20, 4, 5, 1],
+            'mpa' => [17, 13, 3, 19, 20, 8, 18],
+            'mpe' => [17, 22, 6, 18, 13],
             default => [],
         };
     }
 }
 
-if (!function_exists('getMecRedURL')) {
+if (! function_exists('getMecRedURL')) {
     function getMecRedURL($query, $offset, $profile, $meta = null)
     {
         $educational_stages = implode('', array_map(fn ($id) => "&educational_stages={$id}", mecRedEtapas($profile)));

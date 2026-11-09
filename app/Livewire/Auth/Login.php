@@ -2,12 +2,13 @@
 
 namespace App\Livewire\Auth;
 
-use Livewire\Component;
 use Illuminate\Support\Facades\Auth;
+use Livewire\Component;
 
 class Login extends Component
 {
     public $email = '';
+
     public $password = '';
 
     public function login()
@@ -19,6 +20,7 @@ class Login extends Component
 
         if (Auth::attempt(['email' => $this->email, 'password' => $this->password])) {
             session()->regenerate();
+
             return redirect(comParams(url('/')));
         }
 
