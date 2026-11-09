@@ -1,5 +1,36 @@
 <?php
 
+if (!function_exists('comParams')) {
+    /**
+     * Acrescenta a um link interno os query params da página atual, para que eles acompanhem a navegação.
+     * Os params do próprio link têm prioridade. `secao` e `page` dizem respeito só à página em que estão.
+     *
+     * Em POST (Livewire, logout) a query da requisição não é a da página, então ela vem do Referer.
+     */
+    function comParams(string $url): string
+    {
+        $request = request();
+
+        if (in_array($request->method(), ['GET', 'HEAD'], true)) {
+            $atuais = $request->query();
+        } else {
+            $origem = parse_url((string) $request->headers->get('referer')) ?: [];
+            $atuais = [];
+
+            if (($origem['host'] ?? null) === $request->getHost()) {
+                parse_str($origem['query'] ?? '', $atuais);
+            }
+        }
+
+        [$caminho, $query] = array_pad(explode('?', $url, 2), 2, '');
+        parse_str($query, $doLink);
+
+        $params = array_replace(\Illuminate\Support\Arr::except($atuais, ['secao', 'page']), $doLink);
+
+        return $params ? $caminho.'?'.\Illuminate\Support\Arr::query($params) : $url;
+    }
+}
+
 if (!function_exists('mecRedEtapas')) {
     /**
      * IDs de `educational_stages` do MEC RED para o perfil (vazio = sem filtro de nível).

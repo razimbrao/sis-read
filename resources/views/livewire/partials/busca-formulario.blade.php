@@ -88,7 +88,7 @@
                 <h2 class="text-base font-bold text-indigo-950">Personalize pela sua meta</h2>
                 @guest
                     <p class="text-[15px] leading-relaxed text-indigo-900">Com uma conta, responda 28 frases rápidas (uns 5 minutos) e a lista passa a considerar a sua meta de aprendizagem.</p>
-                    <a href="{{ route('login') }}" class="inline-flex items-center min-h-11 px-4 rounded-xl bg-indigo-700 text-white text-[15px] font-semibold hover:bg-indigo-800">Entrar para personalizar</a>
+                    <a href="{{ comParams(route('login')) }}" class="inline-flex items-center min-h-11 px-4 rounded-xl bg-indigo-700 text-white text-[15px] font-semibold hover:bg-indigo-800">Entrar para personalizar</a>
                 @else
                     @if (auth()->user()->questionnaire?->dominant)
                         <p class="text-[15px] leading-relaxed text-indigo-900">
@@ -97,11 +97,11 @@
                         </p>
                     @else
                         <p class="text-[15px] leading-relaxed text-indigo-900">Responda 28 frases rápidas (uns 5 minutos) e a lista passa a considerar a sua meta de aprendizagem.</p>
-                        <a href="{{ route('emapre') }}" class="inline-flex items-center min-h-11 px-4 rounded-xl bg-indigo-700 text-white text-[15px] font-semibold hover:bg-indigo-800">@lang('Responda o questionário')</a>
+                        <a href="{{ comParams(route('emapre')) }}" class="inline-flex items-center min-h-11 px-4 rounded-xl bg-indigo-700 text-white text-[15px] font-semibold hover:bg-indigo-800">@lang('Responda o questionário')</a>
                     @endif
                     {{-- Preferências da conta: não dependem dos painéis de transparência. --}}
                     <p class="text-[15px] text-indigo-900">
-                        Tipos de recurso e meta ficam em <a href="{{ route('preferencias') }}" class="font-semibold text-indigo-800 underline underline-offset-4">Minhas preferências</a>.
+                        Tipos de recurso e meta ficam em <a href="{{ comParams(route('preferencias')) }}" class="font-semibold text-indigo-800 underline underline-offset-4">Minhas preferências</a>.
                     </p>
                 @endguest
             </section>
