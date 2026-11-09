@@ -70,7 +70,7 @@
 
         <div class="flex flex-wrap items-center gap-4">
             <button type="submit" class="min-h-[52px] px-7 rounded-xl bg-emerald-700 text-white text-base font-bold hover:bg-emerald-800">Enviar contribuição</button>
-            <a href="{{ url('/') }}" class="inline-flex items-center min-h-11 text-[15px] font-semibold text-emerald-800 hover:underline underline-offset-4">Voltar à busca</a>
+            <a href="{{ comParams(url('/')) }}" class="inline-flex items-center min-h-11 text-[15px] font-semibold text-emerald-800 hover:underline underline-offset-4">Voltar à busca</a>
             @if ($this->showMessage)
                 <p class="text-[15px] font-medium text-green-800" role="status">✓ @lang('Registro inserido com sucesso!')</p>
             @endif

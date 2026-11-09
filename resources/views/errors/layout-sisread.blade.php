@@ -24,7 +24,7 @@
                 @if ($recarregar ?? false)
                     <button type="button" onclick="location.reload()" class="inline-flex items-center min-h-12 px-5 rounded-xl bg-emerald-700 text-white font-bold hover:bg-emerald-800">Recarregar a página</button>
                 @endif
-                <a href="{{ url('/') }}" @class([
+                <a href="{{ comParams(url('/')) }}" @class([
                     'inline-flex items-center min-h-12 px-5 rounded-xl font-semibold',
                     'border border-slate-300 text-slate-900 hover:bg-slate-50' => $recarregar ?? false,
                     'bg-emerald-700 text-white font-bold hover:bg-emerald-800' => ! ($recarregar ?? false),

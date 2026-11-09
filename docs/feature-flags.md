@@ -119,7 +119,8 @@ Como o grupo é guardado:
   escopo. Escopo do usuário logado: `App\Models\User|<id>`. Escopo do visitante:
   `visitante:<uuid>`, um token guardado na sessão (o id da sessão muda no login, o token não).
 - O link (middleware `App\Http\Middleware\GrupoPorLink`) grava o grupo do escopo atual. Um link novo
-  troca o grupo, mesmo que já houvesse outro.
+  troca o grupo, mesmo que já houvesse outro. O parâmetro acompanha a navegação (`comParams()`), mas
+  cada código só é aplicado uma vez por sessão: repetir o mesmo código na URL não troca o grupo.
 - Quem chega sem link e não tem grupo recebe o de `EXPERIMENTO_SEM_LINK`. Com `sorteio`, a escolha é
   uniforme entre os três grupos e fica gravada, ou seja, é estável.
 - Visitante que faz login: se a conta ainda não tem grupo, herda o do visitante. Se já tem, vale o da conta.
