@@ -74,6 +74,9 @@ EXPERIMENTO_FORCAR_FLAGS="reas-ocultos=0,progresso-busca=0"
 
 # Quem chega sem link: sorteio uniforme (padrão) ou um grupo fixo
 EXPERIMENTO_SEM_LINK=sorteio
+
+# Durante o estudo: editar os tipos preferidos na busca não salva na conta (padrão: true)
+EXPERIMENTO_SALVAR_PREFERENCIA=false
 ```
 
 Depois de mudar o `.env`, rode `php artisan config:clear` se a configuração estiver em cache.
@@ -143,23 +146,25 @@ php artisan experimento:grupo p@ufjf.br --limpar           # apaga (link ou sort
 > `avaliacao/questionario.md`. Aquele protocolo é a fonte de verdade sobre a avaliação; esta seção
 > só resume o que importa para o sistema.
 
-- **Intra-sujeitos**, três condições: cada participante passa por `controle`, `transparencia` e
-  `escrutabilidade`, **nessa ordem**, com um interesse diferente em cada busca. A diferença entre
-  `controle` e `transparencia` mede o efeito das explicações. A diferença entre `transparencia` e
-  `escrutabilidade` mede o efeito de poder corrigir. A ordem é fixa porque quem viu as explicações
-  não volta a ser um usuário sem explicação, e a escrutabilidade contém a transparência.
+- **Intra-sujeitos**, três condições, com rodízio da ordem: as versões têm letras fixas (A =
+  `controle`, B = `transparencia`, C = `escrutabilidade`) e há três cópias do formulário, nas ordens
+  ABC, BCA e CAB, uma por terço dos participantes. O tema da busca é fixo por posição (1ª busca
+  Algoritmos, 2ª Decomposição, 3ª Reconhecimento de padrões). A diferença entre A e B mede o efeito
+  das explicações; a diferença entre B e C, o efeito de poder corrigir.
 - **Mantido igual**: repositórios consultados, regras, rótulos, ordenação, itens ocultos, texto da
   busca e avaliação por estrelas. O teste `FeatureFlagsTest::test_ordenacao_e_igual_em_todos_os_grupos`
   garante que a ordem dos REAs não depende do grupo. Correções mudam a ordem, mas só existem no
   grupo `escrutabilidade`, e isso faz parte do tratamento.
+- **Preferência salva na conta**: editar os tipos preferidos na versão C, com "Salvar também como
+  minha preferência", mudaria a recomendação das buscas seguintes (nas ordens BCA e CAB, C vem antes
+  de A). Durante o estudo, use `EXPERIMENTO_SALVAR_PREFERENCIA=false`: a caixa some e a correção vale
+  só para a busca. A tela "Minhas preferências" continua acessível.
 - **Troca de condição**: o participante entra com conta própria (para ter meta EMAPRE e manter o
-  mesmo `participante` nas três buscas) e o pesquisador entrega os três links, um por etapa. Cada
+  mesmo `participante` nas três buscas) e clica no link de cada versão, que vem no formulário. Cada
   link novo troca o grupo da conta (§4); confira com `php artisan experimento:grupo <email>`.
-  O sorteio (`EXPERIMENTO_SEM_LINK=sorteio`) não é usado no estudo. Registre fora do sistema a
-  sequência de temas de cada participante e o horário de cada etapa.
-- **Ameaças à validade**: a ordem fixa mistura aprendizado e cansaço com a condição (mitigado com
-  temas diferentes e sessão curta); o participante pode editar o link e trocar de grupo (use códigos
-  opacos); a resposta das APIs externas e do Ollama varia entre buscas (compare as métricas de falha
+  O sorteio (`EXPERIMENTO_SEM_LINK=sorteio`) não é usado no estudo. Registre fora do sistema o horário de cada etapa.
+- **Ameaças à validade**: quem já viu explicação pode avaliar a versão A de outro jeito, efeito que o
+  rodízio não elimina; o participante pode editar o link e trocar de grupo, e vê o nome do grupo na URL; a resposta das APIs externas e do Ollama varia entre buscas (compare as métricas de falha
   por grupo). Na análise, agregue por `participante` **e** `grupo`, e não só por busca: cada
   participante tem buscas nos três grupos.
 

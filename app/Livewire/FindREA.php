@@ -601,7 +601,7 @@ class FindREA extends Component
 
         $preferidos = $this->tiposPreferidos($data);
         $tipos = RuleClassifier::normalizarTipos(array_filter($tipos, 'is_string'));
-        $user = $salvarNaConta ? auth()->user() : null;
+        $user = $salvarNaConta && $this->experimento()->salvaPreferenciaNaBusca() ? auth()->user() : null;
 
         if ($user && ! $tipos) {
             $this->addError('correcao', 'Para salvar na sua conta, marque ao menos um tipo.');
