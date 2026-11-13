@@ -64,4 +64,11 @@ return [
      */
     'sem_link' => env('EXPERIMENTO_SEM_LINK', 'sorteio'),
 
+    /*
+     * Se a busca oferece "Salvar também como minha preferência" ao editar os tipos preferidos.
+     * Desligue durante o estudo com usuários: a lista salva na conta valeria nas buscas seguintes, e a
+     * versão com escrutabilidade mudaria a recomendação das outras versões (docs/feature-flags.md §5).
+     */
+    'salvar_preferencia_na_busca' => (bool) env('EXPERIMENTO_SALVAR_PREFERENCIA', true),
+
 ];
