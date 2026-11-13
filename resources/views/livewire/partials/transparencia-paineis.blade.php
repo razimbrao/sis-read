@@ -296,7 +296,7 @@
                                 <div
                                     wire:ignore
                                     wire:key="tipos-{{ md5(json_encode($tipos['atuais'])) }}"
-                                    x-data="{ editando: false, selecionados: @js($tipos['atuais']), salvarNaConta: @js(auth()->check()) }"
+                                    x-data="{ editando: false, selecionados: @js($tipos['atuais']), salvarNaConta: @js(auth()->check() && app(\App\Experimento\Experimento::class)->salvaPreferenciaNaBusca()) }"
                                     class="mt-2"
                                 >
                                     <div x-show="!editando" class="flex flex-wrap gap-2">
@@ -332,7 +332,7 @@
                                                 </label>
                                             @endforeach
                                         </fieldset>
-                                        @auth
+                                        @if (auth()->check() && app(\App\Experimento\Experimento::class)->salvaPreferenciaNaBusca())
                                             <label class="flex items-start gap-2 text-slate-700">
                                                 <input type="checkbox" x-model="salvarNaConta" class="mt-0.5 rounded border-slate-300">
                                                 <span>
@@ -340,7 +340,7 @@
                                                     <span class="block text-slate-600">Vale nas próximas buscas e substitui os tipos dos colaboradores. Desfazer aqui não muda a sua conta.</span>
                                                 </span>
                                             </label>
-                                        @endauth
+                                        @endif
                                         <div class="flex flex-wrap gap-2">
                                             <button
                                                 type="button"

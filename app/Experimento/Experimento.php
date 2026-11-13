@@ -113,6 +113,15 @@ class Experimento
     }
 
     /**
+     * Se editar os tipos preferidos na busca pode salvar a lista na conta (config
+     * `experimento.salvar_preferencia_na_busca`). Desligado durante o estudo com usuários.
+     */
+    public function salvaPreferenciaNaBusca(): bool
+    {
+        return (bool) config('experimento.salvar_preferencia_na_busca', true);
+    }
+
+    /**
      * Identificador do participante nas métricas: `u:<id>` ou `v:<token da sessão>`.
      */
     public function participante(): string

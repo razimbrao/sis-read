@@ -236,6 +236,21 @@ class PreferenciasPorContaTest extends TestCase
         $this->assertSame(0, Correction::count());
     }
 
+    public function test_durante_o_experimento_a_busca_nao_salva_na_conta(): void
+    {
+        config(['experimento.salvar_preferencia_na_busca' => false]);
+        $user = $this->usuario();
+        $this->buscaConcluida(['video'], TiposPreferidos::COLABORADORES);
+
+        Livewire::actingAs($user)->test(FindREA::class)->set('timestampSession', $this->searchedAt)
+            ->call('redefinirTipos', ['jogo'], true)
+            ->assertHasNoErrors()
+            ->assertSet('avisoPreferencia', null);
+
+        $this->assertNull($user->refresh()->tipos_preferidos);
+        $this->assertSame(['corrigir'], Correction::pluck('acao')->all());
+    }
+
     public function test_visitante_nao_salva_na_conta_mesmo_pedindo(): void
     {
         $this->buscaConcluida(['video'], TiposPreferidos::COLABORADORES);
