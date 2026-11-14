@@ -59,10 +59,11 @@ return [
     ],
 
     /*
-     * Grupo de quem chega sem link e ainda não tem grupo: `sorteio` (uniforme entre os grupos,
-     * gravado e estável) ou o nome de um grupo.
+     * Grupo de quem chega sem link e ainda não tem grupo: o nome de um grupo ou `sorteio` (uniforme
+     * entre os grupos, gravado e estável). Padrão: `escrutabilidade`, com todas as flags ligadas; as
+     * outras versões vêm pelo link (/?grupo=<código>).
      */
-    'sem_link' => env('EXPERIMENTO_SEM_LINK', 'sorteio'),
+    'sem_link' => env('EXPERIMENTO_SEM_LINK', 'escrutabilidade'),
 
     /*
      * Se a busca oferece "Salvar também como minha preferência" ao editar os tipos preferidos.

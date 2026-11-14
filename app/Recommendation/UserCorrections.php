@@ -24,7 +24,9 @@ class UserCorrections
 
         $original = self::originalCorrigivel($rea, 'nivel');
 
-        if ($original['valor'] === $nivel) {
+        // Escolher o nível que o sistema estimou equivale a desfazer. Se o nível foi só assumido (o texto não
+        // menciona etapa), confirmar o mesmo valor é informação nova: o critério passa de não verificado a conferido.
+        if ($original['valor'] === $nivel && ! ($original['assumido'] ?? false)) {
             return self::desfazer($rea, 'nivel');
         }
 

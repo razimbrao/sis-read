@@ -97,8 +97,32 @@ class UserCorrectionsTest extends TestCase
     {
         $rea = $this->rea();
 
-        $this->assertSame($rea, UserCorrections::corrigirNivel(UserCorrections::corrigirNivel($rea, 'ensino medio'), 'ensino superior'));
-        $this->assertSame($rea, UserCorrections::corrigirNivel($rea, 'ensino superior'));
+        // Voltar ao valor do sistema depois de uma correção desfaz a correção.
+        $comMedio = UserCorrections::corrigirNivel($rea, 'ensino medio');
+        $this->assertSame('usuario', $comMedio['explicacao']['criterios']['nivel']['fonte']);
+        $this->assertSame($rea, UserCorrections::desfazer($comMedio, 'nivel'));
+    }
+
+    public function test_confirmar_o_nivel_assumido_vira_nivel_conferido(): void
+    {
+        // O texto não menciona etapa: o sistema assume ensino superior, igual ao perfil, mas não conta no grau.
+        $criterios = [
+            'tema' => RuleClassifier::criterioTema('algoritmos', 'Eduplay'),
+            'nivel' => RuleClassifier::criterioNivel('Ensino superior', RuleClassifier::inferirNivel('Grafos', '')),
+            'tipo' => RuleClassifier::criterioTipo('Vídeo', ['jogo']),
+        ];
+        $rotulo = RuleClassifier::rotular($criterios, false);
+        $rea = ['chave' => 'abc', 'recommended' => $rotulo, 'explicacao' => RuleClassifier::explicacao($criterios, $rotulo)];
+        $this->assertTrue($criterios['nivel']['assumido']);
+        $this->assertSame('interest', $rotulo);
+
+        // Confirmar o mesmo valor não é desfazer: o nível passa a conferido e soma no grau.
+        $confirmado = UserCorrections::corrigirNivel($rea, 'ensino superior');
+        $nivel = $confirmado['explicacao']['criterios']['nivel'];
+
+        $this->assertSame(['ok', 'ensino superior', 'usuario'], [$nivel['status'], $nivel['valor'], $nivel['fonte']]);
+        $this->assertSame('profile', $confirmado['recommended']);
+        $this->assertSame(2, RuleClassifier::grau($confirmado['explicacao']['criterios'])['total']);
     }
 
     public function test_desfazer_sem_correcao_nao_muda_nada(): void

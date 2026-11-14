@@ -72,8 +72,8 @@ EXPERIMENTO_FORCAR_GRUPO=escrutabilidade
 # Ablação: grupo do participante, mas sem a lista de ocultos e sem o progresso
 EXPERIMENTO_FORCAR_FLAGS="reas-ocultos=0,progresso-busca=0"
 
-# Quem chega sem link: sorteio uniforme (padrão) ou um grupo fixo
-EXPERIMENTO_SEM_LINK=sorteio
+# Quem chega sem link: um grupo fixo (padrão: escrutabilidade, tudo ligado) ou sorteio uniforme
+EXPERIMENTO_SEM_LINK=escrutabilidade
 
 # Durante o estudo: editar os tipos preferidos na busca não salva na conta (padrão: true)
 EXPERIMENTO_SALVAR_PREFERENCIA=false
@@ -124,8 +124,12 @@ Como o grupo é guardado:
 - O link (middleware `App\Http\Middleware\GrupoPorLink`) grava o grupo do escopo atual. Um link novo
   troca o grupo, mesmo que já houvesse outro. O parâmetro acompanha a navegação (`comParams()`), mas
   cada código só é aplicado uma vez por sessão: repetir o mesmo código na URL não troca o grupo.
-- Quem chega sem link e não tem grupo recebe o de `EXPERIMENTO_SEM_LINK`. Com `sorteio`, a escolha é
-  uniforme entre os três grupos e fica gravada, ou seja, é estável.
+- Quem chega sem link e não tem grupo recebe o de `EXPERIMENTO_SEM_LINK`. O padrão é
+  `escrutabilidade`: o sistema abre com todas as flags ligadas, e as versões com menos
+  explicabilidade (controle, transparência) só aparecem pelo link `/?grupo=<código>`. Com `sorteio`,
+  a escolha é uniforme entre os três grupos e fica gravada, ou seja, é estável.
+- O grupo fica gravado: quem já recebeu um grupo (por sorteio, quando ele era o padrão) continua nele.
+  Para voltar ao padrão, use `php artisan experimento:grupo <email> --limpar` ou um link.
 - Visitante que faz login: se a conta ainda não tem grupo, herda o do visitante. Se já tem, vale o da conta.
 - O visitante perde o grupo quando a sessão expira (`SESSION_LIFETIME`). Para estudos com mais de uma
   sessão, peça login ou mande o link de novo.
