@@ -71,8 +71,8 @@
     ao trocar o prompt, incremente `MetaClassifier::VERSAO_PROMPT` (ou `VERSAO_PROMPT_LOTE`, se for o `promptLote`); ao trocar o modelo, o cache já separa
     por `OLLAMA_MODELO`. Efeito na lista: numa busca real com meta `mpa`, os 39 REAs saíram com meta
     `falhou`, e como a meta incompatível ocultava o REA, a lista ficava **vazia**. **Mitigado** (2026-10-06):
-    a meta diferente não esconde mais o REA; ele vai para o fim da lista, marcado "meta diferente da sua",
-    abaixo dos de meta não conferida (`docs/recomendacao.md`). O viés em si continua aberto.
+    a meta diferente não esconde mais o REA; ele vem depois dos compatíveis e dos de meta não conferida,
+    marcado "meta diferente da sua" (se esses grupos estiverem vazios, abre a lista) (`docs/recomendacao.md`). O viés em si continua aberto.
 19. Empate no EMAPRE é resolvido em silêncio: `array_keys($resultados, max(...))[0]` pega o primeiro fator.
     Existe ao menos um caso real no banco (usuário 3, ma=2 e mpa=2).
 20. Os 24 `collaborators` vieram de uma planilha de artigos (o "nome" é uma referência bibliográfica), e a

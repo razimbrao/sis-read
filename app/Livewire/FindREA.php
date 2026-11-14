@@ -401,6 +401,15 @@ class FindREA extends Component
     }
 
     /**
+     * Grupo da meta que abre a lista (Ranking::grupoTopo), para a explicação dizer por que um REA de meta
+     * não conferida ou diferente está no topo.
+     */
+    public function grupoTopo($data): ?int
+    {
+        return Ranking::grupoTopo(json_decode($data->data ?? '[]') ?? [], $this->temMeta());
+    }
+
+    /**
      * REAs encontrados que não são exibidos, com o motivo de cada um (limitado para não pesar a tela).
      *
      * @return array<int, array{chave: ?string, titulo: string, repositorio: string, motivo: string, resumo: string, corrigiveis: array, corrigidos: array}>
