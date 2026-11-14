@@ -96,8 +96,15 @@
                             {{ $resumo['mudaram_faixa'] }} {{ $resumo['mudaram_faixa'] === 1 ? 'REA mudou' : 'REAs mudaram' }} de faixa por correções suas.
                         @endif
                     </span>
-                    <button type="button" class="min-h-11 font-medium text-indigo-700 hover:underline" wire:click="desfazerTodas"
-                        wire:confirm="Desfazer todas as suas correções nesta busca?">Desfazer todas</button>
+                    {{-- Confirmação na própria página, no lugar do confirm do navegador. --}}
+                    <span x-data="{ confirmando: false }" class="flex flex-wrap items-center gap-2">
+                        <button type="button" x-show="!confirmando" class="min-h-11 font-medium text-indigo-700 hover:underline" @click="confirmando = true">Desfazer todas</button>
+                        <span x-show="confirmando" style="display: none" class="flex flex-wrap items-center gap-2" role="group" aria-label="Confirmar desfazer todas">
+                            <span>Desfazer todas as suas correções nesta busca?</span>
+                            <button type="button" class="min-h-11 px-3.5 rounded-lg bg-amber-700 text-white font-semibold hover:bg-amber-800" wire:click="desfazerTodas" @click="confirmando = false">Sim, desfazer</button>
+                            <button type="button" class="min-h-11 px-3.5 rounded-lg border border-amber-300 bg-white font-semibold text-amber-900 hover:bg-amber-100" @click="confirmando = false">Cancelar</button>
+                        </span>
+                    </span>
                 </div>
             @endif
 
@@ -277,88 +284,26 @@
                                     {{ $daConta ? 'Editar os tipos da sua conta' : 'Salvar tipos preferidos na sua conta' }}
                                 </a>
                             @endauth
-                            @if ($avisoPreferencia)
-                                <p class="mt-1 text-sm text-emerald-700" role="status">{{ $avisoPreferencia }}</p>
-                            @endif
 
                             @if (! $tipos['opcoes'] || ! \App\Experimento\Experimento::ativa('escrutabilidade'))
                                 {{-- Nenhum REA comparável (ex.: Aquarela não respondeu): editar não teria efeito. --}}
                             @elseif (! $podeCorrigir)
                                 <p class="text-sm text-slate-600 mt-1">Você poderá editar os tipos preferidos quando todos os repositórios responderem.</p>
                             @else
-                                @php
-                                    $origemTipo = function (string $tipo) use ($contexto, $tipos) {
-                                        return match (true) {
-                                            $tipos['fonte'] === 'usuario' && in_array($tipo, $contexto['tipos_conta'] ?? [], true) => 'da sua conta',
-                                            in_array($tipo, $contexto['tipos_busca'] ?? [], true) => 'colaboradores, mesmo interesse e perfil',
-                                            in_array($tipo, $contexto['tipos_gerais'] ?? [], true) => 'outros colaboradores',
-                                            in_array($tipo, $tipos['originais'], true) => 'usado pelo sistema',
-                                            default => 'aparece nos REAs desta busca',
-                                        };
-                                    };
-                                @endphp
-                                {{-- wire:ignore: o poll não pode desmarcar o que o usuário está escolhendo. A chave muda quando a lista muda. --}}
-                                <div
-                                    wire:ignore
-                                    wire:key="tipos-{{ md5(json_encode($tipos['atuais'])) }}"
-                                    x-data="{ editando: false, selecionados: @js($tipos['atuais']), salvarNaConta: @js(auth()->check() && app(\App\Experimento\Experimento::class)->salvaPreferenciaNaBusca()) }"
-                                    class="mt-2"
-                                >
-                                    <div x-show="!editando" class="flex flex-wrap gap-2">
+                                {{-- O editor é o modal da página (modal-tipos), o mesmo aberto pelo critério de tipo dos cartões. --}}
+                                <div class="mt-2 flex flex-wrap gap-2">
+                                    <button
+                                        type="button"
+                                        class="min-h-11 px-3.5 rounded-lg border border-indigo-200 bg-white text-sm font-medium text-indigo-700 hover:bg-indigo-50"
+                                        @click="$dispatch('editar-tipos'); $wire.registrarExplicacao('abriu_correcao')"
+                                    >Editar tipos preferidos</button>
+                                    @if ($tipos['editados'])
                                         <button
                                             type="button"
-                                            class="min-h-11 px-3.5 rounded-lg border border-indigo-200 bg-white text-sm font-medium text-indigo-700 hover:bg-indigo-50 focus:outline-none"
-                                            @click="editando = true; $wire.registrarExplicacao('abriu_correcao')"
-                                        >Editar tipos preferidos</button>
-                                        @if ($tipos['editados'])
-                                            <button
-                                                type="button"
-                                                class="min-h-11 px-3.5 rounded-lg text-sm text-indigo-700 hover:underline focus:outline-none"
-                                                @click="$wire.redefinirTipos(@js($tipos['originais']))"
-                                            >{{ $daConta ? 'Voltar aos tipos da sua conta' : 'Voltar aos tipos do sistema' }}</button>
-                                        @endif
-                                    </div>
-                                    <div x-show="editando" style="display: none" class="mt-1 space-y-3 p-3 rounded-lg bg-white border border-slate-200 text-sm">
-                                        <p class="text-slate-600">
-                                            Marque os tipos de recurso que você prefere. Os REAs do Aquarela e do Eduplay são
-                                            reclassificados com a sua escolha; o MEC RED não informa o tipo, então os REAs dele não mudam.
-                                        </p>
-                                        <fieldset class="grid gap-1.5 sm:grid-cols-2">
-                                            <legend class="sr-only">Tipos preferidos</legend>
-                                            @foreach ($tipos['opcoes'] as $tipo)
-                                                <label class="flex items-start gap-2 p-2 rounded-lg border border-slate-100 hover:bg-slate-50 cursor-pointer">
-                                                    <input type="checkbox" value="{{ $tipo }}" x-model="selecionados" class="mt-0.5 rounded border-slate-300">
-                                                    <span>
-                                                        <span class="font-medium text-slate-900">{{ ExplanationRenderer::tipo($tipo) }}</span>
-                                                        <span class="block text-slate-600">
-                                                            ({{ $origemTipo($tipo) }}; {{ $tipos['contagem'][$tipo] ?? 0 }} {{ ($tipos['contagem'][$tipo] ?? 0) === 1 ? 'REA' : 'REAs' }} desta busca)
-                                                        </span>
-                                                    </span>
-                                                </label>
-                                            @endforeach
-                                        </fieldset>
-                                        @if (auth()->check() && app(\App\Experimento\Experimento::class)->salvaPreferenciaNaBusca())
-                                            <label class="flex items-start gap-2 text-slate-700">
-                                                <input type="checkbox" x-model="salvarNaConta" class="mt-0.5 rounded border-slate-300">
-                                                <span>
-                                                    Salvar também como minha preferência
-                                                    <span class="block text-slate-600">Vale nas próximas buscas e substitui os tipos dos colaboradores. Desfazer aqui não muda a sua conta.</span>
-                                                </span>
-                                            </label>
-                                        @endif
-                                        <div class="flex flex-wrap gap-2">
-                                            <button
-                                                type="button"
-                                                class="min-h-11 px-3.5 rounded-lg bg-indigo-600 text-white font-medium hover:bg-indigo-700"
-                                                @click="$wire.redefinirTipos(selecionados, salvarNaConta); editando = false"
-                                            >Aplicar</button>
-                                            <button
-                                                type="button"
-                                                class="min-h-11 px-3.5 rounded-lg text-slate-600 hover:bg-slate-100"
-                                                @click="editando = false; selecionados = @js($tipos['atuais'])"
-                                            >Cancelar</button>
-                                        </div>
-                                    </div>
+                                            class="min-h-11 px-3.5 rounded-lg text-sm text-indigo-700 hover:underline"
+                                            @click="$wire.redefinirTipos(@js($tipos['originais']))"
+                                        >{{ $daConta ? 'Voltar aos tipos da sua conta' : 'Voltar aos tipos do sistema' }}</button>
+                                    @endif
                                 </div>
                             @endif
                         </dd>
