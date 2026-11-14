@@ -399,14 +399,14 @@ class EscrutabilidadeTest extends TestCase
 
         $componente = $this->componente()->set('userType', 'usuario')->set('interestApiSearch', 'algoritmos')
             ->set('contexto', $this->contexto())
-            // Um único modal na página, aberto pelo evento `editar-tipos`.
+            // Um único modal na página; o estado fica em Alpine.store('tipos'), que sobrevive ao poll.
             ->assertSee('id="modal-tipos-titulo"', false)
-            ->assertSee('@editar-tipos.window', false);
+            ->assertSee('x-show="$store.tipos.aberto"', false);
 
         // Só o REA cujo tipo é comparado com os preferidos ganha o botão, e ele leva o tipo do REA ao modal.
         $html = $componente->html();
-        $this->assertSame(1, substr_count($html, "\$dispatch('editar-tipos', { tipo:"));
-        $this->assertStringContainsString("\$dispatch('editar-tipos', { tipo: 'jogo' })", $html);
+        $this->assertSame(1, substr_count($html, "\$store.tipos.abrir('"));
+        $this->assertStringContainsString("\$store.tipos.abrir('jogo')", $html);
 
         // O modal aplica pela mesma ação do painel, que continua recusando sem a flag (FeatureFlagsTest).
         $componente->call('redefinirTipos', ['video', 'jogo'])->assertHasNoErrors();

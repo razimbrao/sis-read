@@ -177,7 +177,7 @@ class Experimento
             return $daSessao;
         }
 
-        $padrao = config('experimento.sem_link', 'sorteio');
+        $padrao = config('experimento.sem_link', 'escrutabilidade');
 
         return in_array($padrao, self::GRUPOS, true) ? $padrao : self::GRUPOS[random_int(0, count(self::GRUPOS) - 1)];
     }
