@@ -121,7 +121,7 @@
             <svg class="w-[18px] h-[18px] transition-transform" :class="aberto && 'rotate-180'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
         </button>
         <div x-show="aberto" style="display: none" class="px-5 sm:px-6 pb-5">
-            @include('livewire.partials.explicacao-rea', ['explicacao' => $explicacao, 'faixa' => $faixa, 'rea' => $rea, 'podeCorrigir' => $podeCorrigir, 'prefixo' => $chaveLinha])
+            @include('livewire.partials.explicacao-rea', ['explicacao' => $explicacao, 'faixa' => $faixa, 'rea' => $rea, 'podeCorrigir' => $podeCorrigir, 'prefixo' => $chaveLinha, 'tiposEditaveis' => $tiposEditaveis ?? false])
         </div>
     </div>
     @endexplicabilidade
