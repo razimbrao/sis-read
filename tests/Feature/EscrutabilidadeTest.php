@@ -366,7 +366,7 @@ class EscrutabilidadeTest extends TestCase
 
         $this->componente()->set('userType', 'usuario')->set('interestApiSearch', 'algoritmos')
             ->set('contexto', $this->contexto())
-            ->assertSee('Editar tipos preferidos')
+            ->assertSee('Mudar nesta busca')
             ->assertSee('jogo')
             ->assertSee('(aparece nos REAs desta busca; 2 REAs desta busca)', false)
             ->assertSee('(colaboradores, mesmo interesse e perfil; 1 REA desta busca)', false)
@@ -396,7 +396,7 @@ class EscrutabilidadeTest extends TestCase
         $this->componente()->set('userType', 'usuario')->set('interestApiSearch', 'algoritmos')
             ->set('contexto', $this->contexto())
             ->assertSee('Você poderá editar os tipos preferidos quando todos os repositórios responderem.')
-            ->assertDontSee('Editar tipos preferidos');
+            ->assertDontSee('Mudar nesta busca')->assertDontSee('Mudar tipos nesta busca');
     }
 
     public function test_criterio_de_tipo_abre_o_modal_de_tipos_preferidos(): void

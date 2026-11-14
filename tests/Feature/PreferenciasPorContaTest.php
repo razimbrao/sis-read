@@ -297,7 +297,7 @@ class PreferenciasPorContaTest extends TestCase
         $componente->call('$refresh')
             ->assertSee('Da sua conta:')
             ->assertSee('Substituem os tipos cadastrados pelos colaboradores.')
-            ->assertSee('Editar os tipos da sua conta')
+            ->assertSee('Preferência da conta (próximas buscas)')
             ->assertSee(route('preferencias'))
             ->assertSee('Tipo jogo, entre os tipos preferidos da sua conta (jogo).');
     }
