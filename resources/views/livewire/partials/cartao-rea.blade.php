@@ -19,6 +19,7 @@
     $textosMeta = ['ok' => 'compatível com a sua', 'falhou' => 'diferente da sua', 'filtro_api' => 'filtrada pelo repositório'];
 @endphp
 <li
+    @if (isset($rea->chave)) id="{{ \App\Livewire\FindREA::idDoCartao($rea->chave) }}" @endif
     x-data="{ aberto: false }"
     wire:key="{{ $chaveLinha }}"
     @class([
