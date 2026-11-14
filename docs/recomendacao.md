@@ -74,7 +74,7 @@ posição, a ordem em que aparecem em `Data.data`.
 
 Visibilidade:
 - **Com meta**: a meta **não esconde nenhum REA**. Abaixo dos compatíveis vêm os REAs de meta não
-  conferida e, no fim, os de meta diferente da do usuário (`falhou`, pela IA ou por correção). Nos dois
+  conferida e, depois deles, os de meta diferente da do usuário (`falhou`, pela IA ou por correção). Nos dois
   grupos, a meta vale 0 ponto e a ordem é a mesma (grau e desempate); o selo diz "meta não conferida" ou
   "meta diferente da sua".
 - **Sem meta**: `both` → `profile` → `interest`. Os itens `meta*` (de uma busca feita com meta) não aparecem.

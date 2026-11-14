@@ -34,6 +34,31 @@ class ExplanationRenderer
     ];
 
     /**
+     * Tipos são comparados sem acento (RuleClassifier::normalizar); aqui voltam à grafia legível.
+     */
+    public const TIPOS_LEGIVEIS = [
+        'programacao' => 'programação',
+        'video' => 'vídeo',
+        'audio' => 'áudio',
+        'animacao' => 'animação',
+        'apresentacao' => 'apresentação',
+        'simulacao' => 'simulação',
+        'exercicio' => 'exercício',
+        'infografico' => 'infográfico',
+        'pagina web' => 'página web',
+        'arquivo pdf' => 'arquivo PDF',
+        'documento html' => 'documento HTML',
+        'mooc' => 'MOOC',
+    ];
+
+    /**
+     * Modelos de meta com viés medido (docs/problemas-conhecidos.md #18) e o aviso de cada um.
+     */
+    public const MODELOS_COM_VIES = [
+        'gemma3:4b' => 'O modelo gemma3:4b, usado na classificação da meta, tende a favorecer “Aprendizagem”.',
+    ];
+
+    /**
      * Faixas do grau de recomendação (RuleClassifier::grau, pesos meta 4, nível 2, tipo 1). `graus` é o
      * intervalo de grau de cada faixa; com ou sem meta, ele é o mesmo, pois a meta não atendida vale 0.
      */
@@ -50,32 +75,59 @@ class ExplanationRenderer
      * Título e descrição da faixa. Numa busca com meta, as faixas sem meta reúnem os REAs cuja meta não
      * pôde ser conferida ou é diferente da do usuário (Ranking::grupoMeta). `observacao` só existe em REAs gravados antes do grau (versao_regras 1), quando
      * MEC RED e Eduplay tinham faixa fixa por política.
+     *
+     * A descrição fala da posição em relação aos outros grupos, nunca em "fim da lista": quando os grupos
+     * de cima estão vazios, o grupo do REA abre a lista. `$abreALista` (ver Ranking::grupoTopo()) indica
+     * esse caso e acrescenta `contexto`, que explica por que um REA de grau baixo está no topo. `selo` é a
+     * versão curta do título, para o selo do cartão.
+     *
+     * @return array{titulo: string, selo: string, descricao: string, graus: string, contexto: ?string}
      */
-    public static function faixa(?string $rotulo, $explicacao = null, bool $comMeta = false): array
+    public static function faixa(?string $rotulo, $explicacao = null, bool $comMeta = false, bool $abreALista = false): array
     {
-        $faixa = self::FAIXAS[$rotulo] ?? ['titulo' => 'Sem faixa', 'descricao' => 'rótulo desconhecido', 'graus' => '?'];
+        $faixa = (self::FAIXAS[$rotulo] ?? ['titulo' => 'Sem faixa', 'descricao' => 'rótulo desconhecido', 'graus' => '?']) + ['contexto' => null];
+        $faixa['selo'] = $faixa['titulo'];
         $explicacao = self::paraArray($explicacao);
 
         if (! empty($explicacao['observacao'])) {
             return [
                 'titulo' => $faixa['titulo'].' (política)',
+                'selo' => $faixa['titulo'].' (política)',
                 'descricao' => 'posição definida por política do repositório, não pelos critérios conferidos',
                 'graus' => $faixa['graus'],
+                'contexto' => null,
             ];
         }
 
         if (($comMeta || isset($explicacao['criterios']['meta'])) && in_array($rotulo, Ranking::ORDEM_SEM_META, true)) {
-            [$sufixo, $motivo] = match ($explicacao['criterios']['meta']['status'] ?? null) {
+            [$sufixo, $selo, $motivo, $contexto] = match ($explicacao['criterios']['meta']['status'] ?? null) {
                 // Sem o REA (painel "Como ordenamos"), a faixa reúne os dois grupos.
-                null => [', meta não conferida ou diferente da sua', 'a meta do REA não pôde ser conferida ou é diferente da sua, por isso ele fica abaixo dos compatíveis com a sua meta'],
-                'falhou' => [', meta diferente da sua', 'a meta do REA é diferente da sua, por isso ele fica no fim da lista, abaixo dos compatíveis e dos de meta não conferida'],
-                default => [', meta não conferida', 'a meta do REA não pôde ser conferida, por isso ele fica abaixo dos compatíveis com a sua meta'],
+                null => [
+                    ', meta não conferida ou diferente da sua',
+                    'meta não conferida ou diferente',
+                    'a meta desses REAs não pôde ser conferida ou é diferente da sua, por isso eles vêm depois dos compatíveis com a sua meta, quando houver',
+                    null,
+                ],
+                'falhou' => [
+                    ', meta diferente da sua',
+                    'meta diferente da sua',
+                    'a meta do REA é diferente da sua. REAs assim vêm depois dos compatíveis com a sua meta e dos de meta não conferida, quando houver',
+                    'Nesta busca, nenhum REA teve meta compatível ou não conferida. Por isso a lista começa por este grupo, ordenada por nível e tipo.',
+                ],
+                default => [
+                    ', meta não conferida',
+                    'meta não conferida',
+                    'a meta do REA não pôde ser conferida. REAs assim vêm depois dos compatíveis com a sua meta, quando houver',
+                    'Nesta busca, nenhum REA teve meta compatível com a sua. Por isso a lista começa pelos de meta não conferida, ordenados por nível e tipo.',
+                ],
             };
 
             return [
                 'titulo' => $faixa['titulo'].$sufixo,
+                'selo' => $selo,
                 'descricao' => $faixa['descricao'].'; '.$motivo,
                 'graus' => $faixa['graus'],
+                'contexto' => $abreALista ? $contexto : null,
             ];
         }
 
@@ -107,14 +159,26 @@ class ExplanationRenderer
 
         $repositorio = $criterios['tema']['repositorio'] ?? 'repositório';
 
+        // Numa busca com meta, o grupo da meta vem antes do grau (Ranking::ordenar): o grau só ordena dentro
+        // do grupo. Os compatíveis (grau 4 a 7) estão sempre acima dos demais, então só os outros grupos precisam
+        // do aviso.
+        $grupo = match (true) {
+            ! isset($criterios['meta']) || RuleClassifier::atende($criterios, 'meta') => null,
+            ($criterios['meta']['status'] ?? null) === 'falhou' => 'de meta diferente da sua',
+            default => 'de meta não conferida',
+        };
+        $posicao = "vale a posição no repositório: este é o {$grau['posicao']}º resultado do {$repositorio}.";
+
         return [
             'total' => $grau['total'],
             'maximo' => $grau['maximo'],
             'selo' => "Grau {$grau['total']} de {$grau['maximo']}",
             'conta' => "Grau {$grau['total']} de {$grau['maximo']}: ".implode(', ', $partes).'.',
-            'desempate' => $grau['posicao'] === null
-                ? null
-                : "Entre REAs de mesmo grau, vale a posição no repositório: este é o {$grau['posicao']}º resultado do {$repositorio}.",
+            'desempate' => match (true) {
+                $grau['posicao'] === null => null,
+                $grupo === null => "Entre REAs de mesmo grau, {$posicao}",
+                default => "No grupo {$grupo}, a ordem é pelo grau; entre REAs de mesmo grau, {$posicao}",
+            },
         ];
     }
 
@@ -224,14 +288,23 @@ class ExplanationRenderer
     {
         $explicacao = self::paraArray($explicacao);
 
+        $estimado = false;
+        $vies = null;
+
         foreach ($explicacao['criterios'] ?? [] as $c) {
             if (in_array($c['fonte'] ?? null, ['regex', 'llm'], true)
                 && in_array($c['status'] ?? null, ['ok', 'falhou'], true)) {
-                return ['Estimativa automática (regex/IA): pode conter erros. A classificação por IA roda num modelo local e tende a favorecer “Aprendizagem”.'];
+                $estimado = true;
+                // O viés só foi medido em alguns modelos; nos outros, não afirmamos nada (problema #18).
+                $vies ??= self::MODELOS_COM_VIES[$c['modelo'] ?? ''] ?? null;
             }
         }
 
-        return [];
+        if (! $estimado) {
+            return [];
+        }
+
+        return ['Estimativa automática (regex/IA): pode conter erros.'.($vies ? ' '.$vies : '')];
     }
 
     private static function texto(string $nome, array $c): string
@@ -278,8 +351,8 @@ class ExplanationRenderer
 
     private static function textoTipo(string $status, array $c): string
     {
-        $valor = ($c['valor'] ?? '') !== '' ? $c['valor'] : 'não informado';
-        $lista = implode(', ', $c['esperado'] ?? []);
+        $valor = ($c['valor'] ?? '') !== '' ? self::tipo($c['valor']) : 'não informado';
+        $lista = implode(', ', self::tipos($c['esperado'] ?? []));
 
         if (($c['origem_esperado'] ?? null) === 'usuario') {
             return match (true) {
@@ -333,7 +406,7 @@ class ExplanationRenderer
             return ($c['evidencia'] ?? '').($status === 'ok' ? " Compatível com a sua meta ({$esperado})." : " Sua meta é {$esperado}.");
         }
 
-        $modelo = empty($c['modelo']) ? '' : " Modelo: {$c['modelo']}".(isset($c['duracao']) ? ", em {$c['duracao']}s." : '.');
+        $modelo = empty($c['modelo']) ? '' : " Modelo: {$c['modelo']}".(isset($c['duracao']) ? ', em '.self::segundos($c['duracao']).'.' : '.');
         // Ex.: classificação reaproveitada do cache, ou feita só pelo título.
         $modelo .= empty($c['evidencia']) ? '' : ' '.ucfirst($c['evidencia']).'.';
 
@@ -361,6 +434,28 @@ class ExplanationRenderer
     private static function nivel(?string $nivel): string
     {
         return self::NIVEIS_LEGIVEIS[$nivel] ?? (string) $nivel;
+    }
+
+    public static function tipo(?string $tipo): string
+    {
+        return self::TIPOS_LEGIVEIS[$tipo] ?? (string) $tipo;
+    }
+
+    /**
+     * @param  array<int, string>  $tipos
+     * @return array<int, string>
+     */
+    public static function tipos(array $tipos): array
+    {
+        return array_map(fn ($tipo) => self::tipo((string) $tipo), $tipos);
+    }
+
+    /**
+     * Duração no formato brasileiro (ex.: "0,52 s").
+     */
+    private static function segundos($duracao): string
+    {
+        return number_format((float) $duracao, 2, ',', '').' s';
     }
 
     private static function paraArray($valor): array

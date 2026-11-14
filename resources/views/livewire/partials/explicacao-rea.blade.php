@@ -20,6 +20,9 @@
         <p class="font-semibold text-slate-900">
             {{ $faixa['titulo'] }} <span class="font-normal text-slate-600">— {{ $faixa['descricao'] }}</span>
         </p>
+        @if ($faixa['contexto'] ?? null)
+            <p class="text-slate-700">{{ $faixa['contexto'] }}</p>
+        @endif
         @if ($grau)
             <p class="text-slate-700">{{ $grau['conta'] }}</p>
             @if ($grau['desempate'])

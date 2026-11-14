@@ -148,6 +148,13 @@ class RankingTest extends TestCase
         $this->assertSame(['compativel', 'nao_conferida', 'incompativel'], $this->ids(Ranking::ordenar($reas, true)));
         $this->assertSame([0, 1, 2], array_map(fn ($r) => Ranking::grupoMeta($r, true), [$reas[2], $reas[1], $reas[0]]));
 
+        // O grupo que abre a lista é o primeiro com REAs: sem compatíveis, um grupo de baixo sobe ao topo.
+        $this->assertSame(Ranking::GRUPO_COMPATIVEL, Ranking::grupoTopo($reas, true));
+        $this->assertSame(Ranking::GRUPO_META_NAO_CONFERIDA, Ranking::grupoTopo([$reas[0], $reas[1]], true));
+        $this->assertSame(Ranking::GRUPO_META_INCOMPATIVEL, Ranking::grupoTopo([$reas[0]], true));
+        $this->assertSame(Ranking::GRUPO_COMPATIVEL, Ranking::grupoTopo([$reas[0]], false));
+        $this->assertNull(Ranking::grupoTopo([], true));
+
         $contagem = Ranking::contar($reas, true);
         $this->assertSame(0, $contagem['ocultos']);
         $this->assertSame(1, $contagem['meta_incompativel']);

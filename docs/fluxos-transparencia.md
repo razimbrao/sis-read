@@ -433,7 +433,9 @@ flowchart LR
 ```
 
 Com meta, a lista é dividida em três grupos, nesta ordem: compatíveis, meta não conferida e meta
-diferente da sua (`Ranking::grupoMeta`). Dentro de cada grupo, vai do maior grau para o menor. Entre REAs de mesmo grau, vem primeiro o de menor posição no
+diferente da sua (`Ranking::grupoMeta`). Um grupo vazio não ocupa lugar: sem compatíveis, a lista começa
+pelo primeiro grupo com REAs (`Ranking::grupoTopo`), e a explicação desses REAs diz por que estão no topo.
+Dentro de cada grupo, vai do maior grau para o menor. Entre REAs de mesmo grau, vem primeiro o de menor posição no
 próprio repositório (intercalando os repositórios), depois a ordem alfabética do repositório e a
 `chave`. A ordem de chegada dos jobs não influi: a mesma busca dá sempre a mesma lista.
 
@@ -737,7 +739,7 @@ flowchart LR
     D -- sim --> E["meta ok → meta_both / meta_one / meta"]
     D -- não --> F["meta falhou → both / profile / interest"]
     E --> G["aparece na lista"]
-    F --> H["fim da lista: meta diferente da sua"]
+    F --> H["grupo à parte: meta diferente da sua"]
 ```
 
 MEC RED e Eduplay passam pela mesma classificação por IA (o MEC RED só pelo título) e entram na mesma
