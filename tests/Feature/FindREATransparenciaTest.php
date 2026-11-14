@@ -150,12 +150,33 @@ class FindREATransparenciaTest extends TestCase
             ->assertSee('grau de recomendação')
             ->assertSee('meta +4, nível +2, tipo +1, de 0 a 7')
             ->assertSee('Grau 7 de 7 · Meta, nível e tipo')
-            ->assertSee('Grau 3 de 7 · Nível e tipo, meta não conferida')
-            ->assertSee('Grau 3 de 7 · Nível e tipo, meta diferente da sua')
+            ->assertSee('Grau 3 de 7 · meta não conferida')
+            ->assertSee('Grau 3 de 7 · meta diferente da sua')
             ->assertSee('2 REAs estão com a meta não conferida.')
             ->assertSee('1 REA está com a meta diferente da sua.')
             ->assertSee('este é o 2º resultado do Aquarela')
+            ->assertSee('A lista é organizada primeiro pela meta')
+            ->assertDontSee('a lista começa por este grupo')
             ->assertDontSee('Por política do SisREAd');
+    }
+
+    public function test_meta_diferente_no_topo_explica_por_que(): void
+    {
+        $user = User::factory()->create();
+        $questionnaire = new Questionnaire(['ma' => 2, 'mpa' => 3, 'mpe' => 4, 'dominant' => 'mpe']);
+        $questionnaire->user_id = $user->id;
+        $questionnaire->save();
+
+        // Nenhum REA compatível nem de meta não conferida: o grupo de meta diferente abre a lista.
+        Data::create(['searched_at' => '2026-10-06 12:00:00', 'finished' => true, 'data' => json_encode([
+            $this->reaComGrau('trilha', 'Aquarela', 1, 'ok', 'ok', 'falhou'),
+            $this->reaComGrau('jogo', 'Aquarela', 2, 'ok', 'falhou', 'falhou'),
+        ])]);
+
+        Livewire::actingAs($user)->test(FindREA::class)
+            ->set('timestampSession', '2026-10-06 12:00:00')->set('userType', 'usuario')->set('interestApiSearch', 'algoritmos')
+            ->assertSee('Nesta busca, nenhum REA teve meta compatível ou não conferida. Por isso a lista começa por este grupo')
+            ->assertDontSee('fim da lista');
     }
 
     public function test_status_dos_repositorios_mostra_falhas(): void

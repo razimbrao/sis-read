@@ -147,7 +147,7 @@ class EscrutabilidadeTest extends TestCase
         $user = $this->usuarioComMeta('ma');
         $componente = $this->componente($user);
 
-        // A meta diferente não esconde o REA: ele fica no fim da lista.
+        // A meta diferente não esconde o REA: ele vem depois dos compatíveis.
         $this->assertSame(['Árvores', 'Grafos'], $this->titulosExibidos($componente));
         $this->assertSame([], $componente->instance()->ocultos(Data::first()));
 
@@ -374,7 +374,7 @@ class EscrutabilidadeTest extends TestCase
             ->set('contexto', $this->contexto())
             ->call('redefinirTipos', ['jogo'])
             ->assertSee('Definidos por você nesta busca:')
-            ->assertSee('O sistema tinha usado: video.')
+            ->assertSee('O sistema tinha usado: vídeo.')
             // Nenhum dos dois REAs bate o nível do perfil, então trocar os tipos não muda faixa.
             ->assertSee('Suas correções não mudaram a faixa de nenhum REA.')
             ->assertSee('Voltar aos tipos do sistema')

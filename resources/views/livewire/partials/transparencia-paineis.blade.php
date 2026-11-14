@@ -36,7 +36,12 @@
                     Cada REA recebe um <strong>grau de recomendação</strong>: a soma dos pontos dos critérios que foram
                     conferidos e atendidos ({{ $resumo['com_meta'] ? 'meta +4, nível +2, tipo +1, de 0 a 7' : 'nível +2, tipo +1, de 0 a 3' }}).
                     Critério que não pôde ser conferido vale 0, e a regra é a mesma para todos os repositórios.
-                    A lista vai do maior grau para o menor, nestas faixas:
+                    @if ($resumo['com_meta'])
+                        A lista é organizada primeiro pela meta (compatível, não conferida, diferente da sua) e, dentro de
+                        cada grupo, do maior grau para o menor, nestas faixas:
+                    @else
+                        A lista vai do maior grau para o menor, nestas faixas:
+                    @endif
                 </p>
                 <ol class="space-y-2">
                     @foreach ($resumo['ordem'] as $rotulo)
@@ -64,9 +69,9 @@
                     @endphp
                     <div class="text-sm text-slate-600 space-y-1">
                         <p>
-                            Abaixo dos compatíveis com a sua meta vêm primeiro os REAs cuja meta não pôde ser conferida e, no fim,
-                            os de meta diferente da sua. Em cada grupo, a ordem é a mesma: do maior grau para o menor.
-                            A meta não tira nenhum REA da lista, porque a classificação por IA pode errar.
+                            Depois dos compatíveis com a sua meta vêm os REAs cuja meta não pôde ser conferida e, em seguida,
+                            os de meta diferente da sua. Se um grupo estiver vazio, o seguinte sobe: sem compatíveis, a lista
+                            começa por um desses grupos. A meta não tira nenhum REA da lista, porque a classificação por IA pode errar.
                         </p>
                         @if ($resumo['meta_nao_conferida'] > 0)
                             <p>{{ $resumo['meta_nao_conferida'] }} {{ $resumo['meta_nao_conferida'] === 1 ? 'REA está' : 'REAs estão' }} com a meta não conferida.</p>
@@ -246,25 +251,25 @@
                             @php $daConta = $tipos['fonte'] === 'usuario'; @endphp
                             @if ($tipos['editados'])
                                 <span class="text-amber-700">{{ ExplanationRenderer::MARCA_CORRECAO }} Definidos por você nesta busca:</span>
-                                {{ $tipos['atuais'] ? implode(', ', $tipos['atuais']) : 'nenhum' }}.
-                                <span class="block text-sm text-slate-600">{{ $daConta ? 'A busca começou com os tipos da sua conta' : 'O sistema tinha usado' }}: {{ $tipos['originais'] ? implode(', ', $tipos['originais']) : 'nenhum' }}.</span>
+                                {{ $tipos['atuais'] ? implode(', ', ExplanationRenderer::tipos($tipos['atuais'])) : 'nenhum' }}.
+                                <span class="block text-sm text-slate-600">{{ $daConta ? 'A busca começou com os tipos da sua conta' : 'O sistema tinha usado' }}: {{ $tipos['originais'] ? implode(', ', ExplanationRenderer::tipos($tipos['originais'])) : 'nenhum' }}.</span>
                             @elseif ($daConta)
                                 {{-- Preferência salva na conta (docs/plano-escrutabilidade.md §15). --}}
                                 <span class="font-medium text-slate-900">Da sua conta:</span>
-                                {{ implode(', ', $contexto['tipos_conta'] ?? []) ?: implode(', ', $tipos['originais']) }}.
+                                {{ implode(', ', ExplanationRenderer::tipos($contexto['tipos_conta'] ?? [])) ?: implode(', ', ExplanationRenderer::tipos($tipos['originais'])) }}.
                                 @if ($tipos['inclui_colaboradores'])
-                                    <span class="block text-sm text-slate-600">Unidos aos tipos dos colaboradores, como você pediu: {{ implode(', ', $tipos['originais']) }}.</span>
+                                    <span class="block text-sm text-slate-600">Unidos aos tipos dos colaboradores, como você pediu: {{ implode(', ', ExplanationRenderer::tipos($tipos['originais'])) }}.</span>
                                 @else
                                     <span class="block text-sm text-slate-600">Substituem os tipos cadastrados pelos colaboradores.</span>
                                 @endif
                             @else
                                 @if ($contexto['tipos_busca'] ?? [])
-                                    De colaboradores com o mesmo interesse e perfil: {{ implode(', ', $contexto['tipos_busca']) }}.
+                                    De colaboradores com o mesmo interesse e perfil: {{ implode(', ', ExplanationRenderer::tipos($contexto['tipos_busca'])) }}.
                                 @else
                                     Nenhum colaborador cadastrou REAs com o mesmo interesse e perfil.
                                 @endif
                                 @if ($contexto['tipos_gerais'] ?? [])
-                                    <span class="block">De outros colaboradores: {{ implode(', ', $contexto['tipos_gerais']) }}.</span>
+                                    <span class="block">De outros colaboradores: {{ implode(', ', ExplanationRenderer::tipos($contexto['tipos_gerais'])) }}.</span>
                                 @endif
                             @endif
                             @auth
@@ -324,7 +329,7 @@
                                                 <label class="flex items-start gap-2 p-2 rounded-lg border border-slate-100 hover:bg-slate-50 cursor-pointer">
                                                     <input type="checkbox" value="{{ $tipo }}" x-model="selecionados" class="mt-0.5 rounded border-slate-300">
                                                     <span>
-                                                        <span class="font-medium text-slate-900">{{ $tipo }}</span>
+                                                        <span class="font-medium text-slate-900">{{ ExplanationRenderer::tipo($tipo) }}</span>
                                                         <span class="block text-slate-600">
                                                             ({{ $origemTipo($tipo) }}; {{ $tipos['contagem'][$tipo] ?? 0 }} {{ ($tipos['contagem'][$tipo] ?? 0) === 1 ? 'REA' : 'REAs' }} desta busca)
                                                         </span>

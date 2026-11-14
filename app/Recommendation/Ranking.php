@@ -89,6 +89,25 @@ class Ranking
     }
 
     /**
+     * Grupo da meta que abre a lista: o primeiro com algum REA visível, ou null sem REAs. Quando não é o
+     * compatível, os REAs desse grupo estão no topo apesar do grau baixo, e a explicação diz por quê
+     * (ExplanationRenderer::faixa(), `$abreALista`).
+     */
+    public static function grupoTopo(iterable $reas, bool $comMeta): ?int
+    {
+        $topo = null;
+
+        foreach ($reas as $rea) {
+            if (self::visivel($rea, $comMeta)) {
+                $grupo = self::grupoMeta($rea, $comMeta);
+                $topo = $topo === null ? $grupo : min($topo, $grupo);
+            }
+        }
+
+        return $topo;
+    }
+
+    /**
      * Grau calculado dos critérios (a mesma regra do job e das correções); REAs antigos usam a faixa.
      */
     public static function grauDe($rea): int

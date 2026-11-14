@@ -265,8 +265,8 @@ Exemplos:
 | nível | falhou, regex | Nível estimado ensino medio (trecho “médio”), diferente do seu perfil (ensino fundamental). |
 | nível | falhou, assumido | O texto não menciona nenhuma etapa; o sistema assume ensino superior, diferente do seu perfil (…). |
 | nível | filtro_api | O MEC RED filtrou a busca pela etapa do seu perfil (ensino fundamental). |
-| tipo | ok | Tipo video, entre os tipos preferidos (video, livro digital). |
-| tipo | falhou | Tipo jogo não está entre os tipos preferidos (video, livro digital). |
+| tipo | ok | Tipo vídeo, entre os tipos preferidos (vídeo, livro digital). |
+| tipo | falhou | Tipo jogo não está entre os tipos preferidos (vídeo, livro digital). |
 | meta | ok, llm | Classificado por IA como Aprendizagem, compatível com a sua meta (Aprendizagem). |
 | meta | nao_avaliado | Não foi possível classificar a meta deste recurso (IA indisponível ou resposta inválida). |
 
@@ -274,12 +274,22 @@ Exemplos:
   `RuleClassifier::atende`, então nível assumido e `filtro_api` ficam em "Não verificado".
 - `faixa()` gera título, descrição e intervalo de grau do selo. Por exemplo, `profile` → "Nível", grau 2:
   "o nível bate com o seu perfil, mas o tipo não está entre os preferidos ou não foi conferido". Numa
-  busca com meta, `both`/`profile`/`interest` ganham ", meta não conferida".
+  busca com meta, `both`/`profile`/`interest` ganham ", meta não conferida" ou ", meta diferente da sua",
+  e a descrição diz a posição **em relação** aos outros grupos ("vêm depois dos compatíveis com a sua
+  meta e dos de meta não conferida, quando houver"), nunca "fim da lista": sem compatíveis, esses grupos
+  abrem a lista. Nesse caso (`$abreALista`, de `Ranking::grupoTopo()`), `contexto` acrescenta "Nesta
+  busca, nenhum REA teve meta compatível ou não conferida. Por isso a lista começa por este grupo…".
+  `selo` é a versão curta do título usada no cartão ("Grau 3 de 7 · meta diferente da sua").
 - `grau()` gera o selo ("Grau 5 de 7"), a conta ("Grau 5 de 7: meta +4, nível 0 (não atende),
   tipo +1.") e o desempate ("Entre REAs de mesmo grau, vale a posição no repositório: este é o 3º
-  resultado do Aquarela."). O critério com 0 ponto diz por quê: não atende, não verificado ou assumido.
+  resultado do Aquarela."). Nos grupos de meta não conferida ou diferente, o grupo vem antes do grau, e o
+  desempate diz isso: "No grupo de meta diferente da sua, a ordem é pelo grau; entre REAs de mesmo grau,
+  vale a posição…". O critério com 0 ponto diz por quê: não atende, não verificado ou assumido.
 - `avisos()` devolve "Estimativa automática (regex/IA): pode conter erros." quando algum critério
-  atendido ou não atendido veio de `regex` ou `llm`.
+  atendido ou não atendido veio de `regex` ou `llm`. O viés para "Aprendizagem" só é citado para modelos
+  em que foi medido (`MODELOS_COM_VIES`, hoje `gemma3:4b`).
+- Tipos são comparados sem acento; `tipo()`/`tipos()` devolvem a grafia legível (`TIPOS_LEGIVEIS`:
+  "programacao" → "programação", "video" → "vídeo").
 
 ## 8. Contexto do usuário (`FindREA::$contexto`)
 
@@ -357,8 +367,9 @@ Quatro pontos em que o sistema falhava calado ou omitia o que estava fazendo:
    repositórios… N de 3 responderam", em vez de só "Carregando". Isso cobre o efeito do `finished`
    prematuro (problema #2), em que a lista parecia pronta e continuava crescendo.
 3. **Classificação por IA**: o critério de meta guarda o modelo (`MetaClassifier::modelo()`, de
-   `config/llm.php`) e quanto tempo levou, e o texto os declara ("Modelo: gemma3:4b, em 1.23s"). O aviso de estimativa
-   automática menciona que o modelo local tende a favorecer "Aprendizagem" (problema #18).
+   `config/llm.php`) e quanto tempo levou, e o texto os declara ("Modelo: gemma3:4b, em 1,23 s"). O aviso de estimativa
+   automática menciona o viés para "Aprendizagem" só quando o modelo é o `gemma3:4b`, onde ele foi
+   medido (problema #18); com o Groq (`openai/gpt-oss-20b`) o aviso não fala de modelo local nem de viés.
 4. **REAs excluídos**: o painel de ordenação ganhou "Ver os REAs que não aparecem", com título,
    repositório, motivo e resumo dos critérios (até 20). A ação vira o evento `abriu_ocultos`.
 
@@ -413,7 +424,7 @@ Textos novos (`ExplanationRenderer`):
 
 O aviso de estimativa automática some para o critério corrigido. O painel **Como ordenamos** mostra
 "N REAs mudaram de faixa por correções suas" e **Desfazer todas**. Um REA cuja meta o usuário
-marcou como diferente da dele vai para o fim da lista e é contado em `meta_corrigida_incompativel`.
+marcou como diferente da dele vai para o grupo de meta diferente (depois dos compatíveis e dos de meta não conferida), sem que isso indique a qualidade do REA, e é contado em `meta_corrigida_incompativel`.
 
 Registro: cada correção e cada desfazer viram uma linha em `corrections` (ver [dados.md](dados.md)),
 e abrir um formulário de correção grava o evento `abriu_correcao` em `explanation_events`. No painel

@@ -63,9 +63,9 @@ class TiposPreferidosTest extends TestCase
             ['tipo' => RuleClassifier::criterioTipo($tipo, ['jogo', 'video'], $origem)], 'interest'
         )))->firstWhere('criterio', 'tipo')['texto'];
 
-        $this->assertSame('Tipo jogo, entre os tipos preferidos da sua conta (jogo, video).', $texto('Jogo', TiposPreferidos::CONTA));
-        $this->assertSame('Tipo livro não está entre os tipos preferidos da sua conta (jogo, video).', $texto('Livro', TiposPreferidos::CONTA));
-        $this->assertSame('Tipo jogo, entre os tipos preferidos da sua conta e dos colaboradores (jogo, video).', $texto('Jogo', TiposPreferidos::CONTA_E_COLABORADORES));
+        $this->assertSame('Tipo jogo, entre os tipos preferidos da sua conta (jogo, vídeo).', $texto('Jogo', TiposPreferidos::CONTA));
+        $this->assertSame('Tipo livro não está entre os tipos preferidos da sua conta (jogo, vídeo).', $texto('Livro', TiposPreferidos::CONTA));
+        $this->assertSame('Tipo jogo, entre os tipos preferidos da sua conta e dos colaboradores (jogo, vídeo).', $texto('Jogo', TiposPreferidos::CONTA_E_COLABORADORES));
     }
 
     public function test_editar_e_desfazer_na_busca_volta_a_lista_da_conta(): void

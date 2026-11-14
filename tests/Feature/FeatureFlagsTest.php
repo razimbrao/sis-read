@@ -390,7 +390,7 @@ class FeatureFlagsTest extends TestCase
 
         $ordens = array_map(fn ($grupo) => $this->titulosExibidos($this->componente($grupo, $user)), Experimento::GRUPOS);
 
-        // A meta diferente não esconde o REA: ele vai para o fim da lista.
+        // A meta diferente não esconde o REA: ele vem depois dos compatíveis.
         $this->assertSame(['Algoritmos no sexto ano', 'Grafos', 'Árvores'], $ordens[0]);
         $this->assertSame([$ordens[0], $ordens[0], $ordens[0]], $ordens);
     }

@@ -46,7 +46,7 @@ class ExplanationRendererTest extends TestCase
 
         $tipo = $this->linha($linhas, 'tipo');
         $this->assertSame('✗', $tipo['icone']);
-        $this->assertSame('Tipo jogo não está entre os tipos preferidos (video, livro digital).', $tipo['texto']);
+        $this->assertSame('Tipo jogo não está entre os tipos preferidos (vídeo, livro digital).', $tipo['texto']);
 
         $meta = $this->linha($linhas, 'meta');
         $this->assertSame('?', $meta['icone']);
@@ -147,7 +147,7 @@ class ExplanationRendererTest extends TestCase
         $c = RuleClassifier::criterioMeta('ma', 'Aprendizagem', 'gemma3:4b', 1.234);
         $texto = ExplanationRenderer::linhas(['criterios' => ['meta' => $c]])[0]['texto'];
 
-        $this->assertStringContainsString('Modelo: gemma3:4b, em 1.23s.', $texto);
+        $this->assertStringContainsString('Modelo: gemma3:4b, em 1,23 s.', $texto);
 
         $semModelo = ExplanationRenderer::linhas(['criterios' => ['meta' => RuleClassifier::criterioMeta('ma', 'Aprendizagem')]])[0]['texto'];
         $this->assertStringNotContainsString('Modelo:', $semModelo);
@@ -158,6 +158,11 @@ class ExplanationRendererTest extends TestCase
         $avisos = ExplanationRenderer::avisos(['criterios' => ['meta' => RuleClassifier::criterioMeta('ma', 'Aprendizagem', 'gemma3:4b', 1.0)]]);
 
         $this->assertStringContainsString('Aprendizagem', $avisos[0]);
+        $this->assertStringContainsString('gemma3:4b', $avisos[0]);
+
+        // Viés não medido em outros modelos: o aviso não afirma nada sobre eles nem chama o modelo de local.
+        $groq = ExplanationRenderer::avisos(['criterios' => ['meta' => RuleClassifier::criterioMeta('ma', 'Aprendizagem', 'openai/gpt-oss-20b', 0.52)]]);
+        $this->assertSame(['Estimativa automática (regex/IA): pode conter erros.'], $groq);
     }
 
     public function test_faixa(): void
@@ -228,7 +233,7 @@ class ExplanationRendererTest extends TestCase
             'tipo'
         );
 
-        $this->assertSame('Tipo jogo, entre os tipos preferidos que você definiu (jogo, video).', $linha(['jogo', 'video'])['texto']);
+        $this->assertSame('Tipo jogo, entre os tipos preferidos que você definiu (jogo, vídeo).', $linha(['jogo', 'video'])['texto']);
         $this->assertTrue($linha(['jogo'])['corrigido']);
         $this->assertFalse($linha(['jogo'])['corrigivel']);
         $this->assertSame('Tipo jogo não está entre os tipos preferidos que você definiu (livro).', $linha(['livro'])['texto']);
@@ -300,7 +305,13 @@ class ExplanationRendererTest extends TestCase
         $this->assertSame(7, $grau['maximo']);
         $this->assertSame('Grau 1 de 7', $grau['selo']);
         $this->assertSame('Grau 1 de 7: meta 0 (não verificado), nível 0 (assumido, não conferido), tipo +1.', $grau['conta']);
-        $this->assertSame('Entre REAs de mesmo grau, vale a posição no repositório: este é o 2º resultado do Eduplay.', $grau['desempate']);
+        $this->assertSame('No grupo de meta não conferida, a ordem é pelo grau; entre REAs de mesmo grau, vale a posição no repositório: este é o 2º resultado do Eduplay.', $grau['desempate']);
+
+        // Meta compatível: o grau ordena a lista toda; meta diferente: só dentro do grupo.
+        $criterios['meta'] = RuleClassifier::criterioMeta('ma', 'Aprendizagem', 'gemma3:4b', 1.0);
+        $this->assertStringStartsWith('Entre REAs de mesmo grau', ExplanationRenderer::grau(RuleClassifier::explicacao($criterios, 'meta_one', 2))['desempate']);
+        $criterios['meta'] = RuleClassifier::criterioMeta('mpe', 'Aprendizagem', 'gemma3:4b', 1.0);
+        $this->assertStringStartsWith('No grupo de meta diferente da sua', ExplanationRenderer::grau(RuleClassifier::explicacao($criterios, 'interest', 2))['desempate']);
 
         $falhou = ExplanationRenderer::grau(RuleClassifier::explicacao(['nivel' => ['status' => 'falhou'], 'tipo' => ['status' => 'ok']], 'interest'));
         $this->assertSame('Grau 1 de 3: nível 0 (não atende), tipo +1.', $falhou['conta']);
@@ -341,7 +352,17 @@ class ExplanationRendererTest extends TestCase
         $this->assertSame('Nível e tipo, meta não conferida ou diferente da sua', ExplanationRenderer::faixa('both', null, true)['titulo']);
         $diferente = UserCorrections::corrigirMeta($this->reaAquarela(), 'mpe');
         $this->assertSame('Tipo ou só tema, meta diferente da sua', ExplanationRenderer::faixa('interest', $diferente['explicacao'])['titulo']);
-        $this->assertStringContainsString('no fim da lista', ExplanationRenderer::faixa('interest', $diferente['explicacao'])['descricao']);
+        // A descrição é relativa aos outros grupos: o REA pode abrir a lista quando eles estão vazios.
+        $faixaDiferente = ExplanationRenderer::faixa('interest', $diferente['explicacao']);
+        $this->assertStringContainsString('vêm depois dos compatíveis com a sua meta e dos de meta não conferida, quando houver', $faixaDiferente['descricao']);
+        $this->assertStringNotContainsString('fim da lista', $faixaDiferente['descricao']);
+        $this->assertSame('meta diferente da sua', $faixaDiferente['selo']);
+        $this->assertNull($faixaDiferente['contexto']);
+        $this->assertStringContainsString('a lista começa por este grupo', ExplanationRenderer::faixa('interest', $diferente['explicacao'], false, true)['contexto']);
+        $this->assertStringContainsString('começa pelos de meta não conferida', ExplanationRenderer::faixa('interest', $this->reaAquarela()['explicacao'], false, true)['contexto']);
+        // Fora dos grupos de meta, não há contexto nem selo curto.
+        $this->assertNull(ExplanationRenderer::faixa('meta_both', null, true, true)['contexto']);
+        $this->assertSame('Nível e tipo', ExplanationRenderer::faixa('both')['selo']);
         $this->assertSame('Nível e tipo', ExplanationRenderer::faixa('both')['titulo']);
         $this->assertSame('Só meta', ExplanationRenderer::faixa('meta', null, true)['titulo']);
         $this->assertSame('Tipo ou só tema, meta não conferida', ExplanationRenderer::faixa('interest', $this->reaAquarela()['explicacao'])['titulo']);

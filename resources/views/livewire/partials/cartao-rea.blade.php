@@ -2,7 +2,10 @@
     use App\Recommendation\ExplanationRenderer;
 
     $explicacao = $rea->explicacao ?? null;
-    $faixa = ExplanationRenderer::faixa($rea->recommended ?? null, $explicacao);
+    // Grupo de meta não conferida ou diferente abrindo a lista: a explicação diz por que ele está no topo.
+    $abreALista = ($grupoTopo ?? null) > \App\Recommendation\Ranking::GRUPO_COMPATIVEL
+        && \App\Recommendation\Ranking::grupoMeta($rea, true) === $grupoTopo;
+    $faixa = ExplanationRenderer::faixa($rea->recommended ?? null, $explicacao, false, $abreALista);
     $grau = ExplanationRenderer::grau($explicacao);
     $criterioMeta = collect(ExplanationRenderer::linhas($explicacao))->firstWhere('criterio', 'meta');
     // O destaque existia antes da transparência e não fica atrás de flag (docs/feature-flags.md).
@@ -13,7 +16,7 @@
         empty($rea->link) && ($rea->repositorio ?? null) === 'MECRED' ? \App\Jobs\ProcessMecRed::linkPublico($rea->id ?? null) : null,
     ]));
     $descricao = filled($rea->descricao ?? null) ? \Illuminate\Support\Str::limit(trim(html_entity_decode(strip_tags($rea->descricao))), 260) : null;
-    $textosMeta = ['ok' => 'compatível com a sua meta', 'falhou' => 'diferente da sua meta', 'filtro_api' => 'filtrada pelo repositório'];
+    $textosMeta = ['ok' => 'compatível com a sua', 'falhou' => 'diferente da sua', 'filtro_api' => 'filtrada pelo repositório'];
 @endphp
 <li
     x-data="{ aberto: false }"
@@ -38,7 +41,7 @@
                                     @endfor
                                 </span>
                             @endif
-                            {{ $grau ? $grau['selo'].' · ' : '' }}{{ $faixa['titulo'] }}
+                            {{ $grau ? $grau['selo'].' · ' : '' }}{{ $faixa['selo'] }}
                         </span>
                     @endif
                 @endexplicabilidade

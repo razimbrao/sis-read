@@ -39,6 +39,7 @@
                         $repos = $this->statusRepositorios($data);
                         $respondidos = collect($repos)->reject(fn ($r) => $r['situacao'] === 'aguardando')->count();
                         $pagina = $data->data ? $this->paginate($data) : null;
+                        $grupoTopo = $data->data ? $this->grupoTopo($data) : null;
                     @endphp
 
                     <div class="space-y-5">
@@ -98,6 +99,7 @@
                                         'posicao' => $pagina->firstItem() + $loop->index,
                                         'chaveLinha' => $chaveLinha,
                                         'podeCorrigir' => $podeCorrigir,
+                                        'grupoTopo' => $grupoTopo,
                                     ])
                                 @endforeach
                             </ol>
