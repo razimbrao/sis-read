@@ -295,7 +295,7 @@
                                     <button
                                         type="button"
                                         class="min-h-11 px-3.5 rounded-lg border border-indigo-200 bg-white text-sm font-medium text-indigo-700 hover:bg-indigo-50"
-                                        @click="$dispatch('editar-tipos'); $wire.registrarExplicacao('abriu_correcao')"
+                                        @click="$store.tipos.abrir(); $wire.registrarExplicacao('abriu_correcao')"
                                     >Editar tipos preferidos</button>
                                     @if ($tipos['editados'])
                                         <button
