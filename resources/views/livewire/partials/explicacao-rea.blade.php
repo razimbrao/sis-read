@@ -13,6 +13,9 @@
     $chave = $rea->chave ?? null;
     $temCorrigivel = $chave && \App\Experimento\Experimento::ativa('escrutabilidade') && collect($linhas)->contains('corrigivel', true);
     $politica = ! empty(is_array($explicacao) ? ($explicacao['observacao'] ?? null) : ($explicacao->observacao ?? null));
+    // Tipo comparado com os preferidos (Aquarela e Eduplay): o botão abre o modal da página (modal-tipos).
+    $criterioTipo = (json_decode(json_encode($explicacao), true) ?? [])['criterios']['tipo'] ?? null;
+    $editaTipos = ($tiposEditaveis ?? false) && ! $politica && \App\Recommendation\RuleClassifier::tipoComparavel($criterioTipo);
 @endphp
 <div class="space-y-4 text-[15px] break-words">
     <div class="bg-white rounded-xl border border-indigo-100 p-4 space-y-1.5">
@@ -61,6 +64,15 @@
                                 ])
                             </span>
                         @endif
+                        @if ($editaTipos && $linha['criterio'] === 'tipo')
+                            <span class="block mt-2">
+                                <button
+                                    type="button"
+                                    class="min-h-11 px-3.5 rounded-lg border border-indigo-300 bg-white text-sm font-semibold text-indigo-800 hover:bg-indigo-50"
+                                    @click="$dispatch('editar-tipos', { tipo: @js($criterioTipo['valor'] ?? null) }); $wire.registrarExplicacao('abriu_correcao', @js($rea->repositorio ?? null), @js($rea->title ?? null), @js($rea->recommended ?? null))"
+                                >Editar tipos preferidos</button>
+                            </span>
+                        @endif
                     </span>
                 </li>
             @endforeach
@@ -74,6 +86,10 @@
             <p>O sistema estimou o nível ou a meta deste REA. Se estiver errado, corrija: a lista se reorganiza com a sua informação.</p>
         @elseif ($politica)
             <p>Os critérios deste REA não podem ser corrigidos: a posição dele é definida por política do repositório.</p>
+        @endif
+        @if ($editaTipos)
+            {{-- O tipo não é estimado: é comparado com a lista de preferidos, que vale para todos os REAs da busca. --}}
+            <p>O tipo deste REA não é uma estimativa: ele é comparado com os seus tipos preferidos. Mudar essa lista reclassifica todos os REAs desta busca.</p>
         @endif
         @foreach (ExplanationRenderer::avisos($explicacao) as $aviso)
             <p class="italic">{{ $aviso }}</p>

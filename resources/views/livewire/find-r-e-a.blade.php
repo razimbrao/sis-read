@@ -40,6 +40,9 @@
                         $respondidos = collect($repos)->reject(fn ($r) => $r['situacao'] === 'aguardando')->count();
                         $pagina = $data->data ? $this->paginate($data) : null;
                         $grupoTopo = $data->data ? $this->grupoTopo($data) : null;
+                        $tipos = $data->data ? $this->tiposPreferidos($data) : null;
+                        // O modal de tipos preferidos só existe quando editar tem efeito (algum REA comparável).
+                        $tiposEditaveis = $podeCorrigir && ! empty($tipos['opcoes']);
                     @endphp
 
                     <div class="space-y-5">
@@ -59,6 +62,13 @@
                         @error('correcao')
                             <div class="p-3 rounded-xl bg-red-50 border border-red-200 text-red-800 text-[15px]" role="alert">{{ $message }}</div>
                         @enderror
+                        {{-- Avisos das ações de escrutabilidade: ficam acima da lista, visíveis mesmo com os painéis fechados ou desligados. --}}
+                        @if ($avisoCorrecao)
+                            <div class="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-[15px]" role="status">{{ \App\Recommendation\ExplanationRenderer::MARCA_CORRECAO }} {{ $avisoCorrecao }}</div>
+                        @endif
+                        @if ($avisoPreferencia)
+                            <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-[15px]" role="status">{{ $avisoPreferencia }}</div>
+                        @endif
 
                         @if ($respondidos < count($repos))
                             @include('livewire.partials.progresso-busca', ['repos' => $repos, 'respondidos' => $respondidos])
@@ -71,8 +81,7 @@
                                 'repositorios' => $repos,
                                 'ocultos' => $this->ocultos($data),
                                 'podeCorrigir' => $podeCorrigir,
-                                'tipos' => $this->tiposPreferidos($data),
-                                'avisoPreferencia' => $avisoPreferencia,
+                                'tipos' => $tipos,
                             ])
                         @endif
 
@@ -100,10 +109,15 @@
                                         'chaveLinha' => $chaveLinha,
                                         'podeCorrigir' => $podeCorrigir,
                                         'grupoTopo' => $grupoTopo,
+                                        'tiposEditaveis' => $tiposEditaveis,
                                     ])
                                 @endforeach
                             </ol>
                         </div>
+
+                        @if ($tiposEditaveis)
+                            @include('livewire.partials.modal-tipos', ['tipos' => $tipos, 'contexto' => $this->contexto])
+                        @endif
 
                         @if ($pagina && $pagina->lastPage() > 1)
                             @include('livewire.partials.paginacao', ['pagina' => $pagina])

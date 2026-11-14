@@ -155,6 +155,8 @@ class EscrutabilidadeTest extends TestCase
 
         $this->assertSame(['Grafos', 'Árvores'], $this->titulosExibidos($componente));
         $this->assertSame($user->id, Correction::sole()->user_id);
+        // A lista se reordena: o aviso diz para onde o REA foi.
+        $componente->assertSet('avisoCorrecao', '“Grafos” foi da posição #2 para a #1.');
     }
 
     public function test_desfazer_restaura_e_registra(): void
@@ -389,6 +391,26 @@ class EscrutabilidadeTest extends TestCase
             ->set('contexto', $this->contexto())
             ->assertSee('Você poderá editar os tipos preferidos quando todos os repositórios responderem.')
             ->assertDontSee('Editar tipos preferidos');
+    }
+
+    public function test_criterio_de_tipo_abre_o_modal_de_tipos_preferidos(): void
+    {
+        $this->busca([$this->aquarela('Grafos', 'Jogo'), $this->mecRed('Filas')]);
+
+        $componente = $this->componente()->set('userType', 'usuario')->set('interestApiSearch', 'algoritmos')
+            ->set('contexto', $this->contexto())
+            // Um único modal na página, aberto pelo evento `editar-tipos`.
+            ->assertSee('id="modal-tipos-titulo"', false)
+            ->assertSee('@editar-tipos.window', false);
+
+        // Só o REA cujo tipo é comparado com os preferidos ganha o botão, e ele leva o tipo do REA ao modal.
+        $html = $componente->html();
+        $this->assertSame(1, substr_count($html, "\$dispatch('editar-tipos', { tipo:"));
+        $this->assertStringContainsString("\$dispatch('editar-tipos', { tipo: 'jogo' })", $html);
+
+        // O modal aplica pela mesma ação do painel, que continua recusando sem a flag (FeatureFlagsTest).
+        $componente->call('redefinirTipos', ['video', 'jogo'])->assertHasNoErrors();
+        $this->assertSame('ok', $this->gravados()[0]['explicacao']['criterios']['tipo']['status']);
     }
 
     private function contexto(): array
