@@ -12,13 +12,6 @@
         // MEC RED gravado antes do link: monta pelo id, se houver.
         empty($rea->link) && ($rea->repositorio ?? null) === 'MECRED' ? \App\Jobs\ProcessMecRed::linkPublico($rea->id ?? null) : null,
     ]));
-    // Só as características preenchidas: "Não especificado" em todo cartão vira ruído.
-    $caracteristicas = collect([
-        'Interatividade' => $rea->interatividade ?? null,
-        'Nível de interatividade' => $rea->nivel_interatividade ?? null,
-        'Estilo de aprendizagem' => $rea->estilo_aprendizagem ?? null,
-        'Estratégia' => $rea->estrategia ?? null,
-    ])->filter(fn ($v) => filled($v) && mb_strtolower(trim($v)) !== 'não especificado');
     $descricao = filled($rea->descricao ?? null) ? \Illuminate\Support\Str::limit(trim(html_entity_decode(strip_tags($rea->descricao))), 260) : null;
     $textosMeta = ['ok' => 'compatível com a sua meta', 'falhou' => 'diferente da sua meta', 'filtro_api' => 'filtrada pelo repositório'];
 @endphp
@@ -62,12 +55,10 @@
                 <p class="text-[15px] leading-relaxed text-slate-600 max-w-prose line-clamp-2 break-words">{{ $descricao }}</p>
             @endif
 
-            @if ($caracteristicas->isNotEmpty() || $criterioMeta)
+            @if ($criterioMeta)
                 <p class="text-sm text-slate-600 break-words">
-                    {{ $caracteristicas->map(fn ($v, $k) => $k.': '.$v)->implode(' · ') }}
                     @explicabilidade('explicacao-rea')
                         @if ($criterioMeta)
-                            @if ($caracteristicas->isNotEmpty()) · @endif
                             <span title="{{ $criterioMeta['texto'] }}" @class([
                                 'font-medium',
                                 'text-green-800' => $criterioMeta['status'] === 'ok',
