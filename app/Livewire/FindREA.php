@@ -21,6 +21,7 @@ use App\Recommendation\UserCorrections;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Livewire\Attributes\Renderless;
 use Livewire\Attributes\Validate;
@@ -122,9 +123,12 @@ class FindREA extends Component
     public ?string $avisoPreferencia = null;
 
     /**
-     * Para onde o REA foi depois de uma correção de nível ou meta (a lista se reordena e ele some de vista).
+     * Notificação temporária depois de uma correção de nível ou meta: a lista se reordena e o REA some de
+     * vista, então ela diz para onde ele foi e se a faixa mudou, e leva até ele (`alvo`, `pagina`).
+     *
+     * @var array{id: string, texto: string, detalhe: ?string, alvo: ?string, pagina: ?int}|null
      */
-    public ?string $avisoCorrecao = null;
+    public ?array $notificacao = null;
 
     public function updatedMessage($value)
     {
@@ -702,7 +706,7 @@ class FindREA extends Component
         }
 
         $this->resetErrorBag('correcao');
-        $this->avisoCorrecao = null;
+        $this->notificacao = null;
         $data = $this->dadosDaBusca();
 
         if (! $this->podeCorrigir($data)) {
@@ -753,11 +757,26 @@ class FindREA extends Component
             ]);
         });
 
-        $this->avisoCorrecao = $this->textoPosicao(
-            $antes['title'] ?? 'O REA',
-            $this->posicaoNaLista($originais, $chave),
-            $this->posicaoNaLista($reas, $chave)
-        );
+        $posicao = $this->posicaoNaLista($reas, $chave);
+
+        $this->notificacao = [
+            // Id novo a cada correção: o elemento da notificação é trocado e o tempo recomeça.
+            'id' => (string) Str::uuid(),
+            'texto' => $this->textoPosicao($antes['title'] ?? 'O REA', $this->posicaoNaLista($originais, $chave), $posicao),
+            'detalhe' => ($antes['recommended'] ?? null) !== ($depois['recommended'] ?? null)
+                ? ExplanationRenderer::mudancaFaixa($depois['explicacao'] ?? null)
+                : null,
+            'alvo' => $posicao === null ? null : self::idDoCartao($chave),
+            'pagina' => $posicao === null ? null : (int) ceil($posicao / 10),
+        ];
+    }
+
+    /**
+     * Id do cartão do REA na página, para a notificação levar até ele.
+     */
+    public static function idDoCartao(string $chave): string
+    {
+        return 'rea-'.md5($chave);
     }
 
     /**
@@ -878,7 +897,7 @@ class FindREA extends Component
         $this->timestampSession = now()->setTimezone('UTC');
         $this->page = 1;
         $this->avisoPreferencia = null;
-        $this->avisoCorrecao = null;
+        $this->notificacao = null;
 
         Searches::create([
             'interest' => $this->sanitizeSearch($this->interest),
