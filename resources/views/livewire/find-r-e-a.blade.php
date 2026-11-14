@@ -62,10 +62,11 @@
                         @error('correcao')
                             <div class="p-3 rounded-xl bg-red-50 border border-red-200 text-red-800 text-[15px]" role="alert">{{ $message }}</div>
                         @enderror
-                        {{-- Avisos das ações de escrutabilidade: ficam acima da lista, visíveis mesmo com os painéis fechados ou desligados. --}}
-                        @if ($avisoCorrecao)
-                            <div class="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-[15px]" role="status">{{ \App\Recommendation\ExplanationRenderer::MARCA_CORRECAO }} {{ $avisoCorrecao }}</div>
+                        {{-- Correção de nível ou meta: notificação temporária, visível de onde o usuário estiver na lista. --}}
+                        @if ($notificacao)
+                            @include('livewire.partials.notificacao', ['notificacao' => $notificacao])
                         @endif
+                        {{-- Preferência salva na conta: fica acima da lista, visível mesmo com os painéis fechados ou desligados. --}}
                         @if ($avisoPreferencia)
                             <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-[15px]" role="status">{{ $avisoPreferencia }}</div>
                         @endif

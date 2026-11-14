@@ -155,8 +155,14 @@ class EscrutabilidadeTest extends TestCase
 
         $this->assertSame(['Grafos', 'Árvores'], $this->titulosExibidos($componente));
         $this->assertSame($user->id, Correction::sole()->user_id);
-        // A lista se reordena: o aviso diz para onde o REA foi.
-        $componente->assertSet('avisoCorrecao', '“Grafos” foi da posição #2 para a #1.');
+        // A lista se reordena: a notificação diz para onde o REA foi, a mudança de faixa, e leva até ele.
+        $notificacao = $componente->get('notificacao');
+        $this->assertSame('“Grafos” foi da posição #2 para a #1.', $notificacao['texto']);
+        $this->assertStringStartsWith('Faixa alterada pela sua correção', $notificacao['detalhe']);
+        $this->assertSame([FindREA::idDoCartao($diferente['chave']), 1], [$notificacao['alvo'], $notificacao['pagina']]);
+        $componente->set('userType', 'usuario')->set('interestApiSearch', 'algoritmos')
+            ->assertSee('Ver na lista')
+            ->assertSee('id="'.FindREA::idDoCartao($diferente['chave']).'"', false);
     }
 
     public function test_desfazer_restaura_e_registra(): void
@@ -360,7 +366,7 @@ class EscrutabilidadeTest extends TestCase
 
         $this->componente()->set('userType', 'usuario')->set('interestApiSearch', 'algoritmos')
             ->set('contexto', $this->contexto())
-            ->assertSee('Editar tipos preferidos')
+            ->assertSee('Mudar nesta busca')
             ->assertSee('jogo')
             ->assertSee('(aparece nos REAs desta busca; 2 REAs desta busca)', false)
             ->assertSee('(colaboradores, mesmo interesse e perfil; 1 REA desta busca)', false)
@@ -390,7 +396,7 @@ class EscrutabilidadeTest extends TestCase
         $this->componente()->set('userType', 'usuario')->set('interestApiSearch', 'algoritmos')
             ->set('contexto', $this->contexto())
             ->assertSee('Você poderá editar os tipos preferidos quando todos os repositórios responderem.')
-            ->assertDontSee('Editar tipos preferidos');
+            ->assertDontSee('Mudar nesta busca')->assertDontSee('Mudar tipos nesta busca');
     }
 
     public function test_criterio_de_tipo_abre_o_modal_de_tipos_preferidos(): void

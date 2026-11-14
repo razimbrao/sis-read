@@ -593,7 +593,7 @@ sequenceDiagram
 | painel **Como ordenamos** | `abriu_ordenacao` | — |
 | painel **O que usamos sobre você** | `abriu_contexto` | — |
 | **Ver os REAs que não aparecem** | `abriu_ocultos` | — |
-| **Corrigir** (nível, meta) ou **Editar tipos preferidos** | `abriu_correcao` | repositório, título, faixa (vazios no painel de tipos) |
+| **Corrigir** (nível, meta) ou **Mudar tipos nesta busca** (cartão) ou **Mudar nesta busca** (painel) | `abriu_correcao` | repositório, título, faixa (vazios no painel de tipos) |
 
 Os painéis usam `<details>` com `wire:ignore.self`, para que o *poll* não feche o painel que o
 usuário abriu. O evento é disparado no `toggle`, só quando o painel abre.
@@ -669,7 +669,7 @@ stateDiagram-v2
 
 ```mermaid
 flowchart LR
-    A["Painel 'O que usamos sobre você'<br/>Editar tipos preferidos"] --> B["checklist: tipos do sistema<br/>∪ tipos dos REAs da busca<br/>com origem e nº de REAs"]
+    A["Painel 'O que usamos sobre você'<br/>Mudar nesta busca"] --> B["checklist: tipos do sistema<br/>∪ tipos dos REAs da busca<br/>com origem e nº de REAs"]
     B --> C["redefinirTipos(lista)"]
     C --> D["todo REA com tipo de fonte colaboradores:<br/>esperado = lista nova<br/>esperado_original guardado"]
     D --> E["rotular → nova faixa"]

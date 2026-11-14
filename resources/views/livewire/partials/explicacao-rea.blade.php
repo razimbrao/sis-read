@@ -70,7 +70,7 @@
                                     type="button"
                                     class="min-h-11 px-3.5 rounded-lg border border-indigo-300 bg-white text-sm font-semibold text-indigo-800 hover:bg-indigo-50"
                                     @click="$store.tipos.abrir(@js($criterioTipo['valor'] ?? null)); $wire.registrarExplicacao('abriu_correcao', @js($rea->repositorio ?? null), @js($rea->title ?? null), @js($rea->recommended ?? null))"
-                                >Editar tipos preferidos</button>
+                                >Mudar tipos nesta busca</button>
                             </span>
                         @endif
                     </span>
