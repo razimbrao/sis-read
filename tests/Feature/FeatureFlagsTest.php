@@ -263,7 +263,7 @@ class FeatureFlagsTest extends TestCase
             ->assertSee('O que usamos sobre você')
             ->assertDontSee('Qual é a etapa deste REA?')
             ->assertDontSee('Qual é a meta deste REA?')
-            ->assertDontSee('Editar tipos preferidos')
+            ->assertDontSee('Mudar nesta busca')->assertDontSee('Mudar tipos nesta busca')
             ->assertDontSee('Você poderá corrigir')
             ->assertDontSee('Você poderá editar os tipos preferidos');
     }
@@ -276,7 +276,7 @@ class FeatureFlagsTest extends TestCase
             ->assertSee('Por que este REA?')
             ->assertSee('Qual é a etapa deste REA?')
             ->assertSee('Qual é a meta deste REA?')
-            ->assertSee('Editar tipos preferidos');
+            ->assertSee('Mudar nesta busca');
     }
 
     public function test_flag_de_ocultos_desligada_mantem_o_painel_de_ordenacao(): void

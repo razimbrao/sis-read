@@ -389,7 +389,7 @@ diagramas: [plano-escrutabilidade.md](plano-escrutabilidade.md). Fluxo:
 |---|---|---|
 | Nível do REA (fonte `regex`) | **Por que este REA?** → Corrigir | status recalculado contra o perfil |
 | Meta do REA (fonte `llm`) | **Por que este REA?** | status recalculado contra a meta do usuário; o REA muda de grupo (sobe para os compatíveis ou desce para meta diferente) |
-| Tipos preferidos | **O que usamos sobre você** → Editar tipos preferidos | critério de tipo recalculado em todos os REAs comparáveis; logado, pode também salvar na conta |
+| Tipos preferidos | **O que usamos sobre você** → Mudar nesta busca | critério de tipo recalculado em todos os REAs comparáveis; logado, pode também salvar na conta |
 | Tipos preferidos da conta | **Minhas preferências** (`/conta/preferencias`) | vale em todas as buscas seguintes do usuário |
 
 Regras:
@@ -440,8 +440,9 @@ Detalhes em [plano-escrutabilidade.md §15](plano-escrutabilidade.md#15-tipos-pr
   busca (`RuleClassifier::tipoComparavel`). O grau soma o ponto do tipo pela mesma regra
   (`RuleClassifier::atende`), qualquer que seja a fonte.
 - **O que usamos sobre você** mostra "Da sua conta: …", se substituem ou se unem aos tipos dos
-  colaboradores, e o link **Editar os tipos da sua conta**. Sem preferência, o link é **Salvar tipos
-  preferidos na sua conta**. Visitantes não veem o link.
+  colaboradores, e o link **Preferência da conta (próximas buscas)**. Sem preferência, o link é **Salvar como
+  preferência da conta (próximas buscas)**. O nome diz a diferença para o botão **Mudar nesta busca**,
+  que reclassifica a busca atual sem mexer na conta. Visitantes não veem o link.
 - Editar os tipos na busca oferece **Salvar também como minha preferência** (marcada por padrão para
   quem está logado). Desfazer na busca volta à lista com que a busca começou (a da conta, se havia)
   e não muda a conta.

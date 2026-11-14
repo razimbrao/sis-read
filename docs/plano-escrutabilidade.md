@@ -229,7 +229,7 @@ sequenceDiagram
     participant UC as UserCorrections
     participant DB as SQLite
 
-    U->>F: abre "O que usamos sobre você" → "Editar tipos preferidos"
+    U->>F: abre "O que usamos sobre você" → "Mudar nesta busca"
     F-->>U: checklist: tipos preferidos atuais ∪ tipos presentes nos REAs da busca<br/>marcados os que estão em uso, com a origem de cada um
     U->>F: redefinirTipos(['video', 'jogo'])
     F->>F: normalizarTipos + valida contra as opções oferecidas
@@ -423,7 +423,7 @@ flowchart TD
     I -- não --> S["tipos da conta<br/>fonte: usuario, inclui_colaboradores: false"]
     I -- sim --> UN["conta ∪ colaboradores<br/>fonte: usuario, inclui_colaboradores: true"]
     C & S & UN --> J["ProcessAquarela / ProcessEduplay → criterioTipo<br/>(grau e rótulo pela mesma regra)"]
-    J --> B["busca: Editar tipos preferidos<br/>(esperado_original = lista inicial)"]
+    J --> B["busca: Mudar nesta busca<br/>(esperado_original = lista inicial)"]
     B -- "Salvar também como minha preferência" --> CT[("users.tipos_preferidos")]
     CT -. próxima busca .-> U
 ```

@@ -281,7 +281,7 @@
                             @endif
                             @auth
                                 <a href="{{ comParams(route('preferencias')) }}" class="inline-flex items-center min-h-11 text-sm text-indigo-700 hover:underline">
-                                    {{ $daConta ? 'Editar os tipos da sua conta' : 'Salvar tipos preferidos na sua conta' }}
+                                    {{ $daConta ? 'Preferência da conta (próximas buscas)' : 'Salvar como preferência da conta (próximas buscas)' }}
                                 </a>
                             @endauth
 
@@ -296,7 +296,7 @@
                                         type="button"
                                         class="min-h-11 px-3.5 rounded-lg border border-indigo-200 bg-white text-sm font-medium text-indigo-700 hover:bg-indigo-50"
                                         @click="$store.tipos.abrir(); $wire.registrarExplicacao('abriu_correcao')"
-                                    >Editar tipos preferidos</button>
+                                    >Mudar nesta busca</button>
                                     @if ($tipos['editados'])
                                         <button
                                             type="button"
