@@ -33,6 +33,7 @@
                 @click="$wire.{{ $acao }}(@js($chave), valor); editando = false; valor = ''"
             >Salvar correção</button>
             <button type="button" class="min-h-11 px-3.5 rounded-lg border border-slate-300 bg-white font-semibold text-slate-800 hover:bg-slate-50" @click="editando = false; valor = ''">Cancelar</button>
+            <span class="basis-full text-slate-600">A lista se reorganiza com a sua informação: este REA pode subir ou descer. Você pode desfazer depois.</span>
         </span>
     </span>
     @if ($corrigido)

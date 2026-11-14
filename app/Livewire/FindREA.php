@@ -121,6 +121,11 @@ class FindREA extends Component
      */
     public ?string $avisoPreferencia = null;
 
+    /**
+     * Para onde o REA foi depois de uma correção de nível ou meta (a lista se reordena e ele some de vista).
+     */
+    public ?string $avisoCorrecao = null;
+
     public function updatedMessage($value)
     {
         $this->charCount = strlen($value);
@@ -697,6 +702,7 @@ class FindREA extends Component
         }
 
         $this->resetErrorBag('correcao');
+        $this->avisoCorrecao = null;
         $data = $this->dadosDaBusca();
 
         if (! $this->podeCorrigir($data)) {
@@ -706,6 +712,7 @@ class FindREA extends Component
         }
 
         $reas = json_decode($data->data, true) ?? [];
+        $originais = $reas;
         $antes = null;
         $depois = null;
 
@@ -745,6 +752,35 @@ class FindREA extends Component
                 'itens_afetados' => ($antes['recommended'] ?? null) !== ($depois['recommended'] ?? null) ? 1 : 0,
             ]);
         });
+
+        $this->avisoCorrecao = $this->textoPosicao(
+            $antes['title'] ?? 'O REA',
+            $this->posicaoNaLista($originais, $chave),
+            $this->posicaoNaLista($reas, $chave)
+        );
+    }
+
+    /**
+     * Posição (1-based) do REA na lista exibida, ou null se ele não aparece.
+     */
+    private function posicaoNaLista(array $reas, string $chave): ?int
+    {
+        foreach (Ranking::ordenar($reas, $this->temMeta()) as $i => $rea) {
+            if (($rea['chave'] ?? null) === $chave) {
+                return $i + 1;
+            }
+        }
+
+        return null;
+    }
+
+    private function textoPosicao(string $titulo, ?int $antes, ?int $depois): string
+    {
+        return match (true) {
+            $depois === null => "“{$titulo}” não aparece mais na lista.",
+            $antes === null || $antes === $depois => "“{$titulo}” continua na posição #{$depois}.",
+            default => "“{$titulo}” foi da posição #{$antes} para a #{$depois}.",
+        };
     }
 
     /**
@@ -842,6 +878,7 @@ class FindREA extends Component
         $this->timestampSession = now()->setTimezone('UTC');
         $this->page = 1;
         $this->avisoPreferencia = null;
+        $this->avisoCorrecao = null;
 
         Searches::create([
             'interest' => $this->sanitizeSearch($this->interest),
