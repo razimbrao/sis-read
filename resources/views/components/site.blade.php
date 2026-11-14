@@ -21,6 +21,35 @@
                 },
             };
         </script>
+        <script>
+            // Estado do modal de tipos preferidos (livewire/partials/modal-tipos). Fica numa store global, e
+            // não no x-data do modal, porque o poll da busca re-renderiza a página a cada 2 s: um clique que
+            // coincidisse com o re-render perdia o estado e o modal não abria (intermitente).
+            document.addEventListener('alpine:init', () => {
+                Alpine.store('tipos', {
+                    aberto: false,
+                    selecionados: [],
+                    salvarNaConta: false,
+                    tipoRea: null,
+                    origem: null,
+                    abrir(tipo = null) {
+                        const modal = document.getElementById('modal-tipos');
+                        if (! modal) return;
+                        const nomes = JSON.parse(modal.dataset.nomes || '{}');
+                        this.origem = document.activeElement;
+                        this.selecionados = JSON.parse(modal.dataset.atuais || '[]');
+                        this.salvarNaConta = modal.dataset.salvarNaConta === '1';
+                        this.tipoRea = tipo && nomes[tipo] ? tipo : null;
+                        this.aberto = true;
+                    },
+                    fechar() {
+                        this.aberto = false;
+                        const origem = this.origem;
+                        setTimeout(() => origem && origem.isConnected && origem.focus());
+                    },
+                });
+            });
+        </script>
         <style>
             /* Foco sempre visível para quem navega pelo teclado. */
             :focus-visible { outline: 3px solid #047857; outline-offset: 2px; border-radius: 6px; }
