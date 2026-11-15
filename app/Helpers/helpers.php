@@ -3,7 +3,8 @@
 if (! function_exists('comParams')) {
     /**
      * Acrescenta a um link interno os query params da página atual, para que eles acompanhem a navegação.
-     * Os params do próprio link têm prioridade. `secao` e `page` dizem respeito só à página em que estão.
+     * Os params do próprio link têm prioridade. `secao`, `page` e `busca` dizem respeito só à página em que
+     * estão: com `busca`, a logo e "Buscar recursos" reabririam a busca anterior em vez da tela inicial.
      *
      * Em POST (Livewire, logout) a query da requisição não é a da página, então ela vem do Referer.
      */
@@ -25,7 +26,7 @@ if (! function_exists('comParams')) {
         [$caminho, $query] = array_pad(explode('?', $url, 2), 2, '');
         parse_str($query, $doLink);
 
-        $params = array_replace(\Illuminate\Support\Arr::except($atuais, ['secao', 'page']), $doLink);
+        $params = array_replace(\Illuminate\Support\Arr::except($atuais, ['secao', 'page', 'busca']), $doLink);
 
         return $params ? $caminho.'?'.\Illuminate\Support\Arr::query($params) : $url;
     }

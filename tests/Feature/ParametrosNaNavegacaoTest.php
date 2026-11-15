@@ -23,6 +23,19 @@ class ParametrosNaNavegacaoTest extends TestCase
             ->assertSee(route('privacidade').'?grupo=controle&utm_source=email');
     }
 
+    /**
+     * A logo, "Buscar recursos" e "Mudar busca" voltam à tela inicial: `busca` não acompanha os links,
+     * senão o mount() reabriria a busca anterior. O grupo continua.
+     */
+    public function test_busca_nao_acompanha_os_links(): void
+    {
+        $tela = $this->get('/?grupo=controle&busca=123')->assertOk();
+
+        $tela->assertSee('href="'.url('/').'?grupo=controle"', false)
+            ->assertSee(route('login').'?grupo=controle')
+            ->assertDontSee('busca=123');
+    }
+
     public function test_secao_nao_acompanha_e_a_do_link_tem_prioridade(): void
     {
         $tela = $this->get('/?secao=colaborar&utm_source=email')->assertOk();
