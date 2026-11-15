@@ -11,6 +11,8 @@ use App\Models\Data;
 use App\Models\ExplanationEvent;
 use App\Models\Questionnaire;
 use App\Models\User;
+use App\Recommendation\ExplanationRenderer;
+use App\Recommendation\Ranking;
 use App\Recommendation\RuleClassifier;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -282,6 +284,50 @@ class FindREATransparenciaTest extends TestCase
         ]);
 
         $this->assertCount(3, Livewire::test(FindREA::class)->instance()->ocultos($data, 3));
+    }
+
+    public function test_item_sem_o_tema_vai_para_os_ocultos_e_fora_da_lista(): void
+    {
+        $semTema = fn (string $titulo, string $rotulo) => [
+            'title' => $titulo,
+            'recommended' => $rotulo,
+            'repositorio' => 'Eduplay',
+            'explicacao' => [
+                'criterios' => [
+                    'tema' => RuleClassifier::criterioTema('reconhecimento de padrões', 'Eduplay', $titulo, ''),
+                    'nivel' => RuleClassifier::criterioNivel('Ensino médio', RuleClassifier::inferirNivel($titulo, '')),
+                ],
+            ],
+        ];
+
+        $data = Data::create([
+            'searched_at' => '2026-09-30 12:00:00',
+            'data' => json_encode([
+                // Grau alto (nível e tipo), mas o texto não fala do tema: fica oculto.
+                $semTema('Reconhecimento da união homoafetiva', 'both'),
+                $semTema('Padrões em sequências lógicas', 'profile'),
+            ]),
+        ]);
+
+        $componente = Livewire::test(FindREA::class)->instance();
+
+        $ocultos = $componente->ocultos($data);
+        $this->assertCount(1, $ocultos);
+        $this->assertSame('Reconhecimento da união homoafetiva', $ocultos[0]['titulo']);
+        $this->assertSame('tema', $ocultos[0]['motivo']);
+        $this->assertSame(
+            'Não encontramos “Reconhecimento de padrões” no título nem na descrição.',
+            ExplanationRenderer::linhas(json_decode($data->data)[0]->explicacao)[0]['texto']
+        );
+
+        $resumo = $componente->resumoOrdenacao($data);
+        $this->assertSame(1, $resumo['ocultos']);
+        $this->assertSame(1, $resumo['motivos_ocultos']['tema']);
+        $this->assertSame(1, $resumo['faixas']['profile']);
+        $this->assertSame(0, $resumo['faixas']['both']);
+
+        $ordenados = Ranking::ordenar(json_decode($data->data), false);
+        $this->assertSame(['Padrões em sequências lógicas'], array_column($ordenados, 'title'));
     }
 
     public function test_registrar_explicacao_grava_evento(): void
