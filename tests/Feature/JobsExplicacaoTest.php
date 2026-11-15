@@ -12,6 +12,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Tests\TestCase;
 
 class JobsExplicacaoTest extends TestCase
@@ -239,6 +240,30 @@ class JobsExplicacaoTest extends TestCase
         $this->assertArrayNotHasKey('meta', $rea['explicacao']['criterios']);
         $this->assertSame('indisponivel', $rea['fonte_interatividade']);
         Http::assertSent(fn (Request $r) => ! str_contains($r->url(), 'educational_stages'));
+    }
+
+    public function test_mec_red_usa_o_endereco_novo_da_api(): void
+    {
+        Http::fake(['*' => Http::response([['name' => 'Algoritmos no 5º ano']])]);
+
+        (new ProcessMecRed('algoritmos', [], 'Ensino fundamental', 'Algoritmos', $this->searchedAt, null))->handle();
+
+        Http::assertSent(fn (Request $r) => str_starts_with($r->url(), 'https://mecred.prod.c3sl.ufpr.br/v1/api/public/elastic/search?indexes=resources'));
+        $metricas = DB::table('search_metrics')->where('repository', 'MecRed')->first();
+        $this->assertSame([1, 0], [(int) $metricas->items_returned, (int) $metricas->timeouts_errors]);
+    }
+
+    public function test_mec_red_com_resposta_que_nao_e_lista_conta_como_erro(): void
+    {
+        Log::spy();
+        Http::fake(['*' => Http::response('404 Not Found', 404)]);
+
+        (new ProcessMecRed('algoritmos', [], 'Ensino fundamental', 'Algoritmos', $this->searchedAt, null))->handle();
+
+        $this->assertEmpty(json_decode((string) Data::where('searched_at', $this->searchedAt)->first()->data, true));
+        $metricas = DB::table('search_metrics')->where('repository', 'MecRed')->first();
+        $this->assertSame([0, 1], [(int) $metricas->items_returned, (int) $metricas->timeouts_errors]);
+        Log::shouldHaveReceived('warning')->withArgs(fn ($mensagem, $contexto) => str_contains($mensagem, 'MEC RED') && $contexto['status'] === 404);
     }
 
     private function fakeEduplay(?string $respostaOllama, array $conteudos = [['name' => 'Vídeo 1', 'contentUrl' => 'http://v1', 'metatagDescription' => 'Aula']]): void

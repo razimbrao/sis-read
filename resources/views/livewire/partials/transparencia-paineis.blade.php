@@ -36,6 +36,8 @@
                     Cada REA recebe um <strong>grau de recomendação</strong>: a soma dos pontos dos critérios que foram
                     conferidos e atendidos ({{ $resumo['com_meta'] ? 'meta +4, nível +2, tipo +1, de 0 a 7' : 'nível +2, tipo +1, de 0 a 3' }}).
                     Critério que não pôde ser conferido vale 0, e a regra é a mesma para todos os repositórios.
+                    Só entram na lista os REAs cujo título ou descrição fala do tema da busca; os outros ficam em
+                    “REAs que não aparecem”, com o motivo.
                     @if ($resumo['com_meta'])
                         A lista é organizada primeiro pela meta (compatível, não conferida, diferente da sua) e, dentro de
                         cada grupo, do maior grau para o menor, nestas faixas:
@@ -111,9 +113,12 @@
             @if ($resumo['ocultos'] > 0)
                 @php
                     $textosMotivos = [
+                        'tema' => 'o tema da busca não aparece no título nem na descrição',
                         'sem_meta_usuario' => 'que dependem de uma meta de aprendizagem',
                         'outros' => 'sem faixa definida',
                     ];
+                    // Versão para a frase do resumo: "3 REAs ... sem o tema da busca no título nem na descrição".
+                    $textosResumo = array_replace($textosMotivos, ['tema' => 'sem o tema da busca no título nem na descrição']);
                 @endphp
                 <section class="rounded-lg border border-slate-200 overflow-hidden">
                     <div class="p-3 bg-slate-50">
@@ -126,7 +131,7 @@
                         <ul class="mt-1 ml-6 space-y-0.5 text-slate-600">
                             @foreach ($resumo['motivos_ocultos'] as $motivo => $quantidade)
                                 @if ($quantidade > 0)
-                                    <li>{{ $quantidade }} {{ $textosMotivos[$motivo] }}</li>
+                                    <li>{{ $quantidade }} {{ $textosResumo[$motivo] }}</li>
                                 @endif
                             @endforeach
                         </ul>

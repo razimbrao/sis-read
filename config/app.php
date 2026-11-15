@@ -130,7 +130,9 @@ return [
     ],
 
     'mecred' => [
-        'api' => env('MECRED_API_URL', 'https://api.portalmec.c3sl.ufpr.br/v1/search'),
+        // Busca do MEC RED. Em 11/2026 a API saiu de api.mecred.c3sl.ufpr.br (hoje 404) para este host,
+        // o mesmo que o site mecred.mec.gov.br usa. A resposta é uma lista; os itens não têm descrição.
+        'api' => env('MECRED_API_URL', 'https://mecred.prod.c3sl.ufpr.br/v1/api/public/elastic/search'),
         // Página pública de cada recurso (o antigo plataformaintegrada.mec.gov.br redireciona para cá).
         'site' => env('MECRED_SITE_URL', 'https://mecred.mec.gov.br'),
     ],

@@ -33,7 +33,7 @@ class EscrutabilidadeTest extends TestCase
     private function aquarela(string $titulo, string $tipo, ?string $meta = null, ?string $classificacao = null): array
     {
         $criterios = [
-            'tema' => RuleClassifier::criterioTema('algoritmos', 'Aquarela'),
+            'tema' => RuleClassifier::criterioTema('algoritmos', 'Aquarela', 'Algoritmos', null),
             'nivel' => RuleClassifier::criterioNivel('Ensino fundamental', RuleClassifier::inferirNivel($titulo, '')),
             'tipo' => RuleClassifier::criterioTipo($tipo, ['video']),
         ];
@@ -58,7 +58,7 @@ class EscrutabilidadeTest extends TestCase
     private function mecRed(string $titulo): array
     {
         $criterios = [
-            'tema' => RuleClassifier::criterioTema('algoritmos', 'MEC RED'),
+            'tema' => RuleClassifier::criterioTema('algoritmos', 'MEC RED', 'Algoritmos', null),
             'nivel' => ['status' => 'nao_avaliado', 'valor' => null, 'esperado' => 'ensino fundamental', 'fonte' => 'filtro_api'],
             'tipo' => ['status' => 'nao_avaliado', 'valor' => null, 'esperado' => [], 'fonte' => 'filtro_api'],
         ];

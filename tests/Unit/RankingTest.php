@@ -213,7 +213,7 @@ class RankingTest extends TestCase
         $contagem = Ranking::contar([$item('nao_avaliado'), $item('nao_avaliado'), $item('falhou')], true);
 
         $this->assertSame(0, $contagem['ocultos']);
-        $this->assertSame(['sem_meta_usuario' => 0, 'outros' => 0], $contagem['motivos_ocultos']);
+        $this->assertSame(['tema' => 0, 'sem_meta_usuario' => 0, 'outros' => 0], $contagem['motivos_ocultos']);
         $this->assertSame(2, $contagem['meta_nao_conferida']);
         $this->assertSame(1, $contagem['meta_incompativel']);
     }
@@ -226,7 +226,7 @@ class RankingTest extends TestCase
     private function reaComMeta(?string $classificacao): array
     {
         $criterios = [
-            'tema' => RuleClassifier::criterioTema('grafos', 'Aquarela'),
+            'tema' => RuleClassifier::criterioTema('grafos', 'Aquarela', null, null),
             'nivel' => RuleClassifier::criterioNivel('Ensino fundamental', RuleClassifier::inferirNivel('Grafos', '')),
             'tipo' => RuleClassifier::criterioTipo('Jogo', ['video']),
             'meta' => RuleClassifier::criterioMeta('ma', $classificacao),

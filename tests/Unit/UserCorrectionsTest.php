@@ -16,7 +16,7 @@ class UserCorrectionsTest extends TestCase
     private function rea(?string $meta = null, ?string $classificacaoMeta = 'Aprendizagem'): array
     {
         $criterios = [
-            'tema' => RuleClassifier::criterioTema('algoritmos', 'Aquarela'),
+            'tema' => RuleClassifier::criterioTema('algoritmos', 'Aquarela', 'Algoritmos', null),
             'nivel' => RuleClassifier::criterioNivel('Ensino fundamental', RuleClassifier::inferirNivel('Grafos', '')),
             'tipo' => RuleClassifier::criterioTipo('Jogo', ['video']),
         ];
@@ -37,7 +37,7 @@ class UserCorrectionsTest extends TestCase
     private function reaDePolitica(): array
     {
         $criterios = [
-            'tema' => RuleClassifier::criterioTema('algoritmos', 'MEC RED'),
+            'tema' => RuleClassifier::criterioTema('algoritmos', 'MEC RED', 'Algoritmos', null),
             'nivel' => ['status' => 'nao_avaliado', 'valor' => null, 'esperado' => 'ensino fundamental', 'fonte' => 'filtro_api'],
             'tipo' => ['status' => 'nao_avaliado', 'valor' => null, 'esperado' => [], 'fonte' => 'filtro_api'],
         ];
@@ -107,7 +107,7 @@ class UserCorrectionsTest extends TestCase
     {
         // O texto não menciona etapa: o sistema assume ensino superior, igual ao perfil, mas não conta no grau.
         $criterios = [
-            'tema' => RuleClassifier::criterioTema('algoritmos', 'Eduplay'),
+            'tema' => RuleClassifier::criterioTema('algoritmos', 'Eduplay', 'Algoritmos', null),
             'nivel' => RuleClassifier::criterioNivel('Ensino superior', RuleClassifier::inferirNivel('Grafos', '')),
             'tipo' => RuleClassifier::criterioTipo('Vídeo', ['jogo']),
         ];

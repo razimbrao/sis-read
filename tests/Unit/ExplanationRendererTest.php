@@ -12,7 +12,7 @@ class ExplanationRendererTest extends TestCase
     private function explicacaoAquarela(): array
     {
         return RuleClassifier::explicacao([
-            'tema' => RuleClassifier::criterioTema('algoritmos', 'Aquarela'),
+            'tema' => RuleClassifier::criterioTema('algoritmos', 'Aquarela', 'Algoritmos', null),
             'nivel' => RuleClassifier::criterioNivel('Ensino fundamental', RuleClassifier::inferirNivel('Algoritmos no sexto ano', '')),
             'tipo' => RuleClassifier::criterioTipo('Jogo', ['video', 'livro digital']),
             'meta' => RuleClassifier::criterioMeta('ma', 'Não classificado'),
@@ -35,7 +35,7 @@ class ExplanationRendererTest extends TestCase
         $linhas = ExplanationRenderer::linhas($this->explicacaoAquarela());
 
         $this->assertCount(4, $linhas);
-        $this->assertSame('Resultado da busca por “algoritmos” no Aquarela.', $this->linha($linhas, 'tema')['texto']);
+        $this->assertSame('O texto fala do tema: “Algoritmos” aparece no título ou na descrição.', $this->linha($linhas, 'tema')['texto']);
 
         $nivel = $this->linha($linhas, 'nivel');
         $this->assertSame('✓', $nivel['icone']);
@@ -138,7 +138,7 @@ class ExplanationRendererTest extends TestCase
     {
         $this->assertNotEmpty(ExplanationRenderer::avisos($this->explicacaoAquarela()));
         $this->assertSame([], ExplanationRenderer::avisos(['criterios' => [
-            'tema' => RuleClassifier::criterioTema('x', 'Eduplay'),
+            'tema' => RuleClassifier::criterioTema('x', 'Eduplay', null, null),
         ]]));
     }
 
@@ -181,7 +181,7 @@ class ExplanationRendererTest extends TestCase
     private function reaAquarela(): array
     {
         $criterios = [
-            'tema' => RuleClassifier::criterioTema('algoritmos', 'Aquarela'),
+            'tema' => RuleClassifier::criterioTema('algoritmos', 'Aquarela', 'Algoritmos', null),
             'nivel' => RuleClassifier::criterioNivel('Ensino fundamental', RuleClassifier::inferirNivel('Grafos', '')),
             'tipo' => RuleClassifier::criterioTipo('Jogo', ['video']),
             'meta' => RuleClassifier::criterioMeta('ma', 'Não classificado', 'gemma3:4b', 1.0),
@@ -294,7 +294,7 @@ class ExplanationRendererTest extends TestCase
     public function test_grau_mostra_a_conta_e_o_desempate(): void
     {
         $criterios = [
-            'tema' => RuleClassifier::criterioTema('algoritmos', 'Eduplay'),
+            'tema' => RuleClassifier::criterioTema('algoritmos', 'Eduplay', 'Algoritmos', null),
             'nivel' => RuleClassifier::criterioNivel('Ensino superior', RuleClassifier::inferirNivel('Grafos', '')),
             'tipo' => RuleClassifier::criterioTipo('Vídeo', ['video']),
             'meta' => ['status' => 'nao_avaliado', 'valor' => null, 'esperado' => 'ma', 'fonte' => 'padrao_repositorio'],
@@ -335,7 +335,7 @@ class ExplanationRendererTest extends TestCase
     public function test_nivel_assumido_nao_aparece_como_atendido(): void
     {
         $explicacao = RuleClassifier::explicacao([
-            'tema' => RuleClassifier::criterioTema('algoritmos', 'Aquarela'),
+            'tema' => RuleClassifier::criterioTema('algoritmos', 'Aquarela', 'Algoritmos', null),
             'nivel' => RuleClassifier::criterioNivel('Ensino superior', RuleClassifier::inferirNivel('Grafos', '')),
         ], 'interest');
 
