@@ -20,7 +20,9 @@ class RuleClassifierTest extends TestCase
         $tema = RuleClassifier::criterioTema('algoritmos', 'Aquarela', 'Algoritmos no sexto ano', '');
 
         $this->assertSame('ok', $tema['status']);
-        $this->assertSame('algoritmos', $tema['evidencia']);
+        $this->assertSame('Algoritmos', $tema['evidencia']);
+        // A evidência vem do texto original, com acento.
+        $this->assertSame('Padrões', RuleClassifier::criterioTema('reconhecimento de padrões', 'Eduplay', 'Padrões em Frequências', '')['evidencia']);
         $this->assertSame('algoritmos', $tema['valor']);
         $this->assertSame('texto', $tema['fonte']);
         $this->assertSame('Aquarela', $tema['repositorio']);

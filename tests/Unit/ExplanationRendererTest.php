@@ -35,7 +35,7 @@ class ExplanationRendererTest extends TestCase
         $linhas = ExplanationRenderer::linhas($this->explicacaoAquarela());
 
         $this->assertCount(4, $linhas);
-        $this->assertSame('O texto fala do tema: “algoritmos” aparece no título ou na descrição.', $this->linha($linhas, 'tema')['texto']);
+        $this->assertSame('O texto fala do tema: “Algoritmos” aparece no título ou na descrição.', $this->linha($linhas, 'tema')['texto']);
 
         $nivel = $this->linha($linhas, 'nivel');
         $this->assertSame('✓', $nivel['icone']);
