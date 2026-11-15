@@ -81,10 +81,8 @@ class RuleClassifierTest extends TestCase
 
     public function test_tema_cobre_todos_os_temas_da_busca(): void
     {
-        foreach (\App\Livewire\FindREA::TEMAS as $grupo) {
-            foreach (array_keys($grupo) as $tema) {
-                $this->assertArrayHasKey(RuleClassifier::normalizar($tema), RuleClassifier::TERMOS_TEMA, "Tema sem termos: {$tema}");
-            }
+        foreach (array_keys(\App\Livewire\FindREA::TEMAS) as $tema) {
+            $this->assertArrayHasKey(RuleClassifier::normalizar($tema), RuleClassifier::TERMOS_TEMA, "Tema sem termos: {$tema}");
         }
     }
 

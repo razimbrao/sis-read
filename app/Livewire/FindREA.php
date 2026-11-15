@@ -100,29 +100,26 @@ class FindREA extends Component
     }
 
     /**
-     * Temas de pensamento computacional oferecidos na busca (valor => rótulo), em grupos para o dropdown.
-     * Os três primeiros são os temas da avaliação, na ordem das buscas do formulário (protocolo, D5). Os
-     * outros foram escolhidos por terem material no Aquarela (testados em 2026-10-07). Decomposição e
-     * Abstração quase não têm material nos repositórios (medido em 2026-11-15).
+     * Temas de pensamento computacional oferecidos na busca (valor => rótulo), numa lista só e em ordem
+     * alfabética, como aparecem no dropdown. Os temas da avaliação (Algoritmos, Computação desplugada e
+     * Reconhecimento de padrões, protocolo D5) não dependem desta ordem: ficam em
+     * ExperimentoAquecer::TEMAS_PADRAO. Os outros foram escolhidos por terem material no Aquarela (testados
+     * em 2026-10-07). Decomposição e Abstração quase não têm material nos repositórios (medido em 2026-11-15).
      */
     public const TEMAS = [
-        'Temas principais' => [
-            'algoritmos' => 'Algoritmos',
-            'computação desplugada' => 'Computação desplugada',
-            'reconhecimento de padrões' => 'Reconhecimento de padrões',
-        ],
-        'Outros temas' => [
-            'decomposição' => 'Decomposição',
-            'abstração' => 'Abstração',
-            'pensamento computacional' => 'Pensamento computacional',
-            'programação' => 'Programação',
-            'lógica de programação' => 'Lógica de programação',
-            'programação em blocos' => 'Programação em blocos',
-            'scratch' => 'Scratch',
-            'estruturas de repetição' => 'Estruturas de repetição',
-            'robótica educacional' => 'Robótica educacional',
-            'inteligência artificial' => 'Inteligência artificial',
-        ],
+        'abstração' => 'Abstração',
+        'algoritmos' => 'Algoritmos',
+        'computação desplugada' => 'Computação desplugada',
+        'decomposição' => 'Decomposição',
+        'estruturas de repetição' => 'Estruturas de repetição',
+        'inteligência artificial' => 'Inteligência artificial',
+        'lógica de programação' => 'Lógica de programação',
+        'pensamento computacional' => 'Pensamento computacional',
+        'programação' => 'Programação',
+        'programação em blocos' => 'Programação em blocos',
+        'reconhecimento de padrões' => 'Reconhecimento de padrões',
+        'robótica educacional' => 'Robótica educacional',
+        'scratch' => 'Scratch',
     ];
 
     public string $interestApiSearch = '';
@@ -921,37 +918,33 @@ class FindREA extends Component
     }
 
     /**
-     * Interesses que o SisREAd sabe buscar: os fixos mais os cadastrados por colaboradores.
-     * É calculado a cada requisição porque propriedades privadas não sobrevivem entre elas no Livewire.
-     */
-    /**
-     * Temas do dropdown agrupados: os fixos (TEMAS) e, num grupo próprio, os cadastrados por colaboradores.
+     * Temas do dropdown: os fixos (TEMAS), sem grupo, e os cadastrados por colaboradores que não repetem
+     * um fixo, que a view mostra num grupo próprio.
      *
-     * @return array<string, array<string, string>>
+     * @return array{fixos: array<string, string>, colaboradores: array<string, string>}
      */
-    public function temasAgrupados(): array
+    public function temasDoDropdown(): array
     {
-        $grupos = self::TEMAS;
-        $fixos = collect($grupos)->flatMap(fn ($temas) => array_keys($temas))->map(fn ($t) => RuleClassifier::normalizar($t))->all();
+        $fixos = array_map(fn ($t) => RuleClassifier::normalizar($t), array_keys(self::TEMAS));
 
         $colaboradores = collect($this->opcoesInteresse())
             ->reject(fn ($opcao) => in_array(RuleClassifier::normalizar($opcao), $fixos, true))
             ->mapWithKeys(fn ($opcao) => [$opcao => mb_strtoupper(mb_substr($opcao, 0, 1)).mb_substr($opcao, 1)])
             ->all();
 
-        if ($colaboradores) {
-            $grupos['Cadastrados por colaboradores'] = $colaboradores;
-        }
-
-        return $grupos;
+        return ['fixos' => self::TEMAS, 'colaboradores' => $colaboradores];
     }
 
+    /**
+     * Interesses que o SisREAd sabe buscar: os fixos mais os cadastrados por colaboradores.
+     * É calculado a cada requisição porque propriedades privadas não sobrevivem entre elas no Livewire.
+     */
     public function opcoesInteresse(): array
     {
         $opcoes = [];
 
         // Os fixos vêm primeiro, então a grafia com acento prevalece sobre a versão sanitizada do banco.
-        foreach (array_merge(array_keys(array_merge(...array_values(self::TEMAS))), Collaborator::query()->pluck('interest')->filter()->all()) as $opcao) {
+        foreach (array_merge(array_keys(self::TEMAS), Collaborator::query()->pluck('interest')->filter()->all()) as $opcao) {
             $chave = RuleClassifier::normalizar($opcao);
 
             if ($chave !== '' && ! isset($opcoes[$chave])) {

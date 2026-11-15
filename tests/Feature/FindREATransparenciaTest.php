@@ -230,18 +230,44 @@ class FindREATransparenciaTest extends TestCase
         Queue::assertPushed(\App\Jobs\ProcessEduplay::class);
     }
 
-    public function test_dropdown_agrupa_temas_fixos_e_de_colaboradores(): void
+    public function test_dropdown_lista_temas_fixos_juntos_e_colaboradores_a_parte(): void
     {
+        $temas = Livewire::test(FindREA::class)->instance()->temasDoDropdown();
+        $this->assertSame(FindREA::TEMAS, $temas['fixos']);
+        $this->assertSame([], $temas['colaboradores']);
+
         $this->colaborador('jogos educativos', 'ensino médio', 'video');
 
-        $grupos = Livewire::test(FindREA::class)->instance()->temasAgrupados();
-
-        $this->assertArrayHasKey('scratch', $grupos['Outros temas']);
-        $this->assertSame(['jogos educativos' => 'Jogos educativos'], $grupos['Cadastrados por colaboradores']);
+        $temas = Livewire::test(FindREA::class)->instance()->temasDoDropdown();
+        $this->assertArrayHasKey('scratch', $temas['fixos']);
+        $this->assertSame(['jogos educativos' => 'Jogos educativos'], $temas['colaboradores']);
         // Tema de colaborador igual a um fixo não se repete.
         $this->colaborador('Algoritmos', 'ensino médio', 'video');
-        $grupos = Livewire::test(FindREA::class)->instance()->temasAgrupados();
-        $this->assertArrayNotHasKey('Algoritmos', $grupos['Cadastrados por colaboradores']);
+        $temas = Livewire::test(FindREA::class)->instance()->temasDoDropdown();
+        $this->assertArrayNotHasKey('Algoritmos', $temas['colaboradores']);
+    }
+
+    public function test_temas_fixos_estao_em_ordem_alfabetica(): void
+    {
+        $rotulos = array_values(FindREA::TEMAS);
+        $ordenados = $rotulos;
+        usort($ordenados, fn ($a, $b) => strcmp(RuleClassifier::normalizar($a), RuleClassifier::normalizar($b)));
+
+        $this->assertSame($ordenados, $rotulos);
+    }
+
+    public function test_dropdown_nao_tem_mais_os_grupos_fixos(): void
+    {
+        Livewire::test(FindREA::class)
+            ->assertDontSee('Temas principais')
+            ->assertDontSee('Outros temas')
+            ->assertDontSee('<optgroup', false);
+
+        $this->colaborador('jogos educativos', 'ensino médio', 'video');
+
+        Livewire::test(FindREA::class)
+            ->assertSee('<optgroup label="Cadastrados por colaboradores">', false)
+            ->assertSeeInOrder(['Abstração', 'Algoritmos', 'Computação desplugada', 'Scratch', 'Jogos educativos']);
     }
 
     public function test_interesse_de_colaborador_e_aceito(): void
