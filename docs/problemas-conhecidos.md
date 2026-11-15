@@ -96,3 +96,7 @@
 25. ~~Em produção, as mensagens de validação apareciam como a chave crua (`validation.required`): o locale e o
     fallback eram `pt_BR`, e o projeto não tinha `lang/pt_BR/validation.php`.~~ **Corrigido** (2026-11-05): o arquivo
     existe, `pt_BR` é o locale padrão e o fallback recomendado é `en`. Um teste confere que nenhuma chave do framework falta.
+26. O MEC RED não informa a descrição dos REAs (em 12.310 itens gravados, nenhum tem descrição). Por isso o
+    critério de tema, que agora decide se o REA entra na lista (`docs/recomendacao.md`), vale só pelo título
+    desses REAs: um REA do MEC RED cujo título não cita o tema fica oculto, mesmo que trate do assunto.
+    Em `decomposição`, nenhum dos 10 REAs do MEC RED da busca medida passou (2026-11-15).

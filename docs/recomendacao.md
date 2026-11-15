@@ -11,10 +11,30 @@ repositório tem posição reservada.
 | meta | 4 | só existe quando o usuário tem meta (EMAPRE) |
 | nível | 2 | |
 | tipo | 1 | |
-| tema | 0 | todo REA listado é resultado da busca, então o tema não diferencia ninguém |
+| tema | 0 | não pontua: é condição de entrada na lista (ver abaixo) |
 
 **Grau = soma dos pontos dos critérios atendidos**: de 0 a 7 com meta e de 0 a 3 sem meta. Os pesos
 são potências de 2, então a meta vale mais que nível e tipo juntos, e o nível vale mais que o tipo.
+
+## Tema (condição de entrada)
+
+A busca devolve, por palavra, REAs que nem sempre falam do assunto (o Eduplay casa "Reconhecimento" com
+"Reconhecimento da união homoafetiva"; o Aquarela traz material genérico de pensamento computacional). Por
+isso o tema é conferido no título e na descrição do REA (`RuleClassifier::criterioTema`):
+
+- **confere** (`ok`, com a `evidencia` do trecho achado): o texto traz algum termo do tema. O termo fica em
+  `RuleClassifier::TERMOS_TEMA`, uma lista de expressões regulares sobre o texto sem acento e em minúsculas.
+  Ela cobre os temas de `FindREA::TEMAS`, é editável e decide o que sai da lista.
+- **falhou**: nenhum termo casou. O REA **não entra na lista principal**: vai para "REAs que não aparecem",
+  com o motivo "o tema da busca não aparece no título nem na descrição" (`Ranking::visivel`, `Ranking::motivo`).
+  Ele não aparece nem nas faixas (a contagem do painel "Como ordenamos" também não o inclui).
+- **tema sem termos cadastrados**: `ok` sem evidência, para nunca esvaziar uma busca por falta de configuração.
+
+O tema vem da fonte `texto`, que não é corrigível (o usuário não corrige o tema, porque ele é o próprio termo
+da busca). Os termos do "Reconhecimento de padrões" são `padrão(ões)`, `regularidade` e `sequência(s) lógica(s)`:
+"reconhecimento" sozinho não entra, porque casa com "reconhecimento da união homoafetiva".
+
+Ao MEC RED falta a descrição (problema #26): o tema dele é conferido só pelo título.
 
 Um critério só é **atendido** (`RuleClassifier::atende`) quando foi conferido e bateu: `status = ok`
 e não `assumido`. Valem 0 ponto, como o não atendido:
