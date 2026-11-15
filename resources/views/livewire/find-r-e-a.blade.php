@@ -14,10 +14,11 @@
                         <span class="text-[15px] text-slate-600">Você buscou</span>
                         <span class="px-3.5 py-2 rounded-full bg-slate-100 font-semibold text-[15px]">{{ $this->contexto['perfil'] }}</span>
                         <span class="px-3.5 py-2 rounded-full bg-slate-100 font-semibold text-[15px]">{{ ucfirst($this->contexto['interesse']) }}</span>
-                        <button type="button" x-on:click="mostrarForm = !mostrarForm" :aria-expanded="mostrarForm"
+                        {{-- Volta à tela inicial, sem ?busca= (a URL da busca só restaura com F5). --}}
+                        <a href="{{ comParams(url('/')) }}"
                             class="ml-auto px-3.5 py-2.5 rounded-lg border border-slate-300 font-semibold text-[15px] hover:bg-slate-50">
-                            <span x-text="mostrarForm ? 'Fechar' : 'Mudar busca'">Mudar busca</span>
-                        </button>
+                            Mudar busca
+                        </a>
                     </div>
                 </div>
             @endif
