@@ -2,6 +2,7 @@
 
 namespace Tests\Unit;
 
+use App\Livewire\FindREA;
 use App\Recommendation\RuleClassifier;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -13,6 +14,85 @@ class RuleClassifierTest extends TestCase
         $tipos = RuleClassifier::normalizarTipos(['Vídeo', ['vídeo'], ['E-book'], '', ['Jogo'], null]);
 
         $this->assertSame(['video', 'e-book', 'livro digital', 'jogo'], $tipos);
+    }
+
+    public function test_tema_confere_quando_o_texto_fala_do_tema(): void
+    {
+        $tema = RuleClassifier::criterioTema('algoritmos', 'Aquarela', 'Algoritmos no sexto ano', '');
+
+        $this->assertSame('ok', $tema['status']);
+        $this->assertSame('Algoritmos', $tema['evidencia']);
+        // A evidência vem do texto original, com acento.
+        $this->assertSame('Sequências lógicas', RuleClassifier::criterioTema('reconhecimento de padrões', 'Aquarela', 'Sequências lógicas e padrões', '')['evidencia']);
+        $this->assertSame('algoritmos', $tema['valor']);
+        $this->assertSame('texto', $tema['fonte']);
+        $this->assertSame('Aquarela', $tema['repositorio']);
+    }
+
+    public function test_tema_falha_quando_o_texto_nao_fala_do_tema(): void
+    {
+        $tema = RuleClassifier::criterioTema('algoritmos', 'Aquarela', 'Jogo de cartas', 'Atividade divertida');
+
+        $this->assertSame('falhou', $tema['status']);
+        $this->assertNull($tema['evidencia']);
+    }
+
+    public function test_tema_tolera_acento_e_plural(): void
+    {
+        $this->assertSame('ok', RuleClassifier::criterioTema('reconhecimento de padrões', 'Aquarela', 'Padrões e sequências', '')['status']);
+        $this->assertSame('ok', RuleClassifier::criterioTema('reconhecimento de padrões', 'Aquarela', 'Regularidades', '')['status']);
+        $this->assertSame('ok', RuleClassifier::criterioTema('decomposição', 'Eduplay', '', 'Como decompor um problema')['status']);
+        $this->assertSame('ok', RuleClassifier::criterioTema('abstração', 'MEC RED', 'Abstrair detalhes', '')['status']);
+        $this->assertSame('ok', RuleClassifier::criterioTema('programação', 'Aquarela', 'Programações', '')['status']);
+    }
+
+    public function test_reconhecimento_sozinho_nao_conta_como_padroes(): void
+    {
+        $tema = RuleClassifier::criterioTema('reconhecimento de padrões', 'Eduplay', 'Reconhecimento da união homoafetiva', '');
+
+        $this->assertSame('falhou', $tema['status']);
+    }
+
+    /**
+     * "Padrão" sozinho tem outros sentidos; o tema pede o contexto de pensamento computacional. A busca manda
+     * "padrões" às APIs, e esse termo usa a mesma lista.
+     */
+    public function test_padrao_fora_do_contexto_nao_conta_como_padroes(): void
+    {
+        foreach (['Padrões em Frequências', 'Alguns Padrões GoF', 'Padrões Globais de Clima'] as $titulo) {
+            $this->assertSame('falhou', RuleClassifier::criterioTema('padrões', 'Eduplay', $titulo, '')['status'], $titulo);
+        }
+
+        $this->assertSame('ok', RuleClassifier::criterioTema('padrões', 'Aquarela', 'Computação na Educação Infantil - padrões e sequências', '')['status']);
+        $this->assertSame('ok', RuleClassifier::criterioTema('padrões', 'Aquarela', 'Trilha', 'Identificar padrões com o pensamento computacional')['status']);
+        $this->assertSame('reconhecimento de padrões', mb_strtolower(array_search('padrões', FindREA::TERMO_API, true)));
+        $this->assertSame('padrões', FindREA::termoDaApi('Reconhecimento de padrões'));
+        $this->assertSame('Algoritmos', FindREA::termoDaApi('Algoritmos'));
+    }
+
+    public function test_tema_sem_termos_cadastrados_fica_ok_sem_evidencia(): void
+    {
+        $tema = RuleClassifier::criterioTema('tema novo', 'Aquarela', null, null);
+
+        $this->assertSame('ok', $tema['status']);
+        $this->assertNull($tema['evidencia']);
+        $this->assertStringContainsString('não tem termos cadastrados', $tema['motivo']);
+    }
+
+    public function test_tema_cobre_todos_os_temas_da_busca(): void
+    {
+        foreach (\App\Livewire\FindREA::TEMAS as $grupo) {
+            foreach (array_keys($grupo) as $tema) {
+                $this->assertArrayHasKey(RuleClassifier::normalizar($tema), RuleClassifier::TERMOS_TEMA, "Tema sem termos: {$tema}");
+            }
+        }
+    }
+
+    public function test_tema_nao_e_corrigivel(): void
+    {
+        $tema = RuleClassifier::criterioTema('algoritmos', 'Aquarela', 'Jogo', '');
+
+        $this->assertFalse(RuleClassifier::corrigivel($tema));
     }
 
     public function test_inferir_nivel_devolve_o_trecho_que_casou(): void

@@ -15,10 +15,50 @@ class RuleClassifier
 
     /**
      * Pontos que cada critério atendido soma ao grau de recomendação (docs/recomendacao.md).
-     * Potências de 2: meta pesa mais que nível e tipo juntos, e nível mais que tipo. O tema não pontua,
-     * pois todo REA listado é resultado da busca.
+     * Potências de 2: meta pesa mais que nível e tipo juntos, e nível mais que tipo. O tema não pontua:
+     * ele decide se o REA entra na lista (Ranking::visivel), e um REA que não fala do tema fica oculto.
      */
     public const PESOS = ['meta' => 4, 'nivel' => 2, 'tipo' => 1];
+
+    /**
+     * Termos que mostram que um REA fala de cada tema oferecido em FindREA::TEMAS. A chave é o tema
+     * normalizado (sem acento, minúsculo). Cada termo é uma expressão regular aplicada ao título e à
+     * descrição normalizados (normalizar). Lista editável: um REA sem nenhum termo do tema não entra na
+     * lista principal (criterioTema). Tema que não aparece aqui não reprova ninguém.
+     *
+     * Reconhecimento de padrões, no pensamento computacional, é perceber regularidades: sequências que se
+     * repetem, classificação, generalização. "Padrão" sozinho é amplo demais (padrões de projeto de software,
+     * de clima, corporais) e "reconhecimento" sozinho também ("reconhecimento da união homoafetiva"), por isso
+     * os termos pedem o contexto. A busca desse tema manda "padrões" às APIs (FindREA::TERMO_API), e a chave
+     * "padroes" repete a lista porque os jobs conferem o tema pelo termo enviado.
+     */
+    private const TERMOS_PADROES = [
+        '/\breconhecimento de padr(ao|oes)\b/',
+        '/\bpadr(ao|oes) e sequencias?\b/',
+        '/\bsequencias? (e|de) padr(ao|oes)\b/',
+        '/\bpadr(ao|oes) de repeticao\b/',
+        '/\bregularidades?\b/',
+        '/\bsequencias? logicas?\b/',
+        '/\bpadr(ao|oes)\b.{0,80}\bpensamento computacional\b/s',
+        '/\bpensamento computacional\b.{0,80}\bpadr(ao|oes)\b/s',
+    ];
+
+    public const TERMOS_TEMA = [
+        'algoritmos' => ['/\balgoritmos?\b/', '/\bpasso a passo\b/', '/\bsequencia de instrucoes\b/'],
+        'decomposicao' => ['/\bdecomposicao(oes)?\b/', '/\bdecompor\b/', '/\bdecompoe(m)?\b/', '/\bdividir (o|um|uma) problema\b/', '/\bpartes menores\b/'],
+        'reconhecimento de padroes' => self::TERMOS_PADROES,
+        'padroes' => self::TERMOS_PADROES,
+        'abstracao' => ['/\babstracao(oes)?\b/', '/\babstrair\b/'],
+        'pensamento computacional' => ['/\bpensamento computacional\b/'],
+        'programacao' => ['/\bprogramac(ao|oes)\b/', '/\bprogramar\b/', '/\bprogramando\b/'],
+        'logica de programacao' => ['/\blogica (de )?programac(ao|oes)\b/'],
+        'computacao desplugada' => ['/\bcomputacao desplugada\b/', '/\bdesplugad[oa]s?\b/'],
+        'programacao em blocos' => ['/\bprogramac(ao|oes) (em|por) blocos\b/'],
+        'scratch' => ['/\bscratch\b/'],
+        'estruturas de repeticao' => ['/\bestruturas? de repetic(ao|oes)\b/', '/\blacos? de repetic(ao|oes)\b/', '/\brepeticoes?\b/'],
+        'robotica educacional' => ['/\brobot(ica|ico|icas|icos)\b/', '/\brobos?\b/'],
+        'inteligencia artificial' => ['/\binteligencias? artificiais?\b/', '/\bia\b/'],
+    ];
 
     public const METAS = [
         'ma' => 'Aprendizagem',
@@ -67,6 +107,26 @@ class RuleClassifier
     }
 
     /**
+     * O trecho do texto original (com acentos) que corresponde a um achado no texto normalizado, para a
+     * explicação mostrar "padrões" e não "padroes". Sem correspondência, devolve o próprio achado.
+     */
+    private static function trechoOriginal(string $original, string $achado): string
+    {
+        $palavras = preg_split('/\s+/u', trim($original)) ?: [];
+        $tamanho = count(explode(' ', $achado));
+
+        for ($i = 0; $i + $tamanho <= count($palavras); $i++) {
+            $janela = implode(' ', array_slice($palavras, $i, $tamanho));
+
+            if (str_contains(self::normalizar($janela), $achado)) {
+                return preg_replace('/^[^\pL\pN]+|[^\pL\pN]+$/u', '', $janela) ?: $achado;
+            }
+        }
+
+        return $achado;
+    }
+
+    /**
      * Achata, normaliza e deduplica a lista de tipos preferidos.
      */
     public static function normalizarTipos(array $tipos): array
@@ -106,12 +166,41 @@ class RuleClassifier
         return ['valor' => self::NIVEL_PADRAO, 'evidencia' => null, 'assumido' => true];
     }
 
-    public static function criterioTema(string $termo, string $repositorio): array
+    /**
+     * O tema da busca confere quando o título ou a descrição do REA trazem algum termo de TERMOS_TEMA.
+     * Tema sem termos cadastrados fica `ok` sem evidência, para nunca esvaziar uma busca por falta de
+     * configuração. Tema não é corrigível: a fonte `texto` não entra em RuleClassifier::FONTES_CORRIGIVEIS.
+     */
+    public static function criterioTema(string $termo, string $repositorio, ?string $titulo, ?string $descricao): array
     {
+        $padroes = self::TERMOS_TEMA[self::normalizar($termo)] ?? null;
+
+        if ($padroes === null) {
+            return [
+                'status' => 'ok',
+                'valor' => $termo,
+                'evidencia' => null,
+                'fonte' => 'texto',
+                'repositorio' => $repositorio,
+                'motivo' => 'o tema não tem termos cadastrados, então não foi conferido',
+            ];
+        }
+
+        $texto = self::normalizar(($titulo ?? '').' '.($descricao ?? ''));
+        $evidencia = null;
+
+        foreach ($padroes as $padrao) {
+            if (preg_match($padrao, $texto, $m)) {
+                $evidencia = self::trechoOriginal(($titulo ?? '').' '.($descricao ?? ''), $m[0]);
+                break;
+            }
+        }
+
         return [
-            'status' => 'ok',
+            'status' => $evidencia === null ? 'falhou' : 'ok',
             'valor' => $termo,
-            'fonte' => 'busca',
+            'evidencia' => $evidencia,
+            'fonte' => 'texto',
             'repositorio' => $repositorio,
         ];
     }

@@ -193,7 +193,7 @@ class ProcessEduplay implements ShouldQueue
     private function criterios(array $rea, ?array $meta): array
     {
         $criterios = [
-            'tema' => RuleClassifier::criterioTema($this->search, 'Eduplay'),
+            'tema' => RuleClassifier::criterioTema($this->search, 'Eduplay', $rea['name'] ?? null, $rea['metatagDescription'] ?? null),
             'nivel' => RuleClassifier::criterioNivel(
                 $this->profile,
                 RuleClassifier::inferirNivel($rea['name'] ?? '', $rea['metatagDescription'] ?? '')

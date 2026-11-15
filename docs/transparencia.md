@@ -92,7 +92,7 @@ Não é preciso migration: fica dentro do JSON que já existe.
     "grau": {"total": 2, "maximo": 7, "pontos": {"meta": 0, "nivel": 2, "tipo": 0}, "posicao": 3},
     "observacao": null,
     "criterios": {
-      "tema":  {"status": "ok", "valor": "algoritmos", "fonte": "busca", "repositorio": "Aquarela"},
+      "tema":  {"status": "ok", "valor": "algoritmos", "evidencia": "algoritmos", "fonte": "texto", "repositorio": "Aquarela"},
       "nivel": {"status": "ok", "valor": "ensino fundamental", "esperado": "ensino fundamental",
                 "fonte": "regex", "evidencia": "6º", "assumido": false},
       "tipo":  {"status": "falhou", "valor": "jogo", "esperado": ["video", "livro digital"],
@@ -140,7 +140,7 @@ Os três repositórios usam o mesmo `RuleClassifier::rotular` e o mesmo `RuleCla
 
 | Critério | Como é avaliado | Fonte |
 |---|---|---|
-| tema | Todo item é resultado da busca pelo termo | `busca` |
+| tema | Termo do tema (`RuleClassifier::TERMOS_TEMA`) no título ou na descrição; sem termo, o REA fica oculto (`docs/recomendacao.md`, "Tema") | `texto` |
 | nível | Regex em título + descrição: infantil → fundamental → médio. Sem casamento, assume superior (`assumido = true`). Compara com o perfil normalizado | `regex` |
 | tipo | `tipoConteudo` normalizado ∈ tipos preferidos | `colaboradores` |
 | meta | Só se o usuário tem meta. O `MetaClassifier` (LLM, por padrão Ollama `gemma3:4b`) classifica e o resultado é comparado com a meta dominante. Se a resposta for inválida, o serviço falhar ou o tempo reservado acabar, o critério fica `nao_avaliado`, com o motivo em `evidencia` (§5.4) | `llm` |
@@ -164,7 +164,7 @@ conta como conferência:
 
 | Critério | Status | Evidência |
 |---|---|---|
-| tema | `ok` | termo da busca |
+| tema | `ok` ou `falhou` | trecho do termo achado no título ou na descrição (no MEC RED, só o título: a busca não devolve descrição) |
 | nível | regex sobre `name` e `description`, como no Aquarela (fonte `regex`, corrigível). A busca não devolve `description` (conferido em 2026-10-06), então na prática só o título conta | trecho casado, ou *assumido* (0 ponto) |
 | tipo | `nao_avaliado` | o MEC RED não informa o tipo |
 | meta | com meta: classificada por IA (§5.4), só pelo título | "classificado só pelo título, porque o MEC RED não informa descrição nem tipo; a busca já pediu tipos de objeto associados à sua meta (object_type=…)" |
@@ -180,7 +180,7 @@ e não do recurso). Sem meta, `indisponivel`.
 
 | Critério | Status |
 |---|---|
-| tema | `ok` |
+| tema | `ok` ou `falhou`, pelo termo no `name` e na `metatagDescription` |
 | nível | regex sobre `name` e `metatagDescription` (fonte `regex`, corrigível) |
 | tipo | `video` comparado com os tipos preferidos (`criterioTipo`, fonte `colaboradores`). O job recebe os tipos da busca |
 | meta | com meta: classificada por IA (§5.4) a partir do título e de `metatagDescription` |
@@ -259,7 +259,8 @@ Exemplos:
 
 | Critério | Situação | Texto |
 |---|---|---|
-| tema | ok | Resultado da busca por “algoritmos” no Aquarela. |
+| tema | ok | O texto fala do tema: “algoritmos” aparece no título ou na descrição. |
+| tema | falhou (REA oculto) | Não encontramos “Algoritmos” no título nem na descrição. |
 | nível | ok, regex | Nível ensino fundamental, igual ao seu perfil: identificado pelo trecho “6º” no título ou na descrição. |
 | nível | ok, assumido (ícone `?`, 0 ponto) | Nível ensino superior, igual ao seu perfil, mas assumido: o texto não menciona nenhuma etapa. |
 | nível | falhou, regex | Nível estimado ensino medio (trecho “médio”), diferente do seu perfil (ensino fundamental). |
