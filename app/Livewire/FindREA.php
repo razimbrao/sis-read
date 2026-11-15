@@ -18,12 +18,14 @@ use App\Recommendation\Ranking;
 use App\Recommendation\RuleClassifier;
 use App\Recommendation\TiposPreferidos;
 use App\Recommendation\UserCorrections;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Livewire\Attributes\Renderless;
+use Livewire\Attributes\Url;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -73,6 +75,12 @@ class FindREA extends Component
     public Data $data;
 
     public $timestampSession;
+
+    /**
+     * Id da linha `data` da última busca. Na URL (?busca=<id>), a busca volta depois de um F5 (mount).
+     */
+    #[Url(as: 'busca', except: null)]
+    public ?int $busca = null;
 
     public ?string $userType = null;
 
@@ -154,6 +162,58 @@ class FindREA extends Component
             'sugestao' => 'feedback',
             default => null,
         };
+
+        if ($this->busca) {
+            $this->restaurarBusca($this->busca);
+        }
+    }
+
+    /**
+     * Restaura a busca da URL (?busca=<id>). Só vale para quem fez a busca: outro participante, ou uma
+     * linha que não existe, deixa a tela vazia normal.
+     */
+    private function restaurarBusca(int $id): void
+    {
+        $data = Data::find($id);
+
+        if (! $data || $data->participante !== $this->experimento()->participante()) {
+            $this->busca = null;
+
+            return;
+        }
+
+        $this->data = $data;
+        $this->timestampSession = $data->getRawOriginal('searched_at');
+        $this->contexto = $data->contexto ?? [];
+        $this->interestApiSearch = $this->contexto['termo_api'] ?? '';
+        $this->sheet = $this->colaboradoresDaBusca($this->contexto['perfil'] ?? '', $this->contexto['interesse'] ?? '');
+    }
+
+    /**
+     * Colaboradores com o mesmo perfil e interesse da busca (o que a tela mostra como "cadastrados").
+     */
+    private function colaboradoresDaBusca(string $perfil, string $interesse): array
+    {
+        $interesse = $this->sanitizeSearch($interesse);
+        $perfil = $this->sanitizeSearch($perfil);
+
+        $values = collect(Collaborator::lazyById(100, $column = 'id'))
+            ->map(function ($collaborator) {
+                return [
+                    $collaborator->id,
+                    $collaborator->reference,
+                    $collaborator->rea_title,
+                    $collaborator->interest,
+                    $collaborator->profile,
+                    $collaborator->item,
+                ];
+            })
+            ->all();
+
+        return array_filter(
+            $values,
+            fn ($rea) => $rea[3] === $interesse && $rea[4] === $perfil
+        );
     }
 
     /**
@@ -662,6 +722,9 @@ class FindREA extends Component
 
             $this->avisoPreferencia = 'Tipos preferidos salvos na sua conta. Valem a partir da próxima busca.';
         }
+
+        // O painel "O que usamos sobre você" lê o contexto da linha, então a mudança precisa ficar nela.
+        $data->update(['contexto' => $this->contexto]);
     }
 
     /**
@@ -689,6 +752,8 @@ class FindREA extends Component
         if ($this->contexto) {
             $this->contexto['tipos_usuario'] = null;
         }
+
+        $data->update(['contexto' => $this->contexto]);
     }
 
     private function dadosDaBusca(): ?Data
@@ -906,24 +971,7 @@ class FindREA extends Component
 
         $getrange = 'Pagina1!A:F';
 
-        $collaborators = collect(Collaborator::lazyById(100, $column = 'id'))
-            ->map(function ($collaborator) {
-                return [
-                    $collaborator->id,
-                    $collaborator->reference,
-                    $collaborator->rea_title,
-                    $collaborator->interest,
-                    $collaborator->profile,
-                    $collaborator->item,
-                ];
-            });
-
-        $values = $collaborators->all();
-
-        $this->sheet = array_filter(
-            $values,
-            fn ($rea) => $rea[3] === $this->sanitizeSearch($this->interest) && $rea[4] === $this->sanitizeSearch($this->profile)
-        );
+        $this->sheet = $this->colaboradoresDaBusca($this->profile, $this->interest);
 
         $this->findInApi();
 
@@ -984,7 +1032,10 @@ class FindREA extends Component
             'grupo' => $this->experimento()->grupo(),
             'flags' => $this->experimento()->flagsAtivas(),
             'participante' => $this->experimento()->participante(),
+            'contexto' => $this->contexto,
         ]);
+
+        $this->busca = $this->data->id;
 
         ProcessAquarela::dispatch($this->interestApiSearch, $types, $this->profile, $this->timestampSession, auth()->user()?->questionnaire?->dominant, $preferidos['origem']);
 
