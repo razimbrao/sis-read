@@ -200,7 +200,7 @@ class ProcessMecRed implements ShouldQueue
      */
     private function criterios(array $rea, ?array $meta): array
     {
-        $criterios = ['tema' => RuleClassifier::criterioTema($this->search, 'MEC RED')];
+        $criterios = ['tema' => RuleClassifier::criterioTema($this->search, 'MEC RED', $rea['name'] ?? null, $rea['description'] ?? null)];
 
         $criterios['nivel'] = RuleClassifier::criterioNivel(
             $this->profile,

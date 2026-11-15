@@ -32,7 +32,7 @@ class FeatureFlagsTest extends TestCase
     private function aquarela(string $titulo, string $tipo, ?string $meta = null, ?string $classificacao = null): array
     {
         $criterios = [
-            'tema' => RuleClassifier::criterioTema('algoritmos', 'Aquarela'),
+            'tema' => RuleClassifier::criterioTema('algoritmos', 'Aquarela', 'Algoritmos', null),
             'nivel' => RuleClassifier::criterioNivel('Ensino fundamental', RuleClassifier::inferirNivel($titulo, '')),
             'tipo' => RuleClassifier::criterioTipo($tipo, ['video']),
         ];

@@ -230,7 +230,7 @@ class ProcessAquarela implements ShouldQueue
     private function avaliarCriterios(array $rea, ?array $meta): array
     {
         $criterios = [
-            'tema' => RuleClassifier::criterioTema($this->search, 'Aquarela'),
+            'tema' => RuleClassifier::criterioTema($this->search, 'Aquarela', $rea['titulo'] ?? null, $rea['descricao'] ?? null),
             'nivel' => RuleClassifier::criterioNivel(
                 $this->profile,
                 RuleClassifier::inferirNivel($rea['titulo'] ?? '', $rea['descricao'] ?? '')

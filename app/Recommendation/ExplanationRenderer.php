@@ -322,7 +322,15 @@ class ExplanationRenderer
 
     private static function textoTema(array $c): string
     {
-        return "Resultado da busca por “{$c['valor']}” no ".($c['repositorio'] ?? 'repositório').'.';
+        $tema = ucfirst((string) ($c['valor'] ?? ''));
+
+        return match ($c['status'] ?? null) {
+            'ok' => empty($c['evidencia'])
+                ? 'Tema não conferido: '.($c['motivo'] ?? 'informação indisponível').'.'
+                : "O texto fala do tema: “{$c['evidencia']}” aparece no título ou na descrição.",
+            'falhou' => "Não encontramos “{$tema}” no título nem na descrição.",
+            default => 'Tema não verificado.',
+        };
     }
 
     private static function textoNivel(string $status, array $c): string

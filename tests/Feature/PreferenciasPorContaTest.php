@@ -62,7 +62,7 @@ class PreferenciasPorContaTest extends TestCase
 
         foreach (['Jogo no sexto ano' => 'Jogo', 'Vídeo no sexto ano' => 'Vídeo'] as $titulo => $tipo) {
             $criterios = [
-                'tema' => RuleClassifier::criterioTema('algoritmos', 'Aquarela'),
+                'tema' => RuleClassifier::criterioTema('algoritmos', 'Aquarela', 'Algoritmos', null),
                 'nivel' => RuleClassifier::criterioNivel('Ensino fundamental', RuleClassifier::inferirNivel($titulo, '')),
                 'tipo' => RuleClassifier::criterioTipo($tipo, $tipos, $origem),
             ];
