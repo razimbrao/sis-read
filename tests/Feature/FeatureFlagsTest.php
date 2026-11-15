@@ -218,6 +218,29 @@ class FeatureFlagsTest extends TestCase
         $this->assertSame('controle', app(Experimento::class)->grupo());
     }
 
+    public function test_codigos_opacos_no_parametro_v_escolhem_o_grupo(): void
+    {
+        // Configuração de produção (links com ?v=<código>), sem mudar os padrões do config.
+        config([
+            'experimento.parametro_url' => 'v',
+            'experimento.codigos.controle' => 'tq7p',
+            'experimento.codigos.transparencia' => 'k9ks',
+            'experimento.codigos.escrutabilidade' => 'rd7p',
+            'experimento.sem_link' => 'controle',
+        ]);
+
+        $this->get('/?v=k9ks')->assertOk();
+        $this->assertSame('transparencia', session('experimento.grupo'));
+
+        // O nome do grupo não é mais um código: o parâmetro antigo é ignorado.
+        $this->app->forgetScopedInstances();
+        session()->flush();
+        $this->get('/?grupo=transparencia')->assertOk();
+
+        $this->app->forgetScopedInstances();
+        $this->assertSame('controle', app(Experimento::class)->grupo(), 'grupo= não vale quando o parâmetro é v');
+    }
+
     public function test_comando_fixa_e_consulta_o_grupo_de_um_usuario(): void
     {
         $user = User::factory()->create(['email' => 'p@ufjf.br']);
