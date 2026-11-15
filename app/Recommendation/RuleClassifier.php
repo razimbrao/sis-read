@@ -91,6 +91,26 @@ class RuleClassifier
     }
 
     /**
+     * O trecho do texto original (com acentos) que corresponde a um achado no texto normalizado, para a
+     * explicação mostrar "padrões" e não "padroes". Sem correspondência, devolve o próprio achado.
+     */
+    private static function trechoOriginal(string $original, string $achado): string
+    {
+        $palavras = preg_split('/\s+/u', trim($original)) ?: [];
+        $tamanho = count(explode(' ', $achado));
+
+        for ($i = 0; $i + $tamanho <= count($palavras); $i++) {
+            $janela = implode(' ', array_slice($palavras, $i, $tamanho));
+
+            if (str_contains(self::normalizar($janela), $achado)) {
+                return preg_replace('/^[^\pL\pN]+|[^\pL\pN]+$/u', '', $janela) ?: $achado;
+            }
+        }
+
+        return $achado;
+    }
+
+    /**
      * Achata, normaliza e deduplica a lista de tipos preferidos.
      */
     public static function normalizarTipos(array $tipos): array
@@ -155,7 +175,7 @@ class RuleClassifier
 
         foreach ($padroes as $padrao) {
             if (preg_match($padrao, $texto, $m)) {
-                $evidencia = $m[0];
+                $evidencia = self::trechoOriginal(($titulo ?? '').' '.($descricao ?? ''), $m[0]);
                 break;
             }
         }
