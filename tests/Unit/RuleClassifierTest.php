@@ -2,6 +2,7 @@
 
 namespace Tests\Unit;
 
+use App\Livewire\FindREA;
 use App\Recommendation\RuleClassifier;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -22,7 +23,7 @@ class RuleClassifierTest extends TestCase
         $this->assertSame('ok', $tema['status']);
         $this->assertSame('Algoritmos', $tema['evidencia']);
         // A evidência vem do texto original, com acento.
-        $this->assertSame('Padrões', RuleClassifier::criterioTema('reconhecimento de padrões', 'Eduplay', 'Padrões em Frequências', '')['evidencia']);
+        $this->assertSame('Sequências lógicas', RuleClassifier::criterioTema('reconhecimento de padrões', 'Aquarela', 'Sequências lógicas e padrões', '')['evidencia']);
         $this->assertSame('algoritmos', $tema['valor']);
         $this->assertSame('texto', $tema['fonte']);
         $this->assertSame('Aquarela', $tema['repositorio']);
@@ -38,8 +39,8 @@ class RuleClassifierTest extends TestCase
 
     public function test_tema_tolera_acento_e_plural(): void
     {
-        $this->assertSame('ok', RuleClassifier::criterioTema('reconhecimento de padrões', 'Aquarela', 'Padrões em sequências', '')['status']);
-        $this->assertSame('ok', RuleClassifier::criterioTema('reconhecimento de padrões', 'Aquarela', 'Um padrão simples', '')['status']);
+        $this->assertSame('ok', RuleClassifier::criterioTema('reconhecimento de padrões', 'Aquarela', 'Padrões e sequências', '')['status']);
+        $this->assertSame('ok', RuleClassifier::criterioTema('reconhecimento de padrões', 'Aquarela', 'Regularidades', '')['status']);
         $this->assertSame('ok', RuleClassifier::criterioTema('decomposição', 'Eduplay', '', 'Como decompor um problema')['status']);
         $this->assertSame('ok', RuleClassifier::criterioTema('abstração', 'MEC RED', 'Abstrair detalhes', '')['status']);
         $this->assertSame('ok', RuleClassifier::criterioTema('programação', 'Aquarela', 'Programações', '')['status']);
@@ -50,6 +51,23 @@ class RuleClassifierTest extends TestCase
         $tema = RuleClassifier::criterioTema('reconhecimento de padrões', 'Eduplay', 'Reconhecimento da união homoafetiva', '');
 
         $this->assertSame('falhou', $tema['status']);
+    }
+
+    /**
+     * "Padrão" sozinho tem outros sentidos; o tema pede o contexto de pensamento computacional. A busca manda
+     * "padrões" às APIs, e esse termo usa a mesma lista.
+     */
+    public function test_padrao_fora_do_contexto_nao_conta_como_padroes(): void
+    {
+        foreach (['Padrões em Frequências', 'Alguns Padrões GoF', 'Padrões Globais de Clima'] as $titulo) {
+            $this->assertSame('falhou', RuleClassifier::criterioTema('padrões', 'Eduplay', $titulo, '')['status'], $titulo);
+        }
+
+        $this->assertSame('ok', RuleClassifier::criterioTema('padrões', 'Aquarela', 'Computação na Educação Infantil - padrões e sequências', '')['status']);
+        $this->assertSame('ok', RuleClassifier::criterioTema('padrões', 'Aquarela', 'Trilha', 'Identificar padrões com o pensamento computacional')['status']);
+        $this->assertSame('reconhecimento de padrões', mb_strtolower(array_search('padrões', FindREA::TERMO_API, true)));
+        $this->assertSame('padrões', FindREA::termoDaApi('Reconhecimento de padrões'));
+        $this->assertSame('Algoritmos', FindREA::termoDaApi('Algoritmos'));
     }
 
     public function test_tema_sem_termos_cadastrados_fica_ok_sem_evidencia(): void

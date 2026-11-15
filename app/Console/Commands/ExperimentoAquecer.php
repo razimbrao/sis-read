@@ -20,11 +20,11 @@ use Throwable;
  */
 class ExperimentoAquecer extends Command
 {
-    protected $signature = 'experimento:aquecer {--temas= : Temas separados por vírgula (padrão: Algoritmos, Decomposição e Reconhecimento de padrões)}';
+    protected $signature = 'experimento:aquecer {--temas= : Temas separados por vírgula (padrão: Algoritmos, Reconhecimento de padrões e Computação desplugada)}';
 
     protected $description = 'Roda as buscas de cada tema e etapa para preencher o cache da classificação de meta pela IA.';
 
-    private const TEMAS_PADRAO = ['Algoritmos', 'Decomposição', 'Reconhecimento de padrões'];
+    private const TEMAS_PADRAO = ['Algoritmos', 'Reconhecimento de padrões', 'Computação desplugada'];
 
     // O cache é por REA, não por meta, e a IA só é chamada quando a busca tem meta. Qualquer meta serve.
     private const META_DE_AQUECIMENTO = 'ma';
@@ -104,7 +104,7 @@ class ExperimentoAquecer extends Command
 
         foreach (app(FindREA::class)->opcoesInteresse() as $opcao) {
             if (RuleClassifier::normalizar($opcao) === $chave) {
-                return $opcao;
+                return FindREA::termoDaApi($opcao);
             }
         }
 
