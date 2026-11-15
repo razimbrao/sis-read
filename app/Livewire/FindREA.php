@@ -101,20 +101,22 @@ class FindREA extends Component
 
     /**
      * Temas de pensamento computacional oferecidos na busca (valor => rótulo), em grupos para o dropdown.
-     * Os outros temas foram escolhidos por terem material no Aquarela (testados em 2026-10-07).
+     * Os três primeiros são os temas da avaliação, na ordem das buscas do formulário (protocolo, D5). Os
+     * outros foram escolhidos por terem material no Aquarela (testados em 2026-10-07). Decomposição e
+     * Abstração quase não têm material nos repositórios (medido em 2026-11-15).
      */
     public const TEMAS = [
-        'Pilares do pensamento computacional' => [
+        'Temas principais' => [
             'algoritmos' => 'Algoritmos',
-            'decomposição' => 'Decomposição',
+            'computação desplugada' => 'Computação desplugada',
             'reconhecimento de padrões' => 'Reconhecimento de padrões',
-            'abstração' => 'Abstração',
         ],
         'Outros temas' => [
+            'decomposição' => 'Decomposição',
+            'abstração' => 'Abstração',
             'pensamento computacional' => 'Pensamento computacional',
             'programação' => 'Programação',
             'lógica de programação' => 'Lógica de programação',
-            'computação desplugada' => 'Computação desplugada',
             'programação em blocos' => 'Programação em blocos',
             'scratch' => 'Scratch',
             'estruturas de repetição' => 'Estruturas de repetição',
