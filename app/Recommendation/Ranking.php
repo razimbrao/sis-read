@@ -69,7 +69,14 @@ class Ranking
      */
     public static function visivel($rea, bool $comMeta): bool
     {
-        return in_array(self::paraArray($rea)['recommended'] ?? null, self::ordem($comMeta), true);
+        $dados = self::paraArray($rea);
+
+        // O tema decide se o REA entra (RuleClassifier::TERMOS_TEMA); ele não pontua no grau.
+        if (self::temaFalhou($dados)) {
+            return false;
+        }
+
+        return in_array($dados['recommended'] ?? null, self::ordem($comMeta), true);
     }
 
     /**
@@ -123,8 +130,9 @@ class Ranking
     }
 
     /**
-     * Motivos dos ocultos: sem_meta_usuario (item de meta numa busca sem meta) e outros. Os exibidos abaixo
-     * dos compatíveis com a meta são contados em `meta_nao_conferida` (a meta não pôde ser conferida),
+     * Motivos dos ocultos: tema (o texto do REA não fala do tema da busca), sem_meta_usuario (item de meta
+     * numa busca sem meta) e outros. Os exibidos abaixo dos compatíveis com a meta são contados em
+     * `meta_nao_conferida` (a meta não pôde ser conferida),
      * `meta_incompativel` (a IA classificou como diferente) e `meta_corrigida_incompativel` (o usuário
      * informou uma meta diferente). `corrigidos` e `mudaram_faixa` contam as correções.
      *
@@ -134,7 +142,7 @@ class Ranking
     {
         $faixas = array_fill_keys(self::ordem($comMeta), 0);
         $ocultos = 0;
-        $motivos = ['sem_meta_usuario' => 0, 'outros' => 0];
+        $motivos = ['tema' => 0, 'sem_meta_usuario' => 0, 'outros' => 0];
         $abaixo = ['meta_nao_conferida' => 0, 'meta_incompativel' => 0, 'meta_corrigida_incompativel' => 0];
         $corrigidos = 0;
         $mudaramFaixa = 0;
@@ -188,11 +196,23 @@ class Ranking
     {
         $rotulo = $dados['recommended'] ?? null;
 
+        if (self::temaFalhou($dados)) {
+            return 'tema';
+        }
+
         if (! $comMeta && in_array($rotulo, ['meta_both', 'meta_one', 'meta'], true)) {
             return 'sem_meta_usuario';
         }
 
         return 'outros';
+    }
+
+    /**
+     * REA cujo texto não fala do tema da busca. REAs antigos, sem critério de tema, não são afetados.
+     */
+    private static function temaFalhou(array $dados): bool
+    {
+        return ($dados['explicacao']['criterios']['tema']['status'] ?? null) === 'falhou';
     }
 
     /**
