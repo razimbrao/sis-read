@@ -26,12 +26,28 @@ class RuleClassifier
      * descrição normalizados (normalizar). Lista editável: um REA sem nenhum termo do tema não entra na
      * lista principal (criterioTema). Tema que não aparece aqui não reprova ninguém.
      *
-     * "Reconhecimento" sozinho não entra no tema de padrões: aparece em "reconhecimento da união homoafetiva".
+     * Reconhecimento de padrões, no pensamento computacional, é perceber regularidades: sequências que se
+     * repetem, classificação, generalização. "Padrão" sozinho é amplo demais (padrões de projeto de software,
+     * de clima, corporais) e "reconhecimento" sozinho também ("reconhecimento da união homoafetiva"), por isso
+     * os termos pedem o contexto. A busca desse tema manda "padrões" às APIs (FindREA::TERMO_API), e a chave
+     * "padroes" repete a lista porque os jobs conferem o tema pelo termo enviado.
      */
+    private const TERMOS_PADROES = [
+        '/\breconhecimento de padr(ao|oes)\b/',
+        '/\bpadr(ao|oes) e sequencias?\b/',
+        '/\bsequencias? (e|de) padr(ao|oes)\b/',
+        '/\bpadr(ao|oes) de repeticao\b/',
+        '/\bregularidades?\b/',
+        '/\bsequencias? logicas?\b/',
+        '/\bpadr(ao|oes)\b.{0,80}\bpensamento computacional\b/s',
+        '/\bpensamento computacional\b.{0,80}\bpadr(ao|oes)\b/s',
+    ];
+
     public const TERMOS_TEMA = [
         'algoritmos' => ['/\balgoritmos?\b/', '/\bpasso a passo\b/', '/\bsequencia de instrucoes\b/'],
         'decomposicao' => ['/\bdecomposicao(oes)?\b/', '/\bdecompor\b/', '/\bdecompoe(m)?\b/', '/\bdividir (o|um|uma) problema\b/', '/\bpartes menores\b/'],
-        'reconhecimento de padroes' => ['/\bpadr(ao|oes)\b/', '/\bregularidades?\b/', '/\bsequencias? logicas?\b/'],
+        'reconhecimento de padroes' => self::TERMOS_PADROES,
+        'padroes' => self::TERMOS_PADROES,
         'abstracao' => ['/\babstracao(oes)?\b/', '/\babstrair\b/'],
         'pensamento computacional' => ['/\bpensamento computacional\b/'],
         'programacao' => ['/\bprogramac(ao|oes)\b/', '/\bprogramar\b/', '/\bprogramando\b/'],

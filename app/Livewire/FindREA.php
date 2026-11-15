@@ -85,6 +85,21 @@ class FindREA extends Component
     public ?string $userType = null;
 
     /**
+     * Termo enviado às APIs quando ele difere do rótulo do tema. Com "Reconhecimento de padrões" o Aquarela
+     * procura a frase inteira e devolve material genérico (3 de 60 no tema, medido em 2026-11-15); com
+     * "padrões", 31 de 31.
+     */
+    public const TERMO_API = ['reconhecimento de padrões' => 'padrões'];
+
+    /**
+     * O termo que a busca de um tema manda para os repositórios.
+     */
+    public static function termoDaApi(string $tema): string
+    {
+        return self::TERMO_API[mb_strtolower($tema, 'UTF-8')] ?? $tema;
+    }
+
+    /**
      * Temas de pensamento computacional oferecidos na busca (valor => rótulo), em grupos para o dropdown.
      * Os outros temas foram escolhidos por terem material no Aquarela (testados em 2026-10-07).
      */
@@ -1068,7 +1083,7 @@ class FindREA extends Component
     {
         foreach ($this->opcoesInteresse() as $option) {
             if ($this->sanitizeSearch($option) === $this->sanitizeSearch($this->interest)) {
-                $this->interestApiSearch = $option;
+                $this->interestApiSearch = self::termoDaApi($option);
             }
         }
     }
