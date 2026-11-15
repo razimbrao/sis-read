@@ -15,7 +15,8 @@
    Na prática, a classificação quase sempre dá "Não classificado".~~ **Corrigido** (2026-09-18): o prompt pede
    `{"meta": ...}` e `RuleClassifier::casaMeta` normaliza acento, espaço e hífen.
 5. ~~**Typo `obkect_type`** em `getMecRedURL` (meta mpe).~~ **Corrigido** (2026-09-18): IDs em `mecRedTiposObjeto()`.
-6. **`searched_at` usado como chave**: duas buscas no mesmo segundo colidem.
+6. ~~**`searched_at` usado como chave**: duas buscas no mesmo segundo colidem.~~ **Corrigido** (2026-11-15): `data.searched_at`
+   tem índice único, e a busca que colide ganha +1 segundo antes de os jobs saírem (`FindREA::criarBusca`, até 5 tentativas).
 7. ~~`ProcessEduplay` interpola o termo de busca na URL sem encoding.~~ **Corrigido** (2026-10-07): os
    parâmetros vão em array para o `Http::get`, que os codifica.
 8. ~~O `database.sqlite` versionado contém dados de usuários (e-mails e hashes de senha).~~
