@@ -12,6 +12,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class ProcessMecRed implements ShouldQueue
 {
@@ -61,13 +62,25 @@ class ProcessMecRed implements ShouldQueue
 
         $start_api = microtime(true);
         try {
-            $search = Http::withOptions(['verify' => false])
+            $response = Http::withOptions(['verify' => false])
                 ->timeout(15)
-                ->get(getMecRedURL(str_replace(' ', '+', $this->search), $offset, $this->profile, $this->meta))
-                ->json();
+                ->get(getMecRedURL(str_replace(' ', '+', $this->search), $offset, $this->profile, $this->meta));
+            $search = $response->json();
 
             $metrics['api_time'] = microtime(true) - $start_api;
-            $metrics['items_returned'] = is_array($search) ? count($search) : 0;
+
+            // Uma resposta que não é lista (404, página de erro) contava como "0 itens" sem erro, e a troca de
+            // endereço da API em 11/2026 passou despercebida. Agora conta como falha e fica no log.
+            if (! $response->successful() || ! is_array($search) || ! array_is_list($search)) {
+                Log::warning('MEC RED: resposta inesperada da API', [
+                    'status' => $response->status(),
+                    'trecho' => mb_substr($response->body(), 0, 300),
+                ]);
+                $metrics['timeouts_errors']++;
+                $search = [];
+            }
+
+            $metrics['items_returned'] = count($search);
         } catch (\Exception $e) {
             $metrics['api_time'] = microtime(true) - $start_api;
             $metrics['timeouts_errors']++;
