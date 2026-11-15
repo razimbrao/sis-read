@@ -1,6 +1,6 @@
-{{-- Formulário de busca: etapa (4 opções fixas) e tema (dropdown agrupado). --}}
+{{-- Formulário de busca: etapa (4 opções fixas) e tema (dropdown: fixos em ordem alfabética e, num grupo, os de colaboradores). --}}
 @php
-    $temas = $this->temasAgrupados();
+    $temas = $this->temasDoDropdown();
     $frequentes = $this->buscasFrequentes();
     $pill = 'inline-flex items-center min-h-12 px-5 rounded-full border-2 text-base font-semibold cursor-pointer transition-colors';
 @endphp
@@ -41,13 +41,16 @@
                     <select id="interest" wire:model="interest"
                         class="w-full appearance-none min-h-12 pl-4 pr-11 py-3 text-base bg-white border border-slate-300 rounded-xl cursor-pointer focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20">
                         <option value="">Escolha um tema</option>
-                        @foreach ($temas as $grupo => $opcoes)
-                            <optgroup label="{{ $grupo }}">
-                                @foreach ($opcoes as $valor => $rotulo)
+                        @foreach ($temas['fixos'] as $valor => $rotulo)
+                            <option value="{{ $valor }}">{{ $rotulo }}</option>
+                        @endforeach
+                        @if ($temas['colaboradores'])
+                            <optgroup label="Cadastrados por colaboradores">
+                                @foreach ($temas['colaboradores'] as $valor => $rotulo)
                                     <option value="{{ $valor }}">{{ $rotulo }}</option>
                                 @endforeach
                             </optgroup>
-                        @endforeach
+                        @endif
                     </select>
                     <svg class="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
                 </div>
