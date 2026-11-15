@@ -19,10 +19,12 @@ class Data extends Model
         'grupo',
         'flags',
         'participante',
+        'contexto',
     ];
 
     protected $casts = [
         'flags' => 'array',
+        'contexto' => 'array',
     ];
 
     public function feedbackReasons(): BelongsToMany

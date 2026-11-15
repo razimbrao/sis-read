@@ -330,7 +330,7 @@
                                                     'bg-gray-400' => $codigo !== $contexto['meta']['dominante'],
                                                 ]) style="width: {{ max(0, min(100, $valor / 5 * 100)) }}%"></span>
                                             </span>
-                                            <span class="col-start-2 row-start-1 sm:col-start-auto sm:row-start-auto text-right tabular-nums">{{ $contexto['meta'][$codigo] }}</span>
+                                            <span class="col-start-2 row-start-1 sm:col-start-auto sm:row-start-auto text-right tabular-nums">{{ number_format($valor, 1, ',', '') }}</span>
                                         </li>
                                     @endforeach
                                 </ul>
