@@ -1027,8 +1027,7 @@ class FindREA extends Component
         ];
 
         // O grupo e as flags da busca permitem comparar as métricas por grupo (docs/feature-flags.md).
-        $this->data = Data::create([
-            'searched_at' => $this->timestampSession,
+        $this->data = $this->criarBusca([
             'grupo' => $this->experimento()->grupo(),
             'flags' => $this->experimento()->flagsAtivas(),
             'participante' => $this->experimento()->participante(),
@@ -1044,6 +1043,25 @@ class FindREA extends Component
         ProcessEduplay::dispatch($this->interestApiSearch, $this->profile, $this->timestampSession, auth()->user()?->questionnaire?->dominant, $types, $preferidos['origem']);
 
         $this->loading = false;
+    }
+
+    /**
+     * Cria a linha da busca. `searched_at` é único: se outra busca caiu no mesmo segundo, a nova ganha
+     * +1 segundo e tenta de novo (até 5 vezes). Os jobs são despachados depois, com o horário final.
+     */
+    private function criarBusca(array $atributos): Data
+    {
+        for ($tentativa = 1; ; $tentativa++) {
+            try {
+                return Data::create($atributos + ['searched_at' => $this->timestampSession]);
+            } catch (UniqueConstraintViolationException $erro) {
+                if ($tentativa >= 5) {
+                    throw $erro;
+                }
+
+                $this->timestampSession = Carbon::parse($this->timestampSession)->addSecond();
+            }
+        }
     }
 
     private function findAdequateTerm()
